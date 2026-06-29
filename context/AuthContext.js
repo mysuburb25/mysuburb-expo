@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const login = async (email, password) => {
     setUser(TEST_USER);
@@ -36,6 +37,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     setUser(null);
     setProfile(null);
+    setUnreadCount(0);
   };
 
   const createProfile = async (uid, data) => {
@@ -48,7 +50,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading,
+      user, profile, loading, unreadCount, setUnreadCount,
       login, register, logout,
       createProfile, updateUserProfile,
       reloadProfile: () => {},
