@@ -133,6 +133,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
   chipText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
   chipTextActive: { color: Colors.white, fontWeight: '700' },
-  input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, fontSize: 15, color: Colors.charcoal, minHeight: 140 },
+  input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, fontSize: 15, color: Colors.charcoal, minHeight: 180 },
   inputSmall: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, fontSize: 15, color: Colors.charcoal },
 });

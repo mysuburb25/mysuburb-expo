@@ -21,6 +21,7 @@ export default function BuySellScreen() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
 
+  useEffect(() => { setActiveFilter(FILTERS[0]); }, []);
   useEffect(() => { if (profile?.suburb) fetchListings(); }, [profile, activeFilter]);
 
   const fetchListings = async () => {
@@ -91,9 +92,9 @@ export default function BuySellScreen() {
       )}
       <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: activeFilter.createCategory, preselect: activeFilter.preselect } })}>
         <Svg width="30" height="30" viewBox="0 0 30 30">
-              <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-              <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-            </Svg>
+          <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+          <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+        </Svg>
       </TouchableOpacity>
     </View>
   );
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
-  profileAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
+  profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   filterRow: { flexDirection: 'row', padding: 12, gap: 8 },

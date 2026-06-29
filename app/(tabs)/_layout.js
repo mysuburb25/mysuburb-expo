@@ -79,7 +79,7 @@ export default function TabsLayout() {
         options={{
           headerShown: false,
           tabBarIcon: ({ color }) => <Ionicons name="search" size={26} color={color} />,
-          tabBarLabel: 'Lost+Found',
+          tabBarLabel: 'Lost & Found',
         }}
       />
       <Tabs.Screen

@@ -1,60 +1,98 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { Colors } from '../../constants/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) { Alert.alert('Error', 'Please enter your email and password.'); return; }
     setLoading(true);
     try {
-      await login(email.trim(), password);
-      router.replace('/');
+      await login(email, password);
+      router.replace('/(tabs)');
     } catch (e) {
-      Alert.alert('Login failed', e.message);
-    } finally { setLoading(false); }
+      Alert.alert('Error', e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <View style={styles.logoCircle}><Text style={styles.logoText}>MS</Text></View>
-        <Text style={styles.title}>My Suburb</Text>
-        <Text style={styles.subtitle}>Connect with your local community</Text>
-      </View>
-      <Text style={styles.label}>Email</Text>
-      <TextInput style={styles.input} placeholder="your@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <Text style={styles.label}>Password</Text>
-      <TextInput style={styles.input} placeholder="Your password" value={password} onChangeText={setPassword} secureTextEntry />
-      <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/(auth)/signup')}>
-        <Text style={styles.linkText}>Don't have an account? <Text style={styles.linkBold}>Sign up</Text></Text>
-      </TouchableOpacity>
-    </ScrollView>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ height: 129 }} />
+        <Text style={styles.appName}>My Suburb</Text>
+        <Text style={styles.tagline}>Bringing suburbs together</Text>
+        <View style={{ height: 40 }} />
+        <Text style={styles.label}>EMAIL</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="your@email.com"
+          placeholderTextColor="rgba(255,255,255,0.4)"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
+        />
+        <View style={{ height: 16 }} />
+        <Text style={styles.label}>PASSWORD</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.inputInner}
+            placeholder="Your password"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+        </View>
+        <View style={{ height: 48 }} />
+        <TouchableOpacity style={[styles.signInBtn, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
+          {loading ? <ActivityIndicator color="#2D6A4F" /> : <Text style={styles.signInText}>Sign In</Text>}
+        </TouchableOpacity>
+        <View style={{ height: 36 }} />
+        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+          <Text style={styles.signupText}>No account? <Text style={styles.signupLink}>Sign up</Text></Text>
+        </TouchableOpacity>
+        <View style={{ height: 60 }} />
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: Colors.sand, padding: 24 },
-  header: { alignItems: 'center', paddingTop: 80, paddingBottom: 40 },
-  logoCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  logoText: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  title: { fontSize: 28, fontWeight: '800', color: Colors.charcoal, marginBottom: 8 },
-  subtitle: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.charcoal, marginBottom: 4, marginTop: 12 },
-  input: { backgroundColor: Colors.white, borderRadius: 12, padding: 14, fontSize: 15, borderWidth: 1, borderColor: Colors.lightGrey, color: Colors.charcoal },
-  button: { backgroundColor: Colors.brandGreen, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  linkButton: { alignItems: 'center', marginTop: 16, padding: 8 },
-  linkText: { color: Colors.midGrey, fontSize: 14 },
-  linkBold: { color: Colors.brandGreen, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#2D6A4F' },
+  content: { alignItems: 'center', paddingHorizontal: 28 },
+  appName: { fontSize: 38, fontWeight: '800', color: '#fff', marginBottom: 8 },
+  tagline: { fontSize: 15, fontWeight: '600', color: '#FFD700', textAlign: 'center' },
+  label: { fontSize: 14, fontWeight: '800', color: '#fff', letterSpacing: 1.5, marginBottom: 8, alignSelf: 'flex-start' },
+  input: { width: '100%', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 16, fontSize: 16, color: '#fff', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  inputRow: { width: '100%', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', paddingRight: 12 },
+  inputInner: { flex: 1, padding: 16, fontSize: 16, color: '#fff' },
+  eyeBtn: { padding: 4 },
+  signInBtn: { width: '100%', backgroundColor: '#FFD700', borderRadius: 12, padding: 14, alignItems: 'center' },
+  signInText: { fontSize: 18, fontWeight: '800', color: '#2D6A4F' },
+  signupText: { color: '#c8e6c9', fontSize: 15, textAlign: 'center' },
+  signupLink: { color: '#FFD700', fontWeight: '700' },
 });

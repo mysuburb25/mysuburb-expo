@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Line } from 'react-native-svg';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -80,6 +80,7 @@ export default function HomeScreen() {
     finally { setLoading(false); setRefreshing(false); }
   };
 
+  useEffect(() => { setActiveFilter(FILTERS[0]); }, []);
   useEffect(() => { setLoading(true); fetchPosts(); }, [profile, activeFilter]);
 
   return (
@@ -128,13 +129,13 @@ export default function HomeScreen() {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'community', preselect: activeFilter.createCategory } })}>
-        <Svg width="30" height="30" viewBox="0 0 30 30">
-              <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-              <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-            </Svg>
-      </TouchableOpacity>
-    </View>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: activeFilter.createCategory, preselect: activeFilter.preselect } })}>
+          <Svg width="30" height="30" viewBox="0 0 30 30">
+            <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+            <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+          </Svg>
+        </TouchableOpacity>
+      </View>
   );
 }
 

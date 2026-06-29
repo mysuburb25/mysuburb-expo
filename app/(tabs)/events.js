@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Line } from 'react-native-svg';
@@ -23,6 +23,7 @@ export default function EventsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
 
+  useEffect(() => { setTab('upcoming'); }, []);
   useEffect(() => { if (profile?.suburb) fetchEvents(); }, [profile]);
 
   const fetchEvents = async () => {
@@ -70,6 +71,16 @@ export default function EventsScreen() {
   const formatDate = (date) => date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   const formatTime = (date) => date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) setEventDate(selectedDate);
+  };
+
+  const onTimeChange = (event, selectedTime) => {
+    setShowTimePicker(false);
+    if (selectedTime) setEventDate(selectedTime);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topHeader}>
@@ -81,7 +92,7 @@ export default function EventsScreen() {
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
-          <Ionicons name="notifications-outline" size={24} color="#fff" />
+          <Ionicons name="notifications-outline" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -108,7 +119,11 @@ export default function EventsScreen() {
           renderItem={({ item }) => {
             const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
             return (
-              <TouchableOpacity style={[styles.card, tab === 'past' && styles.cardPast]} onPress={() => tab === 'upcoming' ? router.push('/post/' + item.id) : null} activeOpacity={tab === 'past' ? 1 : 0.7}>
+              <TouchableOpacity
+                style={[styles.card, tab === 'past' && styles.cardPast]}
+                onPress={() => tab === 'upcoming' ? router.push('/post/' + item.id) : null}
+                activeOpacity={tab === 'past' ? 1 : 0.7}
+              >
                 <View style={styles.dateBox}>
                   <Text style={styles.dateDay}>{ed ? ed.getDate() : '?'}</Text>
                   <Text style={styles.dateMonth}>{ed ? ed.toLocaleString('en-AU', { month: 'short' }) : ''}</Text>
@@ -145,51 +160,70 @@ export default function EventsScreen() {
 
       {tab === 'upcoming' && (
         <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
-          <Svg width="30" height="30" viewBox="0 0 30 30">
+            <Svg width="30" height="30" viewBox="0 0 30 30">
               <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
               <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
             </Svg>
-        </TouchableOpacity>
+          </TouchableOpacity>
       )}
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView style={styles.modalContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)}>
-              <Ionicons name="close" size={24} color="#FFD700" />
+              <Ionicons name="close" size={24} color={Colors.white} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Event</Text>
             <TouchableOpacity style={[styles.postBtn, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
               {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalBody} contentContainerStyle={{ gap: 16, padding: 16 }}>
+          <ScrollView style={styles.modalBody} contentContainerStyle={{ gap: 12, padding: 16, paddingBottom: 200 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
+
             <Text style={styles.inputLabel}>Event Title *</Text>
             <TextInput style={styles.input} placeholder="e.g. Community Garage Sale" placeholderTextColor={Colors.midGrey} value={title} onChangeText={setTitle} />
+
             <Text style={styles.inputLabel}>Description</Text>
             <TextInput style={[styles.input, styles.inputMulti]} placeholder="Tell your neighbours what this event is about..." placeholderTextColor={Colors.midGrey} value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" />
+
             <Text style={styles.inputLabel}>Date</Text>
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
-              <Ionicons name="calendar-outline" size={18} color="#FFD700" />
+            <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowTimePicker(false); setShowDatePicker(true); }}>
+              <Ionicons name="calendar-outline" size={18} color={Colors.brandGreen} />
               <Text style={styles.dateBtnText}>{formatDate(eventDate)}</Text>
             </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={eventDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                minimumDate={new Date()}
+                onChange={onDateChange}
+                style={{ backgroundColor: '#fff' }}
+              />
+            )}
+
             <Text style={styles.inputLabel}>Time</Text>
-            <TouchableOpacity style={styles.dateBtn} onPress={() => setShowTimePicker(true)}>
-              <Ionicons name="time-outline" size={18} color="#FFD700" />
+            <TouchableOpacity style={styles.dateBtn} onPress={() => { setShowDatePicker(false); setShowTimePicker(true); }}>
+              <Ionicons name="time-outline" size={18} color={Colors.brandGreen} />
               <Text style={styles.dateBtnText}>{formatTime(eventDate)}</Text>
             </TouchableOpacity>
+
+            {showTimePicker && (
+              <DateTimePicker
+                value={eventDate}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onTimeChange}
+                style={{ backgroundColor: '#fff' }}
+              />
+            )}
+
             <Text style={styles.inputLabel}>Location</Text>
             <TextInput style={styles.input} placeholder="e.g. Paddington Park, cnr Given Tce & Latrobe St" placeholderTextColor={Colors.midGrey} value={location} onChangeText={setLocation} />
-            {showDatePicker && (
-              <DateTimePicker value={eventDate} mode="date" display="default" minimumDate={new Date()}
-                onChange={(e, date) => { setShowDatePicker(false); if (date) setEventDate(date); }} />
-            )}
-            {showTimePicker && (
-              <DateTimePicker value={eventDate} mode="time" display="default"
-                onChange={(e, date) => { setShowTimePicker(false); if (date) setEventDate(date); }} />
-            )}
+
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -201,8 +235,8 @@ const styles = StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
-  profileAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFC5', justifyContent: 'center', alignItems: 'center' },
-  profileAvatarText: { fontSize: 14, fontWeight: '800', color: Colors.brandGreen },
+  profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
+  profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   tabRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey, backgroundColor: Colors.white },
@@ -226,7 +260,7 @@ const styles = StyleSheet.create({
   completedText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8 },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
   modalContainer: { flex: 1, backgroundColor: Colors.white },
   modalHeader: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },
   modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.white },
@@ -236,6 +270,6 @@ const styles = StyleSheet.create({
   inputLabel: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, fontSize: 15, color: Colors.charcoal },
   inputMulti: { minHeight: 100 },
-  dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14 },
+  dateBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, backgroundColor: Colors.white },
   dateBtnText: { fontSize: 15, color: Colors.charcoal },
 });
