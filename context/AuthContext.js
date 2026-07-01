@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext({});
 
@@ -25,11 +25,26 @@ export function AuthProvider({ children }) {
       } else {
         setUser(null);
         setProfile(null);
+        setUnreadCount(0);
       }
       setLoading(false);
     });
     return unsub;
   }, []);
+
+  // Real-time unread notification count
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', user.uid),
+      where('isRead', '==', false)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUnreadCount(snap.size);
+    }, (e) => console.error('notification listener error:', e));
+    return unsub;
+  }, [user]);
 
   const loadProfile = async (uid) => {
     try {

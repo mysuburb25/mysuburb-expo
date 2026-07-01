@@ -12,7 +12,20 @@
     "android": {
       "package": "com.mysuburb.app"
     },
-    "plugins": ["expo-router"],
-    "scheme": "mysuburb"
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#2D6A4F"
+        }
+      ]
+    ],
+    "scheme": "mysuburb",
+    "extra": {
+      "eas": {
+        "projectId": "bdc0ac98-8f69-4928-94a0-ac468d4f97fb"
+      }
+    }
   }
 }

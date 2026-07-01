@@ -53,7 +53,7 @@ export default function SelectSuburbScreen() {
           displayName: displayName || user?.displayName,
           state: selectedState,
           suburb: suburb.trim(),
-          photoUrl: null,
+          photoURL: null, // Fixed: was photoUrl (lowercase L)
         });
       }
       router.replace('/(tabs)');
@@ -181,50 +181,21 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '800', color: Colors.brandGreen, marginBottom: 8 },
   subtitle: { fontSize: 15, color: Colors.midGrey, marginBottom: 24 },
   label: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen, marginBottom: 10 },
-  dropdownBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.white,
-  },
+  dropdownBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.white },
   dropdownBtnText: { fontSize: 16, color: Colors.charcoal, fontWeight: '600' },
-  stateDropdown: {
-    borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12,
-    marginTop: 4, overflow: 'hidden', backgroundColor: Colors.white,
-  },
-  stateItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey,
-  },
+  stateDropdown: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, marginTop: 4, overflow: 'hidden', backgroundColor: Colors.white },
+  stateItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   stateItemSelected: { backgroundColor: Colors.brandGreen },
   stateItemText: { flex: 1, fontSize: 15, color: Colors.charcoal, fontWeight: '500' },
   stateItemTextSelected: { color: Colors.white, fontWeight: '700' },
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: Colors.white, borderRadius: 12,
-    borderWidth: 1.5, borderColor: Colors.lightGrey,
-    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 4,
-  },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.lightGrey, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 4 },
   searchInput: { flex: 1, fontSize: 15, color: Colors.charcoal },
-  suburbDropdown: {
-    backgroundColor: Colors.white, borderRadius: 12,
-    borderWidth: 1, borderColor: Colors.lightGrey,
-    marginBottom: 12, overflow: 'hidden',
-  },
-  suburbItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey,
-  },
+  suburbDropdown: { backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.lightGrey, marginBottom: 12, overflow: 'hidden' },
+  suburbItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   suburbItemText: { fontSize: 15, color: Colors.charcoal },
-  selectedBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    padding: 12, backgroundColor: Colors.brandGreenPale,
-    borderRadius: 10, marginTop: 8,
-  },
+  selectedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: Colors.brandGreenPale, borderRadius: 10, marginTop: 8 },
   selectedText: { fontSize: 14, color: Colors.brandGreen },
-  button: {
-    backgroundColor: Colors.brandGreen, borderRadius: 12,
-    padding: 16, alignItems: 'center', marginTop: 24,
-  },
+  button: { backgroundColor: Colors.brandGreen, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

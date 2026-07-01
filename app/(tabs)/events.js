@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Line } from 'react-native-svg';
-import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -13,6 +14,7 @@ export default function EventsScreen() {
   const { profile, user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('upcoming');
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
@@ -23,16 +25,52 @@ export default function EventsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
 
-  useEffect(() => { setTab('upcoming'); }, []);
-  useEffect(() => { if (profile?.suburb) fetchEvents(); }, [profile]);
-
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
+    if (!profile?.suburb) return;
     try {
-      const q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'events'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
+      const q = query(
+        collection(db, 'posts'),
+        where('suburb', '==', profile.suburb),
+        where('category', '==', 'events'),
+        where('isRemoved', '==', false),
+        orderBy('createdAt', 'desc')
+      );
       const snap = await getDocs(q);
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, [profile]);
+
+  useFocusEffect(useCallback(() => { setLoading(true); fetchEvents(); }, [fetchEvents]));
+
+  const handleLikeToggle = async (post) => {
+    const liked = post.likedBy?.includes(user.uid) || false;
+    const newLiked = !liked;
+    setEvents(prev => prev.map(p => p.id === post.id ? {
+      ...p,
+      likeCount: (p.likeCount || 0) + (newLiked ? 1 : -1),
+      likedBy: newLiked ? [...(p.likedBy || []), user.uid] : (p.likedBy || []).filter(u => u !== user.uid),
+    } : p));
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        likeCount: increment(newLiked ? 1 : -1),
+        likedBy: newLiked
+          ? [...(post.likedBy || []), user.uid]
+          : (post.likedBy || []).filter(u => u !== user.uid),
+      });
+      if (newLiked) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: post.authorId,
+          type: 'like',
+          message: `${profile.displayName} liked your event`,
+          postId: post.id,
+          fromUserId: user.uid,
+          fromUserName: profile.displayName,
+          isRead: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) { console.error(e); }
   };
 
   const handlePost = async () => {
@@ -116,35 +154,57 @@ export default function EventsScreen() {
           data={filteredEvents}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEvents(); }} tintColor={Colors.brandGreen} />}
           renderItem={({ item }) => {
-            const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
+            const ed = item.eventDate
+              ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate))
+              : null;
+            const liked = item.likedBy?.includes(user?.uid) || false;
             return (
               <TouchableOpacity
                 style={[styles.card, tab === 'past' && styles.cardPast]}
                 onPress={() => tab === 'upcoming' ? router.push('/post/' + item.id) : null}
                 activeOpacity={tab === 'past' ? 1 : 0.7}
               >
-                <View style={styles.dateBox}>
-                  <Text style={styles.dateDay}>{ed ? ed.getDate() : '?'}</Text>
-                  <Text style={styles.dateMonth}>{ed ? ed.toLocaleString('en-AU', { month: 'short' }) : ''}</Text>
+                <View style={styles.cardTop}>
+                  <View style={styles.dateBox}>
+                    <Text style={styles.dateDay}>{ed ? ed.getDate() : '?'}</Text>
+                    <Text style={styles.dateMonth}>{ed ? ed.toLocaleString('en-AU', { month: 'short' }) : ''}</Text>
+                  </View>
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
+                    {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
+                    {item.eventLocation ? (
+                      <View style={styles.locationRow}>
+                        <Ionicons name="location-outline" size={13} color={Colors.midGrey} />
+                        <Text style={styles.location}>{item.eventLocation}</Text>
+                      </View>
+                    ) : null}
+                    {ed ? (
+                      <View style={styles.locationRow}>
+                        <Ionicons name="time-outline" size={13} color={Colors.midGrey} />
+                        <Text style={styles.location}>{formatTime(ed)}</Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.author}>by {item.authorName}</Text>
+                    {tab === 'past' && (
+                      <View style={styles.completedBadge}>
+                        <Text style={styles.completedText}>Completed</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                  {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
-                  {item.eventLocation ? (
-                    <View style={styles.locationRow}>
-                      <Ionicons name="location-outline" size={13} color={Colors.midGrey} />
-                      <Text style={styles.location}>{item.eventLocation}</Text>
-                    </View>
-                  ) : null}
-                  {ed ? (
-                    <View style={styles.locationRow}>
-                      <Ionicons name="time-outline" size={13} color={Colors.midGrey} />
-                      <Text style={styles.location}>{formatTime(ed)}</Text>
-                    </View>
-                  ) : null}
-                  <Text style={styles.author}>by {item.authorName}</Text>
-                  {tab === 'past' && <View style={styles.completedBadge}><Text style={styles.completedText}>Completed</Text></View>}
+
+                {/* Like & Comment Footer */}
+                <View style={styles.footer}>
+                  <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
+                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.midGrey} />
+                    <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
+                    <Ionicons name="chatbubble-outline" size={18} color={Colors.midGrey} />
+                    <Text style={styles.footerText}>{item.commentCount || 0}</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
@@ -160,11 +220,11 @@ export default function EventsScreen() {
 
       {tab === 'upcoming' && (
         <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
-            <Svg width="30" height="30" viewBox="0 0 30 30">
-              <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-              <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-            </Svg>
-          </TouchableOpacity>
+          <Svg width="30" height="30" viewBox="0 0 30 30">
+            <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+            <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+          </Svg>
+        </TouchableOpacity>
       )}
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
@@ -179,7 +239,6 @@ export default function EventsScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.modalBody} contentContainerStyle={{ gap: 12, padding: 16, paddingBottom: 200 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
-
             <Text style={styles.inputLabel}>Event Title *</Text>
             <TextInput style={styles.input} placeholder="e.g. Community Garage Sale" placeholderTextColor={Colors.midGrey} value={title} onChangeText={setTitle} />
 
@@ -191,16 +250,8 @@ export default function EventsScreen() {
               <Ionicons name="calendar-outline" size={18} color={Colors.brandGreen} />
               <Text style={styles.dateBtnText}>{formatDate(eventDate)}</Text>
             </TouchableOpacity>
-
             {showDatePicker && (
-              <DateTimePicker
-                value={eventDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                minimumDate={new Date()}
-                onChange={onDateChange}
-                style={{ backgroundColor: '#fff' }}
-              />
+              <DateTimePicker value={eventDate} mode="date" display={Platform.OS === 'ios' ? 'inline' : 'default'} minimumDate={new Date()} onChange={onDateChange} style={{ backgroundColor: '#fff' }} />
             )}
 
             <Text style={styles.inputLabel}>Time</Text>
@@ -208,20 +259,12 @@ export default function EventsScreen() {
               <Ionicons name="time-outline" size={18} color={Colors.brandGreen} />
               <Text style={styles.dateBtnText}>{formatTime(eventDate)}</Text>
             </TouchableOpacity>
-
             {showTimePicker && (
-              <DateTimePicker
-                value={eventDate}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={onTimeChange}
-                style={{ backgroundColor: '#fff' }}
-              />
+              <DateTimePicker value={eventDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={onTimeChange} style={{ backgroundColor: '#fff' }} />
             )}
 
             <Text style={styles.inputLabel}>Location</Text>
             <TextInput style={styles.input} placeholder="e.g. Paddington Park, cnr Given Tce & Latrobe St" placeholderTextColor={Colors.midGrey} value={location} onChangeText={setLocation} />
-
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -245,8 +288,9 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 15, color: Colors.midGrey, fontWeight: '600' },
   tabTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
-  card: { backgroundColor: Colors.white, borderRadius: 14, padding: 16, flexDirection: 'row', gap: 14, borderWidth: 1, borderColor: Colors.lightGrey },
+  card: { backgroundColor: Colors.white, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.lightGrey },
   cardPast: { opacity: 0.7 },
+  cardTop: { flexDirection: 'row', gap: 14, marginBottom: 10 },
   dateBox: { width: 52, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.brandGreenPale, borderRadius: 10, padding: 8 },
   dateDay: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen },
   dateMonth: { fontSize: 11, fontWeight: '600', color: Colors.brandGreen, textTransform: 'uppercase' },
@@ -258,9 +302,12 @@ const styles = StyleSheet.create({
   author: { fontSize: 12, color: Colors.midGrey },
   completedBadge: { alignSelf: 'flex-start', marginTop: 4, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   completedText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
+  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8 },
   modalContainer: { flex: 1, backgroundColor: Colors.white },
   modalHeader: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },
   modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.white },

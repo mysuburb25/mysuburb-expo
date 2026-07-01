@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Line } from 'react-native-svg';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -15,16 +16,14 @@ const FILTERS = [
 ];
 
 export default function LostFoundScreen() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
 
-  useEffect(() => { setActiveFilter(FILTERS[0]); }, []);
-  useEffect(() => { if (profile?.suburb) fetchItems(); }, [profile, activeFilter]);
-
-  const fetchItems = async () => {
-    setLoading(true);
+  const fetchItems = useCallback(async () => {
+    if (!profile?.suburb) return;
     try {
       const q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'lostfound'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
@@ -32,7 +31,33 @@ export default function LostFoundScreen() {
       if (activeFilter.key !== 'all') data = data.filter(p => p.lostFoundType === activeFilter.key);
       setItems(data);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, [profile, activeFilter]);
+
+  useFocusEffect(useCallback(() => { setLoading(true); fetchItems(); }, [fetchItems]));
+
+  const handleLikeToggle = async (post) => {
+    const liked = post.likedBy?.includes(user.uid) || false;
+    const newLiked = !liked;
+    setItems(prev => prev.map(p => p.id === post.id ? {
+      ...p,
+      likeCount: (p.likeCount || 0) + (newLiked ? 1 : -1),
+      likedBy: newLiked ? [...(p.likedBy || []), user.uid] : (p.likedBy || []).filter(u => u !== user.uid),
+    } : p));
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        likeCount: increment(newLiked ? 1 : -1),
+        likedBy: newLiked ? [...(post.likedBy || []), user.uid] : (post.likedBy || []).filter(u => u !== user.uid),
+      });
+      if (newLiked) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: post.authorId, type: 'like',
+          message: `${profile.displayName} liked your post`,
+          postId: post.id, fromUserId: user.uid, fromUserName: profile.displayName,
+          isRead: false, createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) { console.error(e); }
   };
 
   return (
@@ -66,17 +91,31 @@ export default function LostFoundScreen() {
           data={items}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
-              <View style={[styles.typeBadge, { backgroundColor: item.lostFoundType === 'lost' ? '#FFF3E0' : Colors.brandGreenPale }]}>
-                <Text style={[styles.typeText, { color: item.lostFoundType === 'lost' ? '#E65100' : Colors.brandGreen }]}>
-                  {item.lostFoundType?.toUpperCase() || 'LOST/FOUND'}
-                </Text>
-              </View>
-              <Text style={styles.cardContent} numberOfLines={3}>{item.content}</Text>
-              <Text style={styles.cardAuthor}>by {item.authorName}</Text>
-            </TouchableOpacity>
-          )}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchItems(); }} tintColor={Colors.brandGreen} />}
+          renderItem={({ item }) => {
+            const liked = item.likedBy?.includes(user?.uid) || false;
+            return (
+              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
+                <View style={[styles.typeBadge, { backgroundColor: item.lostFoundType === 'lost' ? '#FFF3E0' : Colors.brandGreenPale }]}>
+                  <Text style={[styles.typeText, { color: item.lostFoundType === 'lost' ? '#E65100' : Colors.brandGreen }]}>
+                    {item.lostFoundType?.toUpperCase() || 'LOST/FOUND'}
+                  </Text>
+                </View>
+                <Text style={styles.cardContent} numberOfLines={3}>{item.content}</Text>
+                <Text style={styles.cardAuthor}>by {item.authorName}</Text>
+                <View style={styles.footer}>
+                  <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
+                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.midGrey} />
+                    <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
+                    <Ionicons name="chatbubble-outline" size={18} color={Colors.midGrey} />
+                    <Text style={styles.footerText}>{item.commentCount || 0}</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="search-outline" size={48} color={Colors.lightGrey} />
@@ -85,7 +124,7 @@ export default function LostFoundScreen() {
           }
         />
       )}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'lostfound', preselect: activeFilter.preselect } })}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'lostfound', preselect: activeFilter.key === 'all' ? 'lost' : activeFilter.key } })}>
         <Svg width="30" height="30" viewBox="0 0 30 30">
           <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
           <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
@@ -113,9 +152,12 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: { backgroundColor: Colors.white, borderRadius: 14, padding: 16, gap: 8, borderWidth: 1, borderColor: Colors.lightGrey },
   typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
-  typeText: { fontSize: 12, fontWeight: '700' },
+  typeText: { fontSize: 13, fontWeight: '700' },
   cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
   cardAuthor: { fontSize: 12, color: Colors.midGrey },
+  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
   fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8 },

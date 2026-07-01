@@ -1,24 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Line } from 'react-native-svg';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 
 const FILTERS = [
-  { key: 'all', label: "What's Happening", createCategory: 'updates' },
-  { key: 'notices', label: 'Notices', createCategory: 'notices' },
-  { key: 'safety', label: 'Safety Alerts', createCategory: 'safety' },
+  { key: 'all', label: "What's Happening", createCategory: 'community' },
+  { key: 'notices', label: 'Notices', createCategory: 'community' },
+  { key: 'safety', label: 'Safety Alerts', createCategory: 'community' },
 ];
 
 const BADGE_COLORS = {
-  general: { bg: '#E8F5E9', text: '#1B4332' },
-  updates: { bg: '#E8F5E9', text: '#1B4332' },
-  notices: { bg: '#E3F2FD', text: '#0D47A1' },
-  safety: { bg: '#FFF3E0', text: '#E65100' },
+  general:  { bg: '#E8F5E9', text: '#1B4332' },
+  updates:  { bg: '#E8F5E9', text: '#1B4332' },
+  notices:  { bg: '#E3F2FD', text: '#0D47A1' },
+  safety:   { bg: '#FFF3E0', text: '#E65100' },
+};
+
+const BADGE_LABELS = {
+  updates:  "What's Happening",
+  notices:  'Notice',
+  safety:   'Safety Alert',
 };
 
 function timeAgo(date) {
@@ -31,41 +38,52 @@ function timeAgo(date) {
   return Math.floor(seconds / 86400) + 'd ago';
 }
 
-function PostCard({ post, onPress }) {
+function PostCard({ post, user, profile, onPress, onLikeToggle }) {
   const badge = BADGE_COLORS[post.category] || BADGE_COLORS.general;
+  const label = BADGE_LABELS[post.category] || post.category;
+  const liked = post.likedBy?.includes(user?.uid) || false;
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.authorRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase() || '?'}</Text>
+      {/* Light green post body */}
+      <View style={styles.cardBody}>
+        <View style={styles.authorRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase() || '?'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.authorName}>{post.authorName}</Text>
+            <Text style={styles.time}>{timeAgo(post.createdAt)}</Text>
+          </View>
+          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.badgeText, { color: badge.text }]}>{label}</Text>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.authorName}>{post.authorName}</Text>
-          <Text style={styles.time}>{timeAgo(post.createdAt)}</Text>
-        </View>
-        <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-          <Text style={[styles.badgeText, { color: badge.text }]}>{post.category?.toUpperCase()}</Text>
-        </View>
+        <Text style={styles.content} numberOfLines={4}>{post.content}</Text>
       </View>
-      <Text style={styles.content} numberOfLines={4}>{post.content}</Text>
+      {/* White like/comment bar */}
       <View style={styles.footer}>
-        <Ionicons name="heart-outline" size={16} color={Colors.midGrey} />
-        <Text style={styles.footerText}>{post.likeCount || 0}</Text>
-        <Ionicons name="chatbubble-outline" size={16} color={Colors.midGrey} />
-        <Text style={styles.footerText}>{post.commentCount || 0}</Text>
+        <TouchableOpacity style={styles.footerBtn} onPress={() => onLikeToggle(post)}>
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.midGrey} />
+          <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{post.likeCount || 0}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.footerBtn} onPress={onPress}>
+          <Ionicons name="chatbubble-outline" size={18} color={Colors.midGrey} />
+          <Text style={styles.footerText}>{post.commentCount || 0}</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 }
 
 export default function HomeScreen() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     if (!profile?.suburb) return;
     try {
       let q;
@@ -78,10 +96,33 @@ export default function HomeScreen() {
       setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  };
+  }, [profile, activeFilter]);
 
-  useEffect(() => { setActiveFilter(FILTERS[0]); }, []);
-  useEffect(() => { setLoading(true); fetchPosts(); }, [profile, activeFilter]);
+  useFocusEffect(useCallback(() => { setLoading(true); fetchPosts(); }, [fetchPosts]));
+
+  const handleLikeToggle = async (post) => {
+    const liked = post.likedBy?.includes(user.uid) || false;
+    const newLiked = !liked;
+    setPosts(prev => prev.map(p => p.id === post.id ? {
+      ...p,
+      likeCount: (p.likeCount || 0) + (newLiked ? 1 : -1),
+      likedBy: newLiked ? [...(p.likedBy || []), user.uid] : (p.likedBy || []).filter(u => u !== user.uid),
+    } : p));
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        likeCount: increment(newLiked ? 1 : -1),
+        likedBy: newLiked ? [...(post.likedBy || []), user.uid] : (post.likedBy || []).filter(u => u !== user.uid),
+      });
+      if (newLiked) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: post.authorId, type: 'like',
+          message: `${profile.displayName} liked your post`,
+          postId: post.id, fromUserId: user.uid, fromUserName: profile.displayName,
+          isRead: false, createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) { console.error(e); }
+  };
 
   return (
     <View style={styles.container}>
@@ -97,11 +138,9 @@ export default function HomeScreen() {
           <Ionicons name="notifications-outline" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
-
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Community Hub</Text>
       </View>
-
       <View style={styles.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[styles.chip, activeFilter.key === f.key && styles.chipActive]} onPress={() => setActiveFilter(f)}>
@@ -109,14 +148,19 @@ export default function HomeScreen() {
           </TouchableOpacity>
         ))}
       </View>
-
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.brandGreen} size="large" />
       ) : (
         <FlatList
           data={posts}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => <PostCard post={item} onPress={() => router.push('/post/' + item.id)} />}
+          renderItem={({ item }) => (
+            <PostCard
+              post={item} user={user} profile={profile}
+              onPress={() => router.push('/post/' + item.id)}
+              onLikeToggle={handleLikeToggle}
+            />
+          )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPosts(); }} tintColor={Colors.brandGreen} />}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
@@ -128,14 +172,13 @@ export default function HomeScreen() {
           }
         />
       )}
-
-      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: activeFilter.createCategory, preselect: activeFilter.preselect } })}>
-          <Svg width="30" height="30" viewBox="0 0 30 30">
-            <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-            <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-          </Svg>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: activeFilter.createCategory, preselect: activeFilter.key === 'all' ? 'updates' : activeFilter.key } })}>
+        <Svg width="30" height="30" viewBox="0 0 30 30">
+          <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+          <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
+        </Svg>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -155,17 +198,19 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: Colors.charcoal, fontWeight: '600' },
   chipTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 12, gap: 12, paddingBottom: 100 },
-  card: { backgroundColor: Colors.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.lightGrey },
+  card: { borderRadius: 16, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
+  cardBody: { backgroundColor: Colors.brandGreenPale, padding: 16 },
   authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen },
   authorName: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
   time: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, marginBottom: 12 },
-  footer: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
-  footerText: { fontSize: 13, color: Colors.midGrey, marginRight: 8 },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  badgeText: { fontSize: 12, fontWeight: '700' },
+  content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white },
+  footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.charcoal },
   emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },

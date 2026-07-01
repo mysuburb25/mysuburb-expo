@@ -56,9 +56,29 @@ export default function CreatePostScreen() {
     if (!content.trim()) { Alert.alert('Error', 'Please write something!'); return; }
     setPosting(true);
     try {
+      let categoryValue = selectedCategory;
+      let extraFields = {};
+
+      if (initialCategory === 'marketplace') {
+        categoryValue = 'marketplace';
+        if (selectedCategory === 'forsale') {
+          extraFields = { marketplaceType: 'forsale', price: price ? parseFloat(price) : 0, isFree: false, isWanted: false };
+        } else if (selectedCategory === 'giveaway') {
+          extraFields = { marketplaceType: 'giveaway', isFree: true, isWanted: false, price: 0 };
+        } else if (selectedCategory === 'seeking') {
+          extraFields = { marketplaceType: 'seeking', isWanted: true, isFree: false, price: 0 };
+        }
+      } else if (initialCategory === 'lostfound') {
+        categoryValue = 'lostfound';
+        extraFields = { lostFoundType: selectedCategory };
+      } else if (initialCategory === 'events') {
+        categoryValue = 'events';
+        if (eventLocation) extraFields = { eventLocation };
+      }
+
       await addDoc(collection(db, 'posts'), {
         content: content.trim(),
-        category: selectedCategory,
+        category: categoryValue,
         suburb: profile.suburb,
         state: profile.state,
         authorId: user.uid,
@@ -67,12 +87,7 @@ export default function CreatePostScreen() {
         likeCount: 0,
         commentCount: 0,
         isRemoved: false,
-        ...(selectedCategory === 'forsale' && price ? { price: parseFloat(price) } : {}),
-        ...(selectedCategory === 'giveaway' ? { isFree: true } : {}),
-        ...(selectedCategory === 'seeking' ? { isWanted: true } : {}),
-        ...(selectedCategory === 'lost' ? { lostFoundType: 'lost' } : {}),
-        ...(selectedCategory === 'found' ? { lostFoundType: 'found' } : {}),
-        ...(eventLocation ? { eventLocation } : {}),
+        ...extraFields,
       });
       router.back();
     } catch (e) { Alert.alert('Error', e.message); }
