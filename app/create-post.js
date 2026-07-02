@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,77 +7,81 @@ import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
-const CATEGORY_CONFIGS = {
-  community: {
-    title: 'Community Hub',
-    categories: [
-      { key: 'updates', label: "What's Happening", placeholder: "Share what's going on in your suburb — local news, community updates, questions or anything neighbours should know about." },
-      { key: 'notices', label: 'Notice', placeholder: 'Post an important notice for your suburb — upcoming roadworks, council announcements, community meetings or local alerts.' },
-      { key: 'safety', label: 'Safety Alert', placeholder: 'Report a safety concern in your suburb — suspicious activity, dangerous road conditions, break-ins, or anything that affects the safety of your neighbours.' },
-    ],
-  },
-  events: {
-    title: 'Events',
-    categories: [
-      { key: 'events', label: 'Event', placeholder: 'Tell your neighbours about a local event — include the date, time, location and what to expect!' },
-    ],
-  },
-  marketplace: {
-    title: 'Buy & Sell',
-    categories: [
-      { key: 'forsale', label: 'For Sale', placeholder: 'Selling something? Describe the item, its condition and your asking price. Local pickup preferred!' },
-      { key: 'giveaway', label: 'Give Away', placeholder: 'Giving something away for free? Describe the item and any pickup details. First come first served!' },
-      { key: 'seeking', label: 'Seeking', placeholder: "Looking for something specific? Let your neighbours know what you're after!" },
-    ],
-  },
-  lostfound: {
-    title: 'Lost & Found',
-    categories: [
-      { key: 'lost', label: 'Lost', placeholder: 'Lost something? Describe the item, where you last saw it and when. Include a contact method so neighbours can reach you.' },
-      { key: 'found', label: 'Found', placeholder: 'Found something? Describe what you found and where. Help reunite it with its owner!' },
-    ],
-  },
+const COMMUNITY_TABS = [
+  { key: 'updates', label: "What's Happening" },
+  { key: 'notices', label: 'Notice' },
+  { key: 'safety', label: 'Safety Alert' },
+];
+
+const MARKETPLACE_TABS = [
+  { key: 'forsale', label: 'For Sale' },
+  { key: 'giveaway', label: 'Give Away' },
+  { key: 'seeking', label: 'Seeking' },
+];
+
+const COMMUNITY_PLACEHOLDERS = {
+  updates: "Share what's going on in your suburb...",
+  notices: 'Post an important notice for your suburb...',
+  safety:  'Report a safety concern in your suburb...',
 };
 
 export default function CreatePostScreen() {
   const { category: initialCategory, preselect } = useLocalSearchParams();
   const { user, profile } = useAuth();
-  const config = CATEGORY_CONFIGS[initialCategory] || CATEGORY_CONFIGS.community;
-  const defaultCat = config.categories.find(c => c.key === preselect) || config.categories[0];
-  const [selectedCategory, setSelectedCategory] = useState(defaultCat.key);
-  const [content, setContent] = useState('');
-  const [price, setPrice] = useState('');
-  const [eventLocation, setEventLocation] = useState('');
-  const [posting, setPosting] = useState(false);
 
-  const currentCat = config.categories.find(c => c.key === selectedCategory) || config.categories[0];
+  const getDefaultCat = () => {
+    if (initialCategory === 'community') return preselect || 'updates';
+    if (initialCategory === 'marketplace') return preselect || 'forsale';
+    if (initialCategory === 'lostfound') return preselect || 'lost';
+    return preselect || 'updates';
+  };
+
+  const [selectedCategory, setSelectedCategory] = useState(getDefaultCat());
+  const [content, setContent] = useState('');
+  const [lfItem, setLfItem] = useState('');
+  const [lfDescription, setLfDescription] = useState('');
+  const [lfLocation, setLfLocation] = useState('');
+  const [mpTitle, setMpTitle] = useState('');
+  const [mpDescription, setMpDescription] = useState('');
+  const [mpPrice, setMpPrice] = useState('');
+  const [posting, setPosting] = useState(false);
+  const scrollRef = useRef(null);
+
+  const isLostFound = initialCategory === 'lostfound';
+  const isMarketplace = initialCategory === 'marketplace';
+  const isCommunity = initialCategory === 'community' || (!isLostFound && !isMarketplace);
+
+  const pageTitle = isLostFound ? 'Lost & Found' : isMarketplace ? 'Buy & Sell' : 'Community Hub';
 
   const handlePost = async () => {
-    if (!content.trim()) { Alert.alert('Error', 'Please write something!'); return; }
+    if (isLostFound && !lfItem.trim()) { Alert.alert('Error', `Please describe what you ${selectedCategory === 'lost' ? 'lost' : 'found'}.`); return; }
+    if (isMarketplace && !mpTitle.trim()) { Alert.alert('Error', 'Please describe your listing.'); return; }
+    if (isCommunity && !content.trim()) { Alert.alert('Error', 'Please write something!'); return; }
+
     setPosting(true);
     try {
       let categoryValue = selectedCategory;
       let extraFields = {};
+      let postContent = content.trim();
 
-      if (initialCategory === 'marketplace') {
-        categoryValue = 'marketplace';
-        if (selectedCategory === 'forsale') {
-          extraFields = { marketplaceType: 'forsale', price: price ? parseFloat(price) : 0, isFree: false, isWanted: false };
-        } else if (selectedCategory === 'giveaway') {
-          extraFields = { marketplaceType: 'giveaway', isFree: true, isWanted: false, price: 0 };
-        } else if (selectedCategory === 'seeking') {
-          extraFields = { marketplaceType: 'seeking', isWanted: true, isFree: false, price: 0 };
-        }
-      } else if (initialCategory === 'lostfound') {
+      if (isLostFound) {
         categoryValue = 'lostfound';
         extraFields = { lostFoundType: selectedCategory };
-      } else if (initialCategory === 'events') {
-        categoryValue = 'events';
-        if (eventLocation) extraFields = { eventLocation };
+        postContent = lfItem.trim();
+        if (lfDescription.trim()) extraFields.description = lfDescription.trim();
+        if (lfLocation.trim()) extraFields.lostFoundLocation = lfLocation.trim();
+      } else if (isMarketplace) {
+        categoryValue = 'marketplace';
+        postContent = mpTitle.trim();
+        if (selectedCategory === 'forsale') extraFields = { marketplaceType: 'forsale', price: mpPrice ? parseFloat(mpPrice) : 0, isFree: false, isWanted: false };
+        else if (selectedCategory === 'giveaway') extraFields = { marketplaceType: 'giveaway', isFree: true, isWanted: false, price: 0 };
+        else if (selectedCategory === 'seeking') extraFields = { marketplaceType: 'seeking', isWanted: true, isFree: false, price: 0 };
+        if (mpDescription.trim()) extraFields.description = mpDescription.trim();
       }
+      // community: categoryValue is already 'updates'|'notices'|'safety'
 
       await addDoc(collection(db, 'posts'), {
-        content: content.trim(),
+        content: postContent,
         category: categoryValue,
         suburb: profile.suburb,
         state: profile.state,
@@ -94,41 +98,225 @@ export default function CreatePostScreen() {
     finally { setPosting(false); }
   };
 
+  const tabs = isCommunity ? COMMUNITY_TABS : isMarketplace ? MARKETPLACE_TABS : null;
+
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={24} color={Colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post to {profile?.suburb}</Text>
-        <TouchableOpacity style={[styles.postBtn, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-          {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
-        </TouchableOpacity>
-      </View>
-      <ScrollView style={styles.body} contentContainerStyle={{ gap: 16, padding: 16 }}>
-        <Text style={styles.label}>{config.title}</Text>
-        <View style={styles.categoryRow}>
-          {config.categories.map(c => (
-            <TouchableOpacity key={c.key} style={[styles.chip, selectedCategory === c.key && styles.chipActive]} onPress={() => setSelectedCategory(c.key)}>
-              <Text style={[styles.chipText, selectedCategory === c.key && styles.chipTextActive]}>{c.label}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.headerCenter}>
+          <Text style={styles.mySuburb}>My Suburb</Text>
+          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TextInput
-          style={styles.input}
-          placeholder={currentCat.placeholder}
-          placeholderTextColor={Colors.midGrey}
-          value={content}
-          onChangeText={setContent}
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
-        {selectedCategory === 'forsale' && (
-          <TextInput style={styles.inputSmall} placeholder="Price (e.g. 25.00)" placeholderTextColor={Colors.midGrey} value={price} onChangeText={setPrice} keyboardType="numeric" />
+        {/* Post button in header only for community */}
+        {isCommunity ? (
+          <TouchableOpacity style={[styles.postBtnHeader, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
+            {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnHeaderText}>Post</Text>}
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
         )}
-        {selectedCategory === 'events' && (
-          <TextInput style={styles.inputSmall} placeholder="Event location (e.g. Paddington Park)" placeholderTextColor={Colors.midGrey} value={eventLocation} onChangeText={setEventLocation} />
+      </View>
+
+      {/* Page sub-header */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>{pageTitle}</Text>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        style={styles.body}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={true}
+      >
+        {/* Solid pill tabs for all categories */}
+        {tabs && (
+          <View style={styles.tabRow}>
+            {tabs.map(t => (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tabBtn, selectedCategory === t.key && styles.tabBtnActive]}
+                onPress={() => setSelectedCategory(t.key)}
+              >
+                <Text style={[styles.tabText, selectedCategory === t.key && styles.tabTextActive]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Lost & Found tabs */}
+        {isLostFound && (
+          <View style={styles.tabRow}>
+            <TouchableOpacity style={[styles.tabBtn, selectedCategory === 'lost' && styles.tabBtnActive]} onPress={() => setSelectedCategory('lost')}>
+              <Text style={[styles.tabText, selectedCategory === 'lost' && styles.tabTextActive]}>Lost</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tabBtn, selectedCategory === 'found' && styles.tabBtnActive]} onPress={() => setSelectedCategory('found')}>
+              <Text style={[styles.tabText, selectedCategory === 'found' && styles.tabTextActive]}>Found</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Community form */}
+        {isCommunity && (
+          <>
+            <View style={styles.sectionBar}>
+              <Text style={styles.sectionBarText}>
+                {selectedCategory === 'updates' ? "What's happening in your suburb?" :
+                 selectedCategory === 'notices' ? 'Post a notice...' : 'Report a safety concern...'}
+              </Text>
+            </View>
+            <View style={styles.fieldPad}>
+              <TextInput
+                style={[styles.input, styles.inputLarge]}
+                placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]}
+                placeholderTextColor={Colors.midGrey}
+                value={content}
+                onChangeText={setContent}
+                multiline
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+              />
+            </View>
+          </>
+        )}
+
+        {/* Marketplace form */}
+        {isMarketplace && (
+          <>
+            <View style={styles.sectionBar}>
+              <Text style={styles.sectionBarText}>
+                {selectedCategory === 'forsale' ? 'I am selling...' : selectedCategory === 'giveaway' ? 'I am giving away...' : 'I am looking for...'}
+              </Text>
+            </View>
+            <View style={styles.fieldPad}>
+              <TextInput
+                style={styles.input2Line}
+                placeholder={selectedCategory === 'forsale' ? 'e.g. iPhone 14, Toyota Corolla...' : selectedCategory === 'giveaway' ? 'e.g. Kids toys, old furniture...' : 'e.g. Second hand bike, lawn mower...'}
+                placeholderTextColor={Colors.midGrey}
+                value={mpTitle}
+                onChangeText={setMpTitle}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+              />
+            </View>
+
+            <View style={styles.sectionBar}>
+              <Text style={styles.sectionBarText}>Description</Text>
+            </View>
+            <View style={styles.fieldPad}>
+              <TextInput
+                style={styles.input2Line}
+                placeholder="Condition, colour, size, any other details..."
+                placeholderTextColor={Colors.midGrey}
+                value={mpDescription}
+                onChangeText={setMpDescription}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+              />
+            </View>
+
+            {selectedCategory === 'forsale' && (
+              <>
+                <View style={styles.sectionBar}>
+                  <Text style={styles.sectionBarText}>Price</Text>
+                </View>
+                <View style={styles.fieldPad}>
+                  <TextInput
+                    style={styles.inputSingle}
+                    placeholder="e.g. 25.00"
+                    placeholderTextColor={Colors.midGrey}
+                    value={mpPrice}
+                    onChangeText={setMpPrice}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </>
+            )}
+
+            <View style={styles.fieldPad}>
+              <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* Lost & Found form */}
+        {isLostFound && (
+          <>
+            <View style={styles.sectionBar}>
+              <Text style={styles.sectionBarText}>{selectedCategory === 'lost' ? 'I lost...' : 'I found...'}</Text>
+            </View>
+            <View style={styles.fieldPad}>
+              <TextInput
+                style={styles.input2Line}
+                placeholder={selectedCategory === 'lost' ? 'e.g. Black wallet, iPhone 15...' : 'e.g. Black wallet, iPhone 15...'}
+                placeholderTextColor={Colors.midGrey}
+                value={lfItem}
+                onChangeText={setLfItem}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+              />
+            </View>
+
+            <View style={styles.sectionBar}>
+              <Text style={styles.sectionBarText}>Description</Text>
+            </View>
+            <View style={styles.fieldPad}>
+              <TextInput
+                style={styles.input2Line}
+                placeholder="Colour, size, features..."
+                placeholderTextColor={Colors.midGrey}
+                value={lfDescription}
+                onChangeText={setLfDescription}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+              />
+            </View>
+
+            <View style={styles.sectionBar}>
+              <Text style={styles.sectionBarText}>Location</Text>
+            </View>
+            <View style={styles.fieldPad}>
+              <TextInput
+                style={styles.input2Line}
+                placeholder={selectedCategory === 'lost' ? 'Where did you last see it?' : 'Where did you find it?'}
+                placeholderTextColor={Colors.midGrey}
+                value={lfLocation}
+                onChangeText={setLfLocation}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
+              />
+            </View>
+
+            <View style={styles.fieldPad}>
+              <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+              </TouchableOpacity>
+            </View>
+          </>
         )}
       </ScrollView>
     </View>
@@ -138,16 +326,27 @@ export default function CreatePostScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   header: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: Colors.white },
-  postBtn: { backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
-  postBtnText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
+  closeBtn: { width: 36, justifyContent: 'center' },
+  headerCenter: { alignItems: 'center' },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
+  suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
+  postBtnHeader: { backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
+  postBtnHeaderText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   body: { flex: 1 },
-  label: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen },
-  categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.lightGrey },
-  chipActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  chipText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
-  chipTextActive: { color: Colors.white, fontWeight: '700' },
-  input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, fontSize: 15, color: Colors.charcoal, minHeight: 180 },
-  inputSmall: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14, fontSize: 15, color: Colors.charcoal },
+  tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '600' },
+  tabTextActive: { color: Colors.white, fontWeight: '700' },
+  sectionBar: { backgroundColor: Colors.brandGreenPale, paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.lightGrey },
+  sectionBarText: { fontSize: 17, fontWeight: '700', color: Colors.brandGreen },
+  fieldPad: { paddingHorizontal: 16, paddingVertical: 8 },
+  input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
+  input2Line: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, height: 68, textAlignVertical: 'top' },
+  inputLarge: { minHeight: 160, textAlignVertical: 'top' },
+  inputSingle: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
+  postBtnBottom: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
+  postBtnBottomText: { fontSize: 20, fontWeight: '800', color: Colors.white },
 });

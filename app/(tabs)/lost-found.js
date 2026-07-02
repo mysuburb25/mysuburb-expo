@@ -3,38 +3,49 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Line } from 'react-native-svg';
 import { collection, query, where, orderBy, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 
-const FILTERS = [
-  { key: 'all', label: 'All', preselect: 'lost' },
-  { key: 'lost', label: 'Lost', preselect: 'lost' },
-  { key: 'found', label: 'Found', preselect: 'found' },
+const TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'lost', label: 'Lost' },
+  { key: 'found', label: 'Found' },
 ];
+
+function formatDate(date) {
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatTime(date) {
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function LostFoundScreen() {
   const { profile, user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
+  const [activeTab, setActiveTab] = useState('all');
 
   const fetchItems = useCallback(async () => {
     if (!profile?.suburb) return;
     try {
       const q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'lostfound'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
-      let data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (activeFilter.key !== 'all') data = data.filter(p => p.lostFoundType === activeFilter.key);
-      setItems(data);
+      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [profile, activeFilter]);
+  }, [profile]);
 
   useFocusEffect(useCallback(() => { setLoading(true); fetchItems(); }, [fetchItems]));
+
+  const filteredItems = activeTab === 'all' ? items : items.filter(p => p.lostFoundType === activeTab);
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
@@ -77,32 +88,46 @@ export default function LostFoundScreen() {
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Lost & Found</Text>
       </View>
-      <View style={styles.filterRow}>
-        {FILTERS.map(f => (
-          <TouchableOpacity key={f.key} style={[styles.chip, activeFilter.key === f.key && styles.chipActive]} onPress={() => setActiveFilter(f)}>
-            <Text style={[styles.chipText, activeFilter.key === f.key && styles.chipTextActive]}>{f.label}</Text>
+      <View style={styles.tabRow}>
+        {TABS.map(t => (
+          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
+
       {loading ? (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
       ) : (
         <FlatList
-          data={items}
+          data={filteredItems}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchItems(); }} tintColor={Colors.brandGreen} />}
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
+            const isLost = item.lostFoundType === 'lost';
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
-                <View style={[styles.typeBadge, { backgroundColor: item.lostFoundType === 'lost' ? '#FFF3E0' : Colors.brandGreenPale }]}>
-                  <Text style={[styles.typeText, { color: item.lostFoundType === 'lost' ? '#E65100' : Colors.brandGreen }]}>
-                    {item.lostFoundType?.toUpperCase() || 'LOST/FOUND'}
-                  </Text>
+                <View style={styles.cardBody}>
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
+                    <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
+                      <Text style={styles.typeText}>{isLost ? 'Lost' : 'Found'}</Text>
+                    </View>
+                  </View>
+                  {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
+                  {item.lostFoundLocation ? (
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location-outline" size={13} color={Colors.midGrey} />
+                      <Text style={styles.locationText}>{item.lostFoundLocation}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.metaRow}>
+                    <Text style={styles.cardAuthor}>by {item.authorName}</Text>
+                    <Text style={styles.metaText}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
+                  </View>
                 </View>
-                <Text style={styles.cardContent} numberOfLines={3}>{item.content}</Text>
-                <Text style={styles.cardAuthor}>by {item.authorName}</Text>
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
                     <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.midGrey} />
@@ -124,11 +149,14 @@ export default function LostFoundScreen() {
           }
         />
       )}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'lostfound', preselect: activeFilter.key === 'all' ? 'lost' : activeFilter.key } })}>
-        <Svg width="30" height="30" viewBox="0 0 30 30">
-          <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-          <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-        </Svg>
+
+      {/* Floating small pill FAB bottom right */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push({ pathname: '/create-post', params: { category: 'lostfound', preselect: activeTab === 'all' ? 'lost' : activeTab } })}
+      >
+        <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
+        <Text style={styles.fabText}>New Post</Text>
       </TouchableOpacity>
     </View>
   );
@@ -144,21 +172,29 @@ const styles = StyleSheet.create({
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  filterRow: { flexDirection: 'row', padding: 12, gap: 8 },
-  chip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.lightGrey },
-  chipActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  chipText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
-  chipTextActive: { color: Colors.white, fontWeight: '700' },
+  tabRow: { flexDirection: 'row', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
+  tabText: { fontSize: 15, color: Colors.midGrey, fontWeight: '600' },
+  tabTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
-  card: { backgroundColor: Colors.white, borderRadius: 14, padding: 16, gap: 8, borderWidth: 1, borderColor: Colors.lightGrey },
-  typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
-  typeText: { fontSize: 13, fontWeight: '700' },
-  cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  card: { borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
+  cardBody: { backgroundColor: Colors.brandGreenPale, padding: 16, gap: 6 },
+  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
+  typeBadge: { width: 72, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
+  typeText: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  locationText: { fontSize: 13, color: Colors.midGrey },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   cardAuthor: { fontSize: 12, color: Colors.midGrey },
-  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  metaText: { fontSize: 11, color: Colors.midGrey },
+  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8 },
+  fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  fabText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
 });

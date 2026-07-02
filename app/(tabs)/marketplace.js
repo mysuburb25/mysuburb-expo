@@ -3,7 +3,6 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Line } from 'react-native-svg';
 import { collection, query, where, orderBy, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +14,24 @@ const FILTERS = [
   { key: 'giveaway', label: 'Give Away' },
   { key: 'seeking', label: 'Seeking' },
 ];
+
+const TYPE_CONFIG = {
+  forsale:  { label: 'For Sale',  bg: Colors.brandGreen },
+  giveaway: { label: 'Give Away', bg: '#1565C0' },
+  seeking:  { label: 'Seeking',   bg: '#6A1B9A' },
+};
+
+function formatDate(date) {
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatTime(date) {
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function BuySellScreen() {
   const { profile, user } = useAuth();
@@ -81,13 +98,14 @@ export default function BuySellScreen() {
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Buy & Sell</Text>
       </View>
-      <View style={styles.filterRow}>
+      <View style={styles.tabRow}>
         {FILTERS.map(f => (
-          <TouchableOpacity key={f.key} style={[styles.chip, activeFilter.key === f.key && styles.chipActive]} onPress={() => setActiveFilter(f)}>
-            <Text style={[styles.chipText, activeFilter.key === f.key && styles.chipTextActive]}>{f.label}</Text>
+          <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => setActiveFilter(f)}>
+            <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
+
       {loading ? (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
       ) : (
@@ -98,19 +116,24 @@ export default function BuySellScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchListings(); }} tintColor={Colors.brandGreen} />}
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
+            const typeConf = TYPE_CONFIG[item.marketplaceType] || TYPE_CONFIG.forsale;
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                  {item.marketplaceType === 'giveaway' || item.isFree ? (
-                    <View style={styles.freeTag}><Text style={styles.freeTagText}>FREE</Text></View>
-                  ) : item.price > 0 ? (
+                <View style={styles.cardBody}>
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
+                    <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
+                      <Text style={styles.typeText}>{typeConf.label}</Text>
+                    </View>
+                  </View>
+                  {item.marketplaceType === 'forsale' && item.price > 0 && (
                     <Text style={styles.price}>${item.price?.toFixed(2)}</Text>
-                  ) : item.marketplaceType === 'seeking' ? (
-                    <View style={styles.seekingTag}><Text style={styles.seekingTagText}>SEEKING</Text></View>
-                  ) : null}
+                  )}
+                  <View style={styles.metaRow}>
+                    <Text style={styles.cardAuthor}>by {item.authorName}</Text>
+                    <Text style={styles.metaText}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
+                  </View>
                 </View>
-                <Text style={styles.author}>by {item.authorName}</Text>
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
                     <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.midGrey} />
@@ -132,11 +155,10 @@ export default function BuySellScreen() {
           }
         />
       )}
+
       <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'marketplace', preselect: activeFilter.key === 'all' ? 'forsale' : activeFilter.key } })}>
-        <Svg width="30" height="30" viewBox="0 0 30 30">
-          <Line x1="15" y1="3" x2="15" y2="27" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-          <Line x1="3" y1="15" x2="27" y2="15" stroke="#FFD700" strokeWidth="4" strokeLinecap="round"/>
-        </Svg>
+        <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
+        <Text style={styles.fabText}>New Post</Text>
       </TouchableOpacity>
     </View>
   );
@@ -152,25 +174,27 @@ const styles = StyleSheet.create({
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  filterRow: { flexDirection: 'row', padding: 12, gap: 8 },
-  chip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.lightGrey },
-  chipActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  chipText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
-  chipTextActive: { color: Colors.white, fontWeight: '700' },
+  tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '600' },
+  tabTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
-  card: { backgroundColor: Colors.white, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: Colors.lightGrey },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 },
-  cardTitle: { flex: 1, fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
-  price: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
-  freeTag: { backgroundColor: Colors.brandGreenPale, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  freeTagText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
-  seekingTag: { backgroundColor: '#E3F2FD', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  seekingTagText: { fontSize: 12, fontWeight: '700', color: '#0D47A1' },
-  author: { fontSize: 12, color: Colors.midGrey, marginBottom: 10 },
-  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  card: { borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
+  cardBody: { backgroundColor: Colors.brandGreenPale, padding: 16, gap: 6 },
+  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
+  typeBadge: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
+  typeText: { fontSize: 13, fontWeight: '800', color: Colors.white },
+  price: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  cardAuthor: { fontSize: 12, color: Colors.midGrey },
+  metaText: { fontSize: 11, color: Colors.midGrey },
+  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', elevation: 8 },
+  fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  fabText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
 });
