@@ -36,7 +36,7 @@ function formatTime(date) {
 }
 
 export default function HomeScreen() {
-  const { profile, user } = useAuth();
+  const { profile, user, unreadCount} = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,8 +93,13 @@ export default function HomeScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
           <Ionicons name="notifications-outline" size={26} color="#fff" />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
@@ -182,7 +187,7 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 12, color: Colors.midGrey, fontWeight: '600' },
+  tabText: { fontSize: 12, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 12, gap: 12, paddingBottom: 100 },
   card: { borderRadius: 16, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
@@ -204,4 +209,6 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   fabText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });

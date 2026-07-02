@@ -8,17 +8,26 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 
-const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'forsale', label: 'For Sale' },
-  { key: 'giveaway', label: 'Give Away' },
-  { key: 'seeking', label: 'Seeking' },
+const TABS = [
+  { key: 'all',      label: 'All' },
+  { key: 'offering', label: 'Offering' },
+  { key: 'looking',  label: 'Looking For' },
 ];
 
-const TYPE_CONFIG = {
-  forsale:  { label: 'For Sale',  bg: Colors.brandGreen },
-  giveaway: { label: 'Give Away', bg: '#1565C0' },
-  seeking:  { label: 'Seeking',   bg: '#6A1B9A' },
+const SERVICE_LABELS = {
+  plumbing:   'Plumbing',
+  painting:   'Painting',
+  electrical: 'Electrical',
+  handyman:   'Handyman',
+  massage:    'Massage',
+  physio:     'Physiotherapy',
+  carpentry:  'Carpentry',
+  cleaning:   'Cleaning',
+  gardening:  'Gardening',
+  petcare:    'Pet Care',
+  childcare:  'Child & Aged Care',
+  tutoring:   'Tutoring',
+  others:     'Others',
 };
 
 function formatDate(date) {
@@ -33,34 +42,35 @@ function formatTime(date) {
   return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function BuySellScreen() {
+export default function ServicesScreen() {
   const { profile, user, unreadCount} = useAuth();
-  const [listings, setListings] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
+  const [activeTab, setActiveTab] = useState('all');
 
-  const fetchListings = useCallback(async () => {
-    if (!profile?.suburb) return;
+  const fetchPosts = useCallback(async () => {
+    if (!profile?.suburb) { setLoading(false); return; }
+    setLoading(true);
     try {
       let q;
-      if (activeFilter.key === 'all') {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'marketplace'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
+      if (activeTab === 'all') {
+        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'services'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
       } else {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'marketplace'), where('marketplaceType', '==', activeFilter.key), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
+        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'services'), where('serviceTab', '==', activeTab), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
       }
       const snap = await getDocs(q);
-      setListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [profile, activeFilter]);
+  }, [profile, activeTab]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); fetchListings(); }, [fetchListings]));
+  useFocusEffect(useCallback(() => { setLoading(true); fetchPosts(); }, [fetchPosts]));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
     const newLiked = !liked;
-    setListings(prev => prev.map(p => p.id === post.id ? {
+    setPosts(prev => prev.map(p => p.id === post.id ? {
       ...p,
       likeCount: (p.likeCount || 0) + (newLiked ? 1 : -1),
       likedBy: newLiked ? [...(p.likedBy || []), user.uid] : (p.likedBy || []).filter(u => u !== user.uid),
@@ -73,7 +83,7 @@ export default function BuySellScreen() {
       if (newLiked) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
-          message: `${profile.displayName} liked your listing`,
+          message: `${profile.displayName} liked your service post`,
           postId: post.id, fromUserId: user.uid, fromUserName: profile.displayName,
           isRead: false, createdAt: serverTimestamp(),
         });
@@ -100,13 +110,15 @@ export default function BuySellScreen() {
           )}
         </TouchableOpacity>
       </View>
+
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Buy & Sell</Text>
+        <Text style={styles.pageTitle}>Services</Text>
       </View>
+
       <View style={styles.tabRow}>
-        {FILTERS.map(f => (
-          <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => setActiveFilter(f)}>
-            <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}>{f.label}</Text>
+        {TABS.map(t => (
+          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => { setLoading(true); setActiveTab(t.key); }}>
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -115,27 +127,32 @@ export default function BuySellScreen() {
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
       ) : (
         <FlatList
-          data={listings}
+          data={posts}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchListings(); }} tintColor={Colors.brandGreen} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPosts(); }} tintColor={Colors.brandGreen} />}
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
-            const typeConf = TYPE_CONFIG[item.marketplaceType] || TYPE_CONFIG.forsale;
+            const serviceLabel = SERVICE_LABELS[item.serviceType] || 'Service';
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
                 <View style={styles.cardBody}>
                   <View style={styles.cardTopRow}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                    <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
-                      <Text style={styles.typeText}>{typeConf.label}</Text>
+                    <View style={styles.cardAuthorRow}>
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{item.authorName?.[0]?.toUpperCase() || '?'}</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.authorName}>{item.authorName}</Text>
+                        <Text style={styles.serviceLabel}>{serviceLabel}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.tabBadge, { backgroundColor: item.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
+                      <Text style={styles.tabBadgeText}>{item.serviceTab === 'offering' ? 'Offering' : 'Looking'}</Text>
                     </View>
                   </View>
-                  {item.marketplaceType === 'forsale' && item.price > 0 && (
-                    <Text style={styles.price}>${item.price?.toFixed(2)}</Text>
-                  )}
+                  <Text style={styles.cardContent} numberOfLines={4}>{item.content}</Text>
                   <View style={styles.metaRow}>
-                    <Text style={styles.cardAuthor}>by {item.authorName}</Text>
                     <Text style={styles.metaText}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
                   </View>
                 </View>
@@ -154,14 +171,14 @@ export default function BuySellScreen() {
           }}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="pricetag-outline" size={48} color={Colors.lightGrey} />
-              <Text style={styles.emptyText}>No listings yet</Text>
+              <Ionicons name="briefcase-outline" size={48} color={Colors.lightGrey} />
+              <Text style={styles.emptyText}>No service posts yet in {profile?.suburb}</Text>
             </View>
           }
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'marketplace', preselect: activeFilter.key === 'all' ? 'forsale' : activeFilter.key } })}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'services', preselect: activeTab === 'all' ? 'offering' : activeTab } })}>
         <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
         <Text style={styles.fabText}>New Post</Text>
       </TouchableOpacity>
@@ -182,24 +199,27 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
-  tabTextActive: { color: Colors.white, fontWeight: '700' },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '700' },
+  tabTextActive: { color: Colors.white, fontWeight: '800' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: { borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
-  cardBody: { backgroundColor: Colors.brandGreenPale, padding: 16, gap: 6 },
-  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
-  cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
-  typeBadge: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
-  typeText: { fontSize: 13, fontWeight: '800', color: Colors.white },
-  price: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
-  cardAuthor: { fontSize: 12, color: Colors.midGrey },
+  cardBody: { backgroundColor: Colors.brandGreenPale, padding: 16, gap: 8 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
+  authorName: { fontSize: 14, fontWeight: '700', color: Colors.charcoal },
+  serviceLabel: { fontSize: 11, color: Colors.midGrey },
+  tabBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  tabBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.white },
+  cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  metaRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   metaText: { fontSize: 11, color: Colors.midGrey },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyText: { fontSize: 15, color: Colors.midGrey },
+  emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   fabText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
 });

@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator }
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import NotificationBell from '../../components/NotificationBell';
 import { collection, query, where, orderBy, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -19,7 +20,7 @@ function timeAgo(date) {
 }
 
 export default function NotificationsScreen() {
-  const { user, profile, setUnreadCount, unreadCount } = useAuth();
+  const { user, profile, setUnreadCount } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,14 +59,7 @@ export default function NotificationsScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
-          <Ionicons name="notifications-outline" size={26} color="#fff" />
-          {unreadCount > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <NotificationBell />
       </View>
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Notifications</Text>
@@ -127,8 +121,6 @@ const styles = StyleSheet.create({
   message: { fontSize: 14, color: Colors.charcoal, lineHeight: 20, fontWeight: '600' },
   time: { fontSize: 12, color: Colors.midGrey, marginTop: 4 },
   unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.brandGreen },
-  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
-  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptyText: { fontSize: 14, color: Colors.midGrey, textAlign: 'center', lineHeight: 20 },

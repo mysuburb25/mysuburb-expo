@@ -27,7 +27,7 @@ function formatTime(date) {
 }
 
 export default function LostFoundScreen() {
-  const { profile, user } = useAuth();
+  const { profile, user, unreadCount} = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,8 +81,13 @@ export default function LostFoundScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
           <Ionicons name="notifications-outline" size={26} color="#fff" />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
@@ -175,7 +180,7 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 15, color: Colors.midGrey, fontWeight: '600' },
+  tabText: { fontSize: 15, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: { borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },

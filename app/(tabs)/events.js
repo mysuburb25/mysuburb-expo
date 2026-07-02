@@ -22,7 +22,7 @@ function formatTime(date) {
 }
 
 export default function EventsScreen() {
-  const { profile, user } = useAuth();
+  const { profile, user, unreadCount} = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -115,8 +115,13 @@ export default function EventsScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
           <Ionicons name="notifications-outline" size={26} color="#fff" />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
