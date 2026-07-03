@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
@@ -68,6 +70,7 @@ export default function CreatePostScreen() {
   const [mpPrice, setMpPrice] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  const [images, setImages] = useState([]); // array of { uri }
   const [posting, setPosting] = useState(false);
   const scrollRef = useRef(null);
 
@@ -77,6 +80,59 @@ export default function CreatePostScreen() {
   const isCommunity = !isLostFound && !isMarketplace && !isServices;
 
   const pageTitle = isCommunity ? 'Community Hub' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services';
+
+  const handlePickImage = () => {
+    if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
+    const remaining = 3 - images.length;
+    Alert.alert('Add Photos', 'Choose an option', [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
+          const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, aspect: [4, 3] });
+          if (!result.canceled) setImages(prev => [...prev, { uri: result.assets[0].uri }]);
+        },
+      },
+      {
+        text: `Choose from Library`,
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            quality: 0.7,
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            selectionLimit: remaining,
+            allowsEditing: false,
+            presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+          });
+          if (!result.canceled) {
+            const newImages = result.assets.slice(0, remaining).map(a => ({ uri: a.uri }));
+            setImages(prev => [...prev, ...newImages]);
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (postId) => {
+    const urls = [];
+    for (let i = 0; i < images.length; i++) {
+      const response = await fetch(images[i].uri);
+      const blob = await response.blob();
+      const storageRef = ref(storage, `posts/${postId}/image_${i}.jpg`);
+      await uploadBytes(storageRef, blob);
+      const url = await getDownloadURL(storageRef);
+      urls.push(url);
+    }
+    return urls;
+  };
 
   const handlePost = async () => {
     if (isServices) {
@@ -125,8 +181,16 @@ export default function CreatePostScreen() {
         likeCount: 0,
         commentCount: 0,
         isRemoved: false,
+        images: [],
         ...extraFields,
       });
+
+      // Upload images if any
+      if (images.length > 0) {
+        const imageUrls = await uploadImages(postRef.id);
+        const { updateDoc, doc } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
+      }
 
       // Notify all users in same suburb except the poster
       try {
@@ -137,22 +201,12 @@ export default function CreatePostScreen() {
           events: 'Event', services: 'Service',
         };
         const label = categoryLabels[categoryValue] || 'Post';
-        const batch = writeBatch(db);
-        otherUsers.forEach(u => {
-          const notifRef = collection(db, 'notifications');
-          // Use addDoc outside batch for notifications
-        });
-        // Send individually (batch doesn't support addDoc)
         await Promise.all(otherUsers.map(u =>
           addDoc(collection(db, 'notifications'), {
-            userId: u.id,
-            type: 'new_post',
+            userId: u.id, type: 'new_post',
             message: `${profile.displayName} posted a new ${label} in ${profile.suburb}`,
-            postId: postRef.id,
-            fromUserId: user.uid,
-            fromUserName: profile.displayName,
-            isRead: false,
-            createdAt: serverTimestamp(),
+            postId: postRef.id, fromUserId: user.uid, fromUserName: profile.displayName,
+            isRead: false, createdAt: serverTimestamp(),
           })
         ));
       } catch (e) { console.error('notification error:', e); }
@@ -163,6 +217,33 @@ export default function CreatePostScreen() {
   };
 
   const tabs = isCommunity ? COMMUNITY_TABS : isMarketplace ? MARKETPLACE_TABS : isServices ? SERVICE_TABS : null;
+
+  // Image picker section — reusable
+  const ImagePickerSection = () => (
+    <>
+      <View style={styles.sectionBar}>
+        <Text style={styles.sectionBarText}>Photos ({images.length}/3)</Text>
+      </View>
+      <View style={styles.fieldPad}>
+        <View style={styles.imageRow}>
+          {images.map((img, index) => (
+            <View key={index} style={styles.imageThumbWrap}>
+              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImage(index)}>
+                <Ionicons name="close-circle" size={20} color="#E53935" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {images.length < 3 && (
+            <TouchableOpacity style={styles.addImageBtn} onPress={handlePickImage}>
+              <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
+              <Text style={styles.addImageText}>Add Photo</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.container}>
@@ -189,7 +270,6 @@ export default function CreatePostScreen() {
 
       <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
 
-        {/* Tabs */}
         {tabs && (
           <View style={styles.tabRow}>
             {tabs.map(t => (
@@ -211,10 +291,9 @@ export default function CreatePostScreen() {
           </View>
         )}
 
-        {/* SERVICES FORM — Select service then description */}
+        {/* SERVICES */}
         {isServices && (
           <>
-            {/* Step 1: Select service */}
             <View style={styles.sectionBar}>
               <Text style={styles.sectionBarText}>Select a Service</Text>
             </View>
@@ -237,37 +316,24 @@ export default function CreatePostScreen() {
                 )}
               </TouchableOpacity>
             </View>
-
-            {/* Step 2: Description */}
             <View style={styles.sectionBar}>
-              <Text style={styles.sectionBarText}>
-                {selectedCategory === 'offering' ? 'Describe your service' : 'What are you looking for?'}
-              </Text>
+              <Text style={styles.sectionBarText}>{selectedCategory === 'offering' ? 'Describe your service' : 'What are you looking for?'}</Text>
             </View>
             <View style={styles.fieldPad}>
               <TextInput
                 style={[styles.input, styles.inputLarge]}
-                placeholder={selectedCategory === 'offering'
-                  ? 'Tell neighbours about your service — experience, availability, rates...'
-                  : 'Describe what you need — location, timing, budget...'}
-                placeholderTextColor={Colors.midGrey}
-                value={content}
-                onChangeText={setContent}
-                multiline
-                textAlignVertical="top"
-                autoCapitalize="sentences"
-                autoCorrect={true}
+                placeholder={selectedCategory === 'offering' ? 'Tell neighbours about your service — experience, availability, rates...' : 'Describe what you need — location, timing, budget...'}
+                placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent}
+                multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true}
                 onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
               />
             </View>
-
+            <ImagePickerSection />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
               </TouchableOpacity>
             </View>
-
-            {/* Service picker modal */}
             <Modal visible={showServiceModal} transparent animationType="slide">
               <View style={styles.modalOverlay}>
                 <View style={styles.modalSheet}>
@@ -281,7 +347,7 @@ export default function CreatePostScreen() {
                     renderItem={({ item: s }) => {
                       const isSelected = selectedService?.key === s.key;
                       return (
-                        <TouchableOpacity key={s.key} style={[styles.modalItem, isSelected && styles.modalItemActive]} onPress={() => { setSelectedService(s); setShowServiceModal(false); }}>
+                        <TouchableOpacity style={[styles.modalItem, isSelected && styles.modalItemActive]} onPress={() => { setSelectedService(s); setShowServiceModal(false); }}>
                           <View style={[styles.modalItemIcon, isSelected && styles.modalItemIconActive]}>
                             <Ionicons name={s.icon} size={20} color={isSelected ? Colors.white : Colors.brandGreen} />
                           </View>
@@ -300,7 +366,7 @@ export default function CreatePostScreen() {
           </>
         )}
 
-        {/* Community form */}
+        {/* COMMUNITY */}
         {isCommunity && (
           <>
             <View style={styles.sectionBar}>
@@ -311,10 +377,11 @@ export default function CreatePostScreen() {
             <View style={styles.fieldPad}>
               <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} />
             </View>
+            <ImagePickerSection />
           </>
         )}
 
-        {/* Marketplace form */}
+        {/* MARKETPLACE */}
         {isMarketplace && (
           <>
             <View style={styles.sectionBar}>
@@ -335,6 +402,7 @@ export default function CreatePostScreen() {
                 </View>
               </>
             )}
+            <ImagePickerSection />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
@@ -343,7 +411,7 @@ export default function CreatePostScreen() {
           </>
         )}
 
-        {/* Lost & Found form */}
+        {/* LOST & FOUND */}
         {isLostFound && (
           <>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>{selectedCategory === 'lost' ? 'I lost...' : 'I found...'}</Text></View>
@@ -358,6 +426,7 @@ export default function CreatePostScreen() {
             <View style={styles.fieldPad}>
               <TextInput style={styles.input2Line} placeholder={selectedCategory === 'lost' ? 'Where did you last see it?' : 'Where did you find it?'} placeholderTextColor={Colors.midGrey} value={lfLocation} onChangeText={setLfLocation} multiline numberOfLines={2} textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
             </View>
+            <ImagePickerSection />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
@@ -390,20 +459,25 @@ const styles = StyleSheet.create({
   sectionBar: { backgroundColor: Colors.brandGreenPale, paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.lightGrey },
   sectionBarText: { fontSize: 17, fontWeight: '700', color: Colors.brandGreen },
   fieldPad: { paddingHorizontal: 16, paddingVertical: 8 },
-  // Service selector
   serviceSelector: { borderWidth: 1.5, borderColor: Colors.brandGreen, borderRadius: 12, overflow: 'hidden' },
   serviceSelectorSelected: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   serviceSelectorIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center' },
   serviceSelectorText: { flex: 1, fontSize: 16, fontWeight: '700', color: Colors.brandGreen },
   serviceSelectorPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   serviceSelectorPlaceholderText: { flex: 1, fontSize: 15, color: Colors.midGrey },
-  // Inputs
   input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   input2Line: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, height: 68, textAlignVertical: 'top' },
   inputLarge: { minHeight: 160, textAlignVertical: 'top' },
   inputSingle: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   postBtnBottom: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   postBtnBottomText: { fontSize: 20, fontWeight: '800', color: Colors.white },
+  // Image picker
+  imageRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  imageThumbWrap: { position: 'relative' },
+  imageThumb: { width: 90, height: 90, borderRadius: 10, borderWidth: 1, borderColor: Colors.lightGrey },
+  removeImageBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: Colors.white, borderRadius: 10 },
+  addImageBtn: { width: 90, height: 90, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.brandGreen, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 4 },
+  addImageText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
   // Service modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, maxHeight: '80%' },
@@ -415,6 +489,6 @@ const styles = StyleSheet.create({
   modalItemIconActive: { backgroundColor: Colors.brandGreen },
   modalItemText: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '600' },
   modalItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
-  modalCloseBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  modalCloseBtnText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen },
+  modalCloseBtn: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  modalCloseBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 });

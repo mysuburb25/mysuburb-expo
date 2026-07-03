@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -17,6 +17,7 @@ const CATEGORY_COLORS = {
   events:      { bg: '#F3E5F5', text: '#6A1B9A', label: 'Event' },
   marketplace: { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: 'Buy & Sell' },
   lostfound:   { bg: '#FFF3E0', text: '#E65100', label: 'Lost & Found' },
+  services:    { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: 'Services' },
 };
 
 function formatDate(date) {
@@ -32,7 +33,7 @@ function formatTime(date) {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, logout, updateUserProfile, unreadCount} = useAuth();
+  const { user, profile, logout, updateUserProfile, unreadCount } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,6 +100,20 @@ export default function ProfileScreen() {
     Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); router.replace('/(auth)/login'); } },
+    ]);
+  };
+
+  const handleDeletePost = (postId) => {
+    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await updateDoc(doc(db, 'posts', postId), { isRemoved: true });
+            setPosts(prev => prev.filter(p => p.id !== postId));
+          } catch (e) { Alert.alert('Error', e.message); }
+        }
+      }
     ]);
   };
 
@@ -181,13 +196,20 @@ export default function ProfileScreen() {
           renderItem={({ item }) => {
             const catStyle = CATEGORY_COLORS[item.category] || CATEGORY_COLORS.updates;
             return (
-              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
-                {/* Light green category bar at top */}
+              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
+                {/* Card header with category badge and delete button */}
                 <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }} />
                   <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
                     <Text style={[styles.catBadgeText, { color: catStyle.text }]}>{catStyle.label}</Text>
                   </View>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeletePost(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#E53935" />
+                  </TouchableOpacity>
                 </View>
                 {/* Post content */}
                 <Text style={styles.cardContent} numberOfLines={3}>{item.content}</Text>
@@ -217,6 +239,8 @@ const styles = StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   profileSection: { backgroundColor: Colors.white, alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
@@ -239,6 +263,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   catBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
   catBadgeText: { fontSize: 12, fontWeight: '700' },
+  deleteBtn: { padding: 4 },
   cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, padding: 12 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10 },
   cardMeta: { fontSize: 11, color: Colors.midGrey },

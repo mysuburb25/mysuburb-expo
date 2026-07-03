@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -25,20 +25,13 @@ function formatDateTime(date) {
 }
 
 const PAGE_TITLES = {
-  updates:     'Community Hub',
-  notices:     'Community Hub',
-  safety:      'Community Hub',
-  events:      'Events',
-  marketplace: 'Buy & Sell',
-  lostfound:   'Lost & Found',
+  updates: 'Community Hub', notices: 'Community Hub', safety: 'Community Hub',
+  events: 'Events', marketplace: 'Buy & Sell', lostfound: 'Lost & Found', services: 'Services',
 };
 
 const CATEGORY_LABELS = {
-  updates:     "What's Happening",
-  notices:     'Notice',
-  safety:      'Safety Alert',
-  events:      'Event',
-  marketplace: 'Buy & Sell',
+  updates: "What's Happening", notices: 'Notice', safety: 'Safety Alert',
+  events: 'Event', marketplace: 'Buy & Sell', services: 'Service',
 };
 
 export default function PostDetailScreen() {
@@ -51,6 +44,8 @@ export default function PostDetailScreen() {
   const [posting, setPosting] = useState(false);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [showPostMenu, setShowPostMenu] = useState(false);
+  const [deletingPost, setDeletingPost] = useState(false);
   const flatListRef = useRef(null);
 
   useEffect(() => { fetchPost(); fetchComments(); }, [id]);
@@ -126,6 +121,44 @@ export default function PostDetailScreen() {
     finally { setPosting(false); }
   };
 
+  const handleDeletePost = () => {
+    setShowPostMenu(false);
+    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          setDeletingPost(true);
+          try {
+            await updateDoc(doc(db, 'posts', id), { isRemoved: true });
+            router.back();
+          } catch (e) { Alert.alert('Error', e.message); }
+          finally { setDeletingPost(false); }
+        }
+      }
+    ]);
+  };
+
+  const handleReportPost = () => {
+    setShowPostMenu(false);
+    Alert.alert('Report Post', 'Thank you for reporting. Our team will review this post.');
+  };
+
+  const handleDeleteComment = (commentId) => {
+    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await deleteDoc(doc(db, 'comments', commentId));
+            await updateDoc(doc(db, 'posts', id), { commentCount: increment(-1) });
+            setComments(prev => prev.filter(c => c.id !== commentId));
+            setPost(prev => ({ ...prev, commentCount: Math.max((prev.commentCount || 1) - 1, 0) }));
+          } catch (e) { Alert.alert('Error', e.message); }
+        }
+      }
+    ]);
+  };
+
   if (loading) return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white }}>
       <ActivityIndicator color={Colors.brandGreen} size="large" />
@@ -140,6 +173,7 @@ export default function PostDetailScreen() {
 
   const isEvent = post.category === 'events';
   const isLostFound = post.category === 'lostfound';
+  const isOwner = post.authorId === user?.uid;
   const pageTitle = PAGE_TITLES[post.category] || 'Community Hub';
   const categoryLabel = CATEGORY_LABELS[post.category];
 
@@ -168,7 +202,6 @@ export default function PostDetailScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Page Title */}
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>{pageTitle}</Text>
       </View>
@@ -184,7 +217,6 @@ export default function PostDetailScreen() {
           if (item.type === 'post') {
             return (
               <View>
-                {/* Event Banner */}
                 {isEvent && eventDate && (
                   <View style={styles.eventBanner}>
                     <View style={styles.eventDateBox}>
@@ -210,9 +242,7 @@ export default function PostDetailScreen() {
                   </View>
                 )}
 
-                {/* Post Card */}
                 <View style={styles.postCard}>
-                  {/* Author row + tag */}
                   <View style={styles.authorRow}>
                     <View style={styles.avatar}>
                       <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase()}</Text>
@@ -231,12 +261,23 @@ export default function PostDetailScreen() {
                         <Text style={styles.pillTagText}>{categoryLabel}</Text>
                       </View>
                     )}
+                    {/* 3-dot menu button */}
+                    <TouchableOpacity style={styles.menuBtn} onPress={() => setShowPostMenu(true)}>
+                      <Ionicons name="ellipsis-vertical" size={20} color={Colors.midGrey} />
+                    </TouchableOpacity>
                   </View>
 
-                  {/* Main content */}
                   <Text style={styles.contentBold}>{post.content}</Text>
 
-                  {/* Lost & Found extra fields */}
+                  {/* Images */}
+                  {post.images && post.images.length > 0 && (
+                    <View style={styles.imagesWrap}>
+                      {post.images.map((url, i) => (
+                        <Image key={i} source={{ uri: url }} style={styles.postImage} resizeMode="cover" />
+                      ))}
+                    </View>
+                  )}
+
                   {isLostFound && post.description ? (
                     <Text style={styles.description}>{post.description}</Text>
                   ) : null}
@@ -247,7 +288,6 @@ export default function PostDetailScreen() {
                     </View>
                   ) : null}
 
-                  {/* Marketplace details */}
                   {post.category === 'marketplace' && (
                     <View style={styles.detailRow}>
                       {post.price > 0 && <Text style={styles.priceTag}>${post.price?.toFixed(2)}</Text>}
@@ -256,7 +296,6 @@ export default function PostDetailScreen() {
                     </View>
                   )}
 
-                  {/* White like/comment footer */}
                   <View style={styles.footer}>
                     <TouchableOpacity style={styles.footerBtn} onPress={handleLike} disabled={liking}>
                       <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.midGrey} />
@@ -280,6 +319,7 @@ export default function PostDetailScreen() {
             );
           }
 
+          const isMyComment = item.authorId === user?.uid;
           return (
             <View style={styles.comment}>
               <View style={styles.commentAvatar}>
@@ -290,6 +330,11 @@ export default function PostDetailScreen() {
                 <Text style={styles.commentContent}>{item.content}</Text>
                 <Text style={styles.commentTime}>{formatDateTime(item.createdAt)}</Text>
               </View>
+              {isMyComment && (
+                <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
+                  <Ionicons name="trash-outline" size={16} color="#E53935" />
+                </TouchableOpacity>
+              )}
             </View>
           );
         }}
@@ -297,9 +342,6 @@ export default function PostDetailScreen() {
 
       {/* Comment Input */}
       <View style={styles.commentInputRow}>
-        <View style={styles.inputAvatar}>
-          <Text style={styles.commentAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
-        </View>
         <TextInput
           style={styles.input}
           placeholder="Write a comment..."
@@ -315,12 +357,41 @@ export default function PostDetailScreen() {
           {posting ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send" size={18} color="#fff" />}
         </TouchableOpacity>
       </View>
+
+      {/* 3-dot Post Menu Modal */}
+      <Modal visible={showPostMenu} transparent animationType="fade">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowPostMenu(false)}>
+          <View style={styles.menuSheet}>
+            <View style={styles.menuHandle} />
+            {isOwner ? (
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleDeletePost} disabled={deletingPost}>
+                  <View style={styles.menuItemIcon}>
+                    <Ionicons name="trash-outline" size={20} color="#E53935" />
+                  </View>
+                  <Text style={styles.menuItemTextDanger}>Delete Post</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.menuItem} onPress={handleReportPost}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="flag-outline" size={20} color="#E65100" />
+                </View>
+                <Text style={styles.menuItemTextWarn}>Report Post</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowPostMenu(false)}>
+              <Text style={styles.menuCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: Colors.white },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerCenter: { alignItems: 'center' },
@@ -344,6 +415,7 @@ const styles = StyleSheet.create({
   dateTime: { fontSize: 11, color: Colors.midGrey, marginTop: 2 },
   pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   pillTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  menuBtn: { padding: 4 },
   contentBold: { fontSize: 17, color: Colors.charcoal, lineHeight: 26, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 6 },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
@@ -358,16 +430,29 @@ const styles = StyleSheet.create({
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   commentsTitle: { fontSize: 16, fontWeight: '700', color: Colors.charcoal, marginBottom: 8 },
-  noComments: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  noComments: { alignItems: 'center', paddingVertical: 16, gap: 8 },
   noCommentsText: { fontSize: 14, color: Colors.midGrey },
   comment: { backgroundColor: Colors.white, borderRadius: 12, padding: 12, flexDirection: 'row', gap: 10, borderWidth: 1, borderColor: Colors.lightGrey, marginBottom: 8 },
   commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
-  inputAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  inputAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   commentAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   commentAuthor: { fontSize: 13, fontWeight: '700', color: Colors.charcoal },
   commentContent: { fontSize: 14, fontWeight: '500', color: Colors.charcoal, marginTop: 2, lineHeight: 20 },
   commentTime: { fontSize: 11, color: Colors.midGrey, marginTop: 4 },
-  commentInputRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.lightGrey, alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  deleteCommentBtn: { padding: 6, justifyContent: 'center' },
+  commentInputRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.brandGreen, borderTopWidth: 1, borderTopColor: Colors.brandGreen, alignItems: 'flex-end' },
+  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  imagesWrap: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
+  postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },
+  // Post menu modal
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },
+  menuHandle: { width: 40, height: 4, backgroundColor: Colors.lightGrey, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12 },
+  menuItemIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
+  menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
+  menuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100' },
+  menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8 },
+  menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
 });
