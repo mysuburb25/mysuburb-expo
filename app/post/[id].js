@@ -30,7 +30,7 @@ const PAGE_TITLES = {
 };
 
 const CATEGORY_LABELS = {
-  updates: "What's Happening", notices: 'Notice', safety: 'Safety Alert',
+  updates: 'General', notices: 'Notice', safety: 'Safety Alert',
   events: 'Event', marketplace: 'Buy & Sell', services: 'Service',
 };
 
@@ -244,13 +244,27 @@ export default function PostDetailScreen() {
 
                 <View style={styles.postCard}>
                   <View style={styles.authorRow}>
-                    <View style={styles.avatar}>
+                    <TouchableOpacity
+                      style={styles.avatar}
+                      onPress={() => {
+                        if (post.authorId !== user?.uid) {
+                          router.push({ pathname: '/chat/' + post.authorId, params: { userId: post.authorId, userName: post.authorName } });
+                        }
+                      }}
+                    >
                       <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase()}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        if (post.authorId !== user?.uid) {
+                          router.push({ pathname: '/chat/' + post.authorId, params: { userId: post.authorId, userName: post.authorName } });
+                        }
+                      }}
+                    >
                       <Text style={styles.authorName}>{post.authorName}</Text>
                       <Text style={styles.dateTime}>{formatDateTime(post.createdAt)}</Text>
-                    </View>
+                    </TouchableOpacity>
                     {isLostFound && post.lostFoundType && (
                       <View style={[styles.pillTag, { backgroundColor: post.lostFoundType === 'lost' ? '#C62828' : Colors.brandGreen }]}>
                         <Text style={styles.pillTagText}>{post.lostFoundType === 'lost' ? 'Lost' : 'Found'}</Text>
@@ -415,6 +429,8 @@ const styles = StyleSheet.create({
   dateTime: { fontSize: 11, color: Colors.midGrey, marginTop: 2 },
   pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   pillTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  messageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.white, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: Colors.brandGreen },
+  messageBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   menuBtn: { padding: 4 },
   contentBold: { fontSize: 17, color: Colors.charcoal, lineHeight: 26, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 6 },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },

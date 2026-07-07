@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
 const COMMUNITY_TABS = [
-  { key: 'updates', label: "What's Happening" },
+  { key: 'updates', label: 'General' },
   { key: 'notices', label: 'Notice' },
   { key: 'safety', label: 'Safety Alert' },
 ];
@@ -43,9 +43,9 @@ const SERVICE_CATEGORIES = [
 ];
 
 const COMMUNITY_PLACEHOLDERS = {
-  updates: "Share what's going on in your suburb...",
-  notices: 'Post an important notice for your suburb...',
-  safety:  'Report a safety concern in your suburb...',
+  updates: "Share news, updates or anything happening in your suburb with your neighbours...",
+  notices: "Post an important notice — road closures, local meetings, community news...",
+  safety:  "Report a safety concern — suspicious activity, hazards, emergencies in your area...",
 };
 
 export default function CreatePostScreen() {
@@ -105,7 +105,7 @@ export default function CreatePostScreen() {
             allowsMultipleSelection: true,
             selectionLimit: remaining,
             allowsEditing: false,
-            presentationStyle: ImagePicker.UIImagePickerPresentationStyle.FULL_SCREEN,
+            preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
           });
           if (!result.canceled) {
             const newImages = result.assets.slice(0, remaining).map(a => ({ uri: a.uri }));
@@ -246,7 +246,7 @@ export default function CreatePostScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={24} color={Colors.white} />
@@ -255,20 +255,14 @@ export default function CreatePostScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        {isCommunity ? (
-          <TouchableOpacity style={[styles.postBtnHeader, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-            {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnHeaderText}>Post</Text>}
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 60 }} />
-        )}
+        <View style={{ width: 60 }} />
       </View>
 
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>{pageTitle}</Text>
       </View>
 
-      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
+      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {tabs && (
           <View style={styles.tabRow}>
@@ -371,13 +365,18 @@ export default function CreatePostScreen() {
           <>
             <View style={styles.sectionBar}>
               <Text style={styles.sectionBarText}>
-                {selectedCategory === 'updates' ? "What's happening?" : selectedCategory === 'notices' ? 'Post a notice...' : 'Report a safety concern...'}
+                {selectedCategory === 'updates' ? "What's in your suburb?" : selectedCategory === 'notices' ? 'Post a notice...' : 'Report a safety concern...'}
               </Text>
             </View>
             <View style={styles.fieldPad}>
-              <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} />
+              <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
             </View>
             <ImagePickerSection />
+            <View style={styles.fieldPad}>
+              <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -435,7 +434,7 @@ export default function CreatePostScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -454,7 +453,7 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '600' },
+  tabText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   sectionBar: { backgroundColor: Colors.brandGreenPale, paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.lightGrey },
   sectionBarText: { fontSize: 17, fontWeight: '700', color: Colors.brandGreen },
@@ -467,7 +466,7 @@ const styles = StyleSheet.create({
   serviceSelectorPlaceholderText: { flex: 1, fontSize: 15, color: Colors.midGrey },
   input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   input2Line: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, height: 68, textAlignVertical: 'top' },
-  inputLarge: { minHeight: 160, textAlignVertical: 'top' },
+  inputLarge: { minHeight: 100, textAlignVertical: 'top' },
   inputSingle: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   postBtnBottom: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   postBtnBottomText: { fontSize: 20, fontWeight: '800', color: Colors.white },

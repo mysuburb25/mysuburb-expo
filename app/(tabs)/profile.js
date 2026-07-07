@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 
 const CATEGORY_COLORS = {
-  updates:     { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: "What's Happening" },
+  updates:     { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: 'General' },
   notices:     { bg: '#E3F2FD', text: '#0D47A1', label: 'Notice' },
   safety:      { bg: '#FFF3E0', text: '#E65100', label: 'Safety Alert' },
   events:      { bg: '#F3E5F5', text: '#6A1B9A', label: 'Event' },

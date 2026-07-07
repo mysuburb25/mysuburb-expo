@@ -9,13 +9,13 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 
 const FILTERS = [
-  { key: 'all', label: "What's Happening", createCategory: 'community', preselect: 'updates' },
+  { key: 'all', label: 'General', createCategory: 'community', preselect: 'updates' },
   { key: 'notices', label: 'Notices', createCategory: 'community', preselect: 'notices' },
   { key: 'safety', label: 'Safety Alerts', createCategory: 'community', preselect: 'safety' },
 ];
 
 const CATEGORY_CONFIG = {
-  updates:     { label: "What's Happening", bg: Colors.brandGreen },
+  updates:     { label: 'General', bg: Colors.brandGreen },
   notices:     { label: 'Notice',           bg: '#1565C0' },
   safety:      { label: 'Safety Alert',     bg: '#E65100' },
   events:      { label: 'Event',            bg: '#6A1B9A' },
@@ -47,7 +47,7 @@ export default function HomeScreen() {
     try {
       let q;
       if (activeFilter.key === 'all') {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('isRemoved', '==', false), orderBy('createdAt', 'desc'), limit(20));
+        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'updates'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'), limit(20));
       } else {
         q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', activeFilter.key), where('isRemoved', '==', false), orderBy('createdAt', 'desc'), limit(20));
       }
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 12, color: Colors.midGrey, fontWeight: '800' },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 12, gap: 12, paddingBottom: 100 },
   card: { borderRadius: 16, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
