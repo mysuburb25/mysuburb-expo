@@ -9,6 +9,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="post/[id]" />
+        <Stack.Screen name="chat/[userId]" />
         <Stack.Screen name="create-post" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="privacy-policy" />

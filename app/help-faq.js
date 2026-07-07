@@ -6,12 +6,21 @@ import { Ionicons } from '@expo/vector-icons';
 const FAQS = [
   { q: 'How does My Suburb work?', a: 'My Suburb connects you with neighbours in your exact suburb. All posts are only visible to people who live in the same suburb as you.' },
   { q: 'How do I change my suburb?', a: 'Go to Profile, tap Settings, then tap Change Suburb. You can search for any suburb in Australia.' },
+  { q: 'Can I follow more than one suburb?', a: 'Yes, you can select up to 3 suburbs — a Primary, Second, and Third. Posts from all your active suburbs appear together in your feed.' },
+  { q: 'What is a Primary suburb?', a: 'Your Primary suburb is the first one you select and is where all your posts are published. It cannot be turned off, but you can replace it any time from Change Suburb.' },
+  { q: 'How do I turn a suburb on or off in my feed?', a: 'Go to Profile and find the Selected Suburbs section. Each Second and Third suburb has a switch you can toggle on or off to control whether its posts show in your feed. Your Primary suburb is always on.' },
   { q: 'Who can see my posts?', a: 'Only verified residents of your suburb can see your posts. Posts are never visible to people outside your suburb.' },
   { q: 'How do I report a post?', a: 'Tap on any post and look for the report button. Our moderation team reviews all reports promptly.' },
   { q: 'Is My Suburb free to use?', a: 'Yes, My Suburb is completely free to use. There are no ads or paid features.' },
   { q: 'How do I delete my account?', a: 'Go to Settings, scroll down to Account Actions and tap Delete Account. You can also email us at support@mysuburb.com.au' },
   { q: 'What is Buy and Sell?', a: 'Buy and Sell lets you list items for sale, give things away for free, or post what you are looking for. All transactions are between neighbours directly.' },
   { q: 'How do Safety Alerts work?', a: 'Safety Alerts are for genuine urgent safety concerns in your suburb such as break-ins or dangerous conditions. For emergencies always call 000 first.' },
+  { q: 'How do I message another neighbour directly?', a: 'Tap on a neighbour\'s name or profile from any post to open a private one-on-one chat with them.' },
+  { q: 'Can I add photos to a post?', a: 'Yes, when creating a post you can attach up to 3 photos from your camera or photo library.' },
+  { q: 'How do I change my profile photo?', a: 'Go to Profile and tap the camera icon on your avatar. You can take a new photo or choose one from your photo library.' },
+  { q: 'How do I turn off notifications?', a: 'Go to Settings to manage which notifications you receive, such as likes, comments, and new posts in your suburb.' },
+  { q: 'Can I sign up using just my mobile number?', a: 'Yes, on the sign up screen choose the Mobile option instead of Email and enter your Australian mobile number.' },
+  { q: 'What happens to my posts and data if I delete my account?', a: 'Deleting your account removes your profile and personal details. Your posts may remain visible to protect ongoing conversations, but they will no longer be linked to your name. Contact support@mysuburb.com.au if you would like your posts removed as well.' },
 ];
 
 export default function HelpFAQScreen() {

@@ -45,14 +45,39 @@ export default function HomeScreen() {
   const fetchPosts = useCallback(async () => {
     if (!profile?.suburb) return;
     try {
-      let q;
-      if (activeFilter.key === 'all') {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'updates'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'), limit(20));
-      } else {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', activeFilter.key), where('isRemoved', '==', false), orderBy('createdAt', 'desc'), limit(20));
-      }
-      const snap = await getDocs(q);
-      setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
+      const activeSuburbs = profile?.suburbs
+        ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+        : [{ suburb: profile.suburb, state: profile.state }];
+      if (activeSuburbs.length === 0) return;
+
+      const categoryFilter = activeFilter.key === 'all' ? 'updates' : activeFilter.key;
+
+      // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
+      // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
+      const queryPromises = activeSuburbs.map(({ suburb, state }) => {
+        const q = query(
+          collection(db, 'posts'),
+          where('suburb', '==', suburb),
+          where('state', '==', state),
+          where('category', '==', categoryFilter),
+          where('isRemoved', '==', false),
+          orderBy('createdAt', 'desc'),
+          limit(20)
+        );
+        return getDocs(q);
+      });
+
+      const snaps = await Promise.all(queryPromises);
+      let allPosts = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Sort merged results by date since each suburb's posts arrive independently
+      allPosts.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(0);
+        const bTime = b.createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime;
+      });
+      setPosts(allPosts);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, [profile, activeFilter]);

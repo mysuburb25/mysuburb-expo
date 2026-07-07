@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, ActivityIndicator, Modal, ScrollView, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { useState, useMemo, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert, ActivityIndicator, Modal, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -17,58 +17,113 @@ const STATE_ICONS = {
   'Northern Territory':          'globe-outline',
 };
 
+const SUBURB_SLOTS = [
+  { key: 'primary',   label: 'Primary Suburb',  required: true  },
+  { key: 'second',    label: 'Second Suburb',    required: false },
+  { key: 'third',     label: 'Third Suburb',     required: false },
+];
+
+const emptySlot = () => ({ state: '', suburb: '', active: true });
+
 export default function SelectSuburbScreen() {
   const { uid, email, displayName } = useLocalSearchParams();
   const { createProfile, updateUserProfile, user, profile } = useAuth();
-  const [selectedState, setSelectedState] = useState(profile?.state || '');
-  const [suburb, setSuburb] = useState(profile?.suburb || '');
+  const isEditing = !!profile?.suburb;
+
+  const initSlots = () => {
+    if (profile?.suburbs && profile.suburbs.length > 0) {
+      return [
+        profile.suburbs[0] || emptySlot(),
+        profile.suburbs[1] || emptySlot(),
+        profile.suburbs[2] || emptySlot(),
+      ];
+    }
+    if (profile?.suburb) {
+      return [
+        { state: profile.state || '', suburb: profile.suburb, active: true },
+        emptySlot(),
+        emptySlot(),
+      ];
+    }
+    return [emptySlot(), emptySlot(), emptySlot()];
+  };
+
+  const [slots, setSlots] = useState(initSlots());
+  const [activeSlotIndex, setActiveSlotIndex] = useState(null); // which slot is being edited
   const [search, setSearch] = useState('');
   const [showStateModal, setShowStateModal] = useState(false);
   const [showSuburbList, setShowSuburbList] = useState(false);
   const [loading, setLoading] = useState(false);
-  const isEditing = !!profile?.suburb;
+  const searchRef = useRef(null);
 
   const filteredSuburbs = useMemo(() => {
-    if (!selectedState) return [];
-    const all = SUBURBS_BY_STATE[selectedState] || [];
+    if (activeSlotIndex === null || !slots[activeSlotIndex]?.state) return [];
+    const all = SUBURBS_BY_STATE[slots[activeSlotIndex].state] || [];
     if (!search.trim()) return all.slice(0, 50);
     return all.filter(s => s.toLowerCase().startsWith(search.toLowerCase())).slice(0, 50);
-  }, [selectedState, search]);
+  }, [activeSlotIndex, slots, search]);
 
-  const handleSelectState = (state) => {
-    setSelectedState(state);
-    setSuburb('');
+  const openStateModal = (index) => {
+    Keyboard.dismiss();
+    setActiveSlotIndex(index);
     setSearch('');
-    setShowSuburbList(true);
-    setShowStateModal(false);
+    setShowSuburbList(false);
+    setTimeout(() => setShowStateModal(true), 150);
   };
 
-  const handleSelectSuburb = (s) => {
-    setSuburb(s);
-    setSearch(s);
+  const handleSelectState = (state) => {
+    setSlots(prev => prev.map((s, i) => i === activeSlotIndex ? { ...s, state, suburb: '' } : s));
+    setSearch('');
+    setShowStateModal(false);
+    setShowSuburbList(true);
+    setTimeout(() => searchRef.current?.focus(), 300);
+  };
+
+  const handleSelectSuburb = (suburb) => {
+    setSlots(prev => prev.map((s, i) => i === activeSlotIndex ? { ...s, suburb, active: true } : s));
+    setSearch('');
     setShowSuburbList(false);
     Keyboard.dismiss();
+    searchRef.current?.blur();
+  };
+
+  const handleClearSlot = (index) => {
+    if (index === 0) {
+      Alert.alert('Cannot clear', 'Primary suburb is required.');
+      return;
+    }
+    setSlots(prev => prev.map((s, i) => i === index ? emptySlot() : s));
+    if (activeSlotIndex === index) {
+      setActiveSlotIndex(null);
+      setShowSuburbList(false);
+    }
   };
 
   const handleSave = async () => {
-    if (!selectedState || !suburb.trim()) {
-      Alert.alert('Error', 'Please select your state and suburb.');
+    if (!slots[0].suburb || !slots[0].state) {
+      Alert.alert('Error', 'Please select your primary suburb.');
       return;
     }
     setLoading(true);
     try {
+      const filledSlots = slots.filter(s => s.suburb && s.state);
+      const data = {
+        suburb: slots[0].suburb,
+        state: slots[0].state,
+        suburbs: filledSlots,
+      };
       if (isEditing) {
-        await updateUserProfile({ state: selectedState, suburb: suburb.trim() });
+        await updateUserProfile(data);
+        router.back();
       } else {
         await createProfile(uid || user?.uid, {
           email: email || user?.email,
           displayName: displayName || user?.displayName,
-          state: selectedState,
-          suburb: suburb.trim(),
           photoURL: null,
+          ...data,
         });
+        router.replace('/(tabs)');
       }
-      router.replace('/(tabs)');
     } catch (e) {
       Alert.alert('Error', e.message);
     } finally {
@@ -77,99 +132,104 @@ export default function SelectSuburbScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>My Suburb</Text>
       </View>
 
-      {/* Fixed top */}
-      <View style={styles.topSection}>
-        <Text style={styles.title}>{isEditing ? 'Change Suburb' : 'Select Your Suburb'}</Text>
-        <Text style={styles.subtitle}>Your feed will show posts from your suburb only.</Text>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} automaticallyAdjustKeyboardInsets={true}>
+        <View style={styles.topSection}>
+          <Text style={styles.title}>{isEditing ? 'My Suburbs' : 'Select Your Suburbs'}</Text>
+          <Text style={styles.subtitle}>Select up to 3 suburbs. Your Primary suburb is where your posts will appear.</Text>
 
-        {/* State button */}
-        <Text style={styles.label}>State or Territory</Text>
-        <TouchableOpacity
-          style={styles.selectorBtn}
-          onPress={() => {
-            Keyboard.dismiss();
-            setShowSuburbList(false);
-            setTimeout(() => setShowStateModal(true), 200);
-          }}
-        >
-          <Ionicons name={STATE_ICONS[selectedState] || 'map-outline'} size={18} color={Colors.brandGreen} />
-          <Text style={[styles.selectorBtnText, !selectedState && { color: Colors.midGrey }]}>
-            {selectedState || 'Select your state...'}
-          </Text>
-          <Ionicons name="chevron-down" size={18} color={Colors.brandGreen} />
-        </TouchableOpacity>
+          {SUBURB_SLOTS.map((slot, index) => (
+            <View key={slot.key} style={styles.slotSection}>
+              <Text style={styles.slotLabel}>
+                {slot.label} {slot.required && <Text style={styles.required}>*</Text>}
+              </Text>
 
-        {/* Suburb search - ONLY shows when no suburb selected */}
-        {selectedState && !suburb ? (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.label}>Suburb in {selectedState}</Text>
-            <View style={styles.searchBox}>
-              <Ionicons name="search-outline" size={18} color={Colors.brandGreen} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Type suburb name..."
-                placeholderTextColor={Colors.midGrey}
-                value={search}
-                onChangeText={(t) => { setSearch(t); setShowSuburbList(true); }}
-                onFocus={() => setShowSuburbList(true)}
-                autoCapitalize="words"
-                autoCorrect={false}
-              />
-              {search.length > 0 && (
-                <TouchableOpacity onPress={() => { setSearch(''); setShowSuburbList(true); }}>
-                  <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
-                </TouchableOpacity>
+              {/* State selector */}
+              <TouchableOpacity
+                style={[styles.selectorBtn, activeSlotIndex === index && styles.selectorBtnActive]}
+                onPress={() => openStateModal(index)}
+              >
+                <Ionicons name={STATE_ICONS[slots[index].state] || 'map-outline'} size={18} color={Colors.brandGreen} />
+                <Text style={[styles.selectorBtnText, !slots[index].state && { color: Colors.midGrey }]}>
+                  {slots[index].state || 'Select state...'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={Colors.midGrey} />
+              </TouchableOpacity>
+
+              {/* Suburb search - only show when this slot is active and has state */}
+              {activeSlotIndex === index && slots[index].state && !slots[index].suburb && (
+                <View style={styles.searchBox}>
+                  <Ionicons name="search-outline" size={18} color={Colors.brandGreen} />
+                  <TextInput
+                    ref={searchRef}
+                    style={styles.searchInput}
+                    placeholder={`Search suburb in ${slots[index].state}...`}
+                    placeholderTextColor={Colors.midGrey}
+                    value={search}
+                    onChangeText={(t) => { setSearch(t); setShowSuburbList(true); }}
+                    onFocus={() => setShowSuburbList(true)}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                  />
+                  {search.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearch('')}>
+                      <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Selected suburb badge */}
+              {slots[index].suburb ? (
+                <View style={styles.selectedBadge}>
+                  <Ionicons name="location" size={16} color={Colors.brandGreen} />
+                  <Text style={styles.selectedBadgeText}>{slots[index].suburb}, {slots[index].state}</Text>
+                  <TouchableOpacity onPress={() => {
+                    setSlots(prev => prev.map((s, i) => i === index ? { ...s, suburb: '' } : s));
+                    setActiveSlotIndex(index);
+                    setShowSuburbList(true);
+                    setTimeout(() => searchRef.current?.focus(), 100);
+                  }}>
+                    <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
+                  </TouchableOpacity>
+                  {index > 0 && (
+                    <TouchableOpacity onPress={() => handleClearSlot(index)}>
+                      <Ionicons name="close-circle" size={18} color="#E53935" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : null}
+
+              {/* Suburb list dropdown */}
+              {activeSlotIndex === index && showSuburbList && slots[index].state && !slots[index].suburb && (
+                <View style={styles.dropdownList}>
+                  {filteredSuburbs.length === 0 ? (
+                    <Text style={styles.emptyListText}>No suburbs found</Text>
+                  ) : (
+                    filteredSuburbs.map(item => (
+                      <TouchableOpacity key={item} style={styles.dropdownItem} onPress={() => handleSelectSuburb(item)}>
+                        <Ionicons name="location-outline" size={14} color={Colors.brandGreen} />
+                        <Text style={styles.dropdownItemText}>{item}</Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
               )}
             </View>
-          </View>
-        ) : null}
+          ))}
+        </View>
 
-        {/* Selected suburb badge - shows INSTEAD of TextInput */}
-        {suburb ? (
-          <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setSuburb(''); setSearch(''); setShowSuburbList(true); }}>
-            <View style={[styles.selectedBadge, { marginTop: 16 }]}>
-              <Ionicons name="checkmark-circle" size={20} color={Colors.brandGreen} />
-              <Text style={styles.selectedText}><Text style={{ fontWeight: '800' }}>{suburb}</Text>, {selectedState}</Text>
-              <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
-            </View>
-          </TouchableWithoutFeedback>
-        ) : null}
-      </View>
-
-      {/* Suburb results list */}
-      {showSuburbList && !suburb ? (
-        <FlatList
-          data={filteredSuburbs}
-          keyExtractor={item => item}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
-          style={styles.suburbList}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.suburbItem} onPress={() => handleSelectSuburb(item)}>
-              <View style={styles.suburbItemIcon}>
-                <Ionicons name="location-outline" size={16} color={Colors.brandGreen} />
-              </View>
-              <Text style={styles.suburbItemText}>{item}</Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={<View style={styles.emptyList}><Text style={styles.emptyListText}>No suburbs found</Text></View>}
-        />
-      ) : null}
-
-      {/* Continue button */}
-      {suburb && !showSuburbList ? (
+        {/* Save button */}
         <View style={styles.saveWrap}>
           <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSave} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isEditing ? 'Save Changes' : 'Continue'}</Text>}
           </TouchableOpacity>
         </View>
-      ) : null}
+      </ScrollView>
 
       {/* State modal */}
       <Modal visible={showStateModal} transparent animationType="slide">
@@ -177,18 +237,18 @@ export default function SelectSuburbScreen() {
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Select State or Territory</Text>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+            <ScrollView showsVerticalScrollIndicator={false}>
               {AustralianStates.map(state => (
                 <TouchableOpacity
                   key={state}
-                  style={[styles.modalItem, selectedState === state && styles.modalItemActive]}
+                  style={[styles.modalItem, slots[activeSlotIndex]?.state === state && styles.modalItemActive]}
                   onPress={() => handleSelectState(state)}
                 >
-                  <View style={[styles.modalItemIcon, selectedState === state && styles.modalItemIconActive]}>
-                    <Ionicons name={STATE_ICONS[state] || 'map-outline'} size={18} color={selectedState === state ? Colors.white : Colors.brandGreen} />
+                  <View style={[styles.modalItemIcon, slots[activeSlotIndex]?.state === state && styles.modalItemIconActive]}>
+                    <Ionicons name={STATE_ICONS[state] || 'map-outline'} size={18} color={slots[activeSlotIndex]?.state === state ? Colors.white : Colors.brandGreen} />
                   </View>
-                  <Text style={[styles.modalItemText, selectedState === state && styles.modalItemTextActive]}>{state}</Text>
-                  {selectedState === state && <Ionicons name="checkmark-circle" size={20} color={Colors.brandGreen} />}
+                  <Text style={[styles.modalItemText, slots[activeSlotIndex]?.state === state && styles.modalItemTextActive]}>{state}</Text>
+                  {slots[activeSlotIndex]?.state === state && <Ionicons name="checkmark-circle" size={20} color={Colors.brandGreen} />}
                 </TouchableOpacity>
               ))}
               <View style={{ height: 20 }} />
@@ -199,7 +259,7 @@ export default function SelectSuburbScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -207,24 +267,24 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   headerBar: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, alignItems: 'center' },
   headerTitle: { fontSize: 27, fontWeight: '800', color: Colors.white },
-  topSection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
+  topSection: { padding: 20 },
   title: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.midGrey, marginBottom: 20 },
-  label: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  selectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderColor: Colors.brandGreen, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.brandGreenPale },
-  selectorBtnText: { flex: 1, fontSize: 16, color: Colors.brandGreen, fontWeight: '800' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen, paddingHorizontal: 14, paddingVertical: 13 },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
-  selectedBadge: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, backgroundColor: Colors.brandGreenPale, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen },
-  selectedText: { flex: 1, fontSize: 15, color: Colors.brandGreen },
-  suburbList: { flex: 1 },
-  separator: { height: 1, backgroundColor: Colors.lightGrey, marginLeft: 56 },
-  suburbItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
-  suburbItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
-  suburbItemText: { fontSize: 15, color: Colors.charcoal, fontWeight: '400' },
-  emptyList: { alignItems: 'center', paddingTop: 40 },
-  emptyListText: { fontSize: 15, color: Colors.midGrey },
-  saveWrap: { padding: 20, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  subtitle: { fontSize: 13, color: Colors.midGrey, marginBottom: 24, lineHeight: 18 },
+  slotSection: { marginBottom: 24 },
+  slotLabel: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen, marginBottom: 8 },
+  required: { color: '#E53935' },
+  selectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FAFAFA' },
+  selectorBtnActive: { borderColor: Colors.brandGreen, backgroundColor: Colors.brandGreenPale },
+  selectorBtnText: { flex: 1, fontSize: 15, color: Colors.brandGreen, fontWeight: '600' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen, paddingHorizontal: 14, paddingVertical: 13, marginTop: 8 },
+  searchInput: { flex: 1, fontSize: 15, color: Colors.charcoal },
+  selectedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 12, backgroundColor: Colors.brandGreenPale, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen + '40' },
+  selectedBadgeText: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.brandGreen },
+  dropdownList: { marginTop: 4, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, maxHeight: 200, overflow: 'hidden' },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
+  dropdownItemText: { fontSize: 14, color: Colors.charcoal },
+  emptyListText: { fontSize: 14, color: Colors.midGrey, padding: 16, textAlign: 'center' },
+  saveWrap: { paddingHorizontal: 20, paddingBottom: 20 },
   button: { backgroundColor: Colors.brandGreen, borderRadius: 14, padding: 16, alignItems: 'center' },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
@@ -236,8 +296,8 @@ const styles = StyleSheet.create({
   modalItemActive: { backgroundColor: Colors.brandGreenPale },
   modalItemIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   modalItemIconActive: { backgroundColor: Colors.brandGreen },
-  modalItemText: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '400' },
-  modalItemTextActive: { color: Colors.brandGreen, fontWeight: '800' },
+  modalItemText: { flex: 1, fontSize: 16, color: Colors.charcoal },
+  modalItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   modalCloseBtn: { backgroundColor: Colors.brandGreen, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   modalCloseBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 });

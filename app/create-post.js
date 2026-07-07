@@ -192,10 +192,31 @@ export default function CreatePostScreen() {
         await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
       }
 
-      // Notify all users in same suburb except the poster
+      // Notify all users who have this suburb active — whether it's their
+      // Primary, Second, or Third suburb — except the poster themselves,
+      // and only if they haven't turned off notifications for this category.
+      // General community posts (updates/notices) have no dedicated toggle,
+      // so those always notify.
       try {
-        const usersSnap = await getDocs(query(collection(db, 'users'), where('suburb', '==', profile.suburb)));
-        const otherUsers = usersSnap.docs.filter(d => d.id !== user.uid);
+        const key = `${profile.state}|${profile.suburb}`;
+        const usersSnap = await getDocs(query(collection(db, 'users'), where('activeSuburbKeys', 'array-contains', key)));
+
+        const prefKeyForCategory = {
+          safety: 'safety',
+          marketplace: 'marketplace',
+          lostfound: 'lostfound',
+          services: 'services',
+        };
+        const prefKey = prefKeyForCategory[categoryValue]; // undefined for updates/notices — always notify
+
+        const otherUsers = usersSnap.docs.filter(d => {
+          if (d.id === user.uid) return false;
+          if (!prefKey) return true;
+          const recipientPrefs = d.data().notificationPrefs;
+          // Default to notifying if the recipient has no saved preference yet.
+          return recipientPrefs ? recipientPrefs[prefKey] !== false : true;
+        });
+
         const categoryLabels = {
           community: 'Community', marketplace: 'Buy & Sell', lostfound: 'Lost & Found',
           events: 'Event', services: 'Service',
@@ -260,6 +281,13 @@ export default function CreatePostScreen() {
 
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>{pageTitle}</Text>
+      </View>
+      {/* Primary suburb notice */}
+      <View style={styles.primarySuburbBanner}>
+        <Ionicons name="location-outline" size={14} color={Colors.brandGreen} />
+        <Text style={styles.primarySuburbText}>
+          Posting to <Text style={{ fontWeight: '700' }}>{profile?.suburb}, {profile?.state}</Text>
+        </Text>
       </View>
 
       <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -445,6 +473,8 @@ const styles = StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
+  primarySuburbBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  primarySuburbText: { fontSize: 13, color: Colors.brandGreen },
   postBtnHeader: { backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
   postBtnHeaderText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },

@@ -40,7 +40,8 @@ For any questions, contact us through the app.`;
 export default function SignupScreen() {
   const { register, createProfile } = useAuth();
   const [signupMethod, setSignupMethod] = useState('email'); // 'email' or 'phone'
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -51,13 +52,16 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!displayName.trim()) { Alert.alert('Error', 'Please enter your name.'); return; }
+    if (!firstName.trim()) { Alert.alert('Error', 'Please enter your first name.'); return; }
+    if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
     if (signupMethod === 'email' && !email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
     if (signupMethod === 'phone' && !phone.trim()) { Alert.alert('Error', 'Please enter your mobile number.'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
     if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters.'); return; }
     if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match.'); return; }
     if (!agreedToTC) { Alert.alert('Error', 'Please agree to the Terms & Conditions.'); return; }
+
+    const displayName = `${firstName.trim()} ${lastName.trim()}`;
 
     setLoading(true);
     try {
@@ -66,7 +70,7 @@ export default function SignupScreen() {
         ? email.trim()
         : `${phone.replace(/\s/g, '')}@mysuburb.app`;
 
-      const cred = await register(emailToUse, password, displayName.trim());
+      const cred = await register(emailToUse, password, displayName);
 
       // Navigate to suburb selection
       router.replace({
@@ -74,7 +78,9 @@ export default function SignupScreen() {
         params: {
           uid: cred.user.uid,
           email: emailToUse,
-          displayName: displayName.trim(),
+          displayName,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           phone: signupMethod === 'phone' ? phone.trim() : '',
         }
       });
@@ -121,15 +127,29 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Name */}
+          {/* First name */}
           <View style={styles.inputWrap}>
             <Ionicons name="person-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Full name"
+              placeholder="First name"
               placeholderTextColor={Colors.midGrey}
-              value={displayName}
-              onChangeText={setDisplayName}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+          </View>
+
+          {/* Last name */}
+          <View style={styles.inputWrap}>
+            <Ionicons name="person-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Last name"
+              placeholderTextColor={Colors.midGrey}
+              value={lastName}
+              onChangeText={setLastName}
               autoCapitalize="words"
               autoCorrect={false}
             />
@@ -256,8 +276,8 @@ const styles = StyleSheet.create({
   appName: { fontSize: 42, fontWeight: '800', color: Colors.white, letterSpacing: 1 },
   tagline: { fontSize: 16, color: '#FFD700', marginTop: 8, fontWeight: '500' },
   card: { backgroundColor: Colors.white, borderRadius: 24, padding: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.brandGreen, marginBottom: 4 },
-  subtitle: { fontSize: 15, color: Colors.midGrey, marginBottom: 20 },
+  title: { fontSize: 26, fontWeight: '800', color: Colors.brandGreen, marginBottom: 4, textAlign: 'center' },
+  subtitle: { fontSize: 15, color: Colors.midGrey, marginBottom: 20, textAlign: 'center' },
   methodToggle: { flexDirection: 'row', gap: 10, marginBottom: 20, backgroundColor: Colors.brandGreenPale, borderRadius: 14, padding: 4 },
   methodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12 },
   methodBtnActive: { backgroundColor: Colors.brandGreen },

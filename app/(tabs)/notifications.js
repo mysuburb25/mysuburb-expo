@@ -33,7 +33,6 @@ export default function NotificationsScreen() {
       );
       const snap = await getDocs(q);
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setNotifications(data);
 
       const unread = snap.docs.filter(d => !d.data().isRead);
       if (unread.length > 0) {
@@ -41,6 +40,12 @@ export default function NotificationsScreen() {
         unread.forEach(d => batch.update(doc(db, 'notifications', d.id), { isRead: true }));
         await batch.commit();
         setUnreadCount(0);
+        // Reflect the read state in the list immediately, rather than waiting
+        // for the next fetch — otherwise the unread dot/border lingers on
+        // screen even though the notifications are already marked read.
+        setNotifications(data.map(n => ({ ...n, isRead: true })));
+      } else {
+        setNotifications(data);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }

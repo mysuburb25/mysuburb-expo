@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 10 },
   input: { flex: 1, paddingVertical: 16, fontSize: 16, color: Colors.white },
   eyeBtn: { padding: 4 },
-  loginBtn: { backgroundColor: '#FFD700', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  loginBtn: { backgroundColor: '#FFD700', borderRadius: 14, height: 54, justifyContent: 'center', alignItems: 'center', marginTop: 8 },
   loginBtnText: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },
   signupRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   signupText: { fontSize: 15, color: 'rgba(255,255,255,0.7)' },

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { auth } from '../config/firebase';
 
 export default function ChangePasswordScreen() {
   const [current, setCurrent] = useState('');
@@ -25,13 +27,37 @@ export default function ChangePasswordScreen() {
       Alert.alert('Error', 'Password must be at least 6 characters.');
       return;
     }
+
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      Alert.alert('Error', 'Could not find your account. Please sign in again.');
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Firebase requires re-authentication with the current password before
+      // allowing a password change, since this is a security-sensitive action.
+      const credential = EmailAuthProvider.credential(user.email, current);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPass);
+
       Alert.alert('Success', 'Your password has been updated.', [
         { text: 'OK', onPress: () => router.back() }
       ]);
-    }, 1000);
+    } catch (e) {
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+        Alert.alert('Error', 'Your current password is incorrect.');
+      } else if (e.code === 'auth/weak-password') {
+        Alert.alert('Error', 'Please choose a stronger password.');
+      } else if (e.code === 'auth/requires-recent-login') {
+        Alert.alert('Error', 'For security, please sign out and sign back in before changing your password.');
+      } else {
+        Alert.alert('Error', e.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

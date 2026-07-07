@@ -1,34 +1,55 @@
 import { useState } from 'react';
-import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
-export default function NotificationPreferencesScreen() {
-  const [prefs, setPrefs] = useState({
-    likes: true,
-    comments: true,
-    safety: true,
-    events: true,
-    marketplace: false,
-    lostfound: true,
-  });
+const DEFAULT_PREFS = {
+  likes: true,
+  comments: true,
+  safety: true,
+  events: true,
+  marketplace: false,
+  lostfound: true,
+  services: true,
+};
 
-  const toggle = (key) => setPrefs(prev => ({ ...prev, [key]: !prev[key] }));
-
-  const Item = ({ label, desc, keyName }) => (
+function NotificationItem({ label, desc, value, onToggle, disabled }) {
+  return (
     <View style={styles.item}>
       <View style={styles.itemText}>
         <Text style={styles.itemLabel}>{label}</Text>
         <Text style={styles.itemDesc}>{desc}</Text>
       </View>
       <Switch
-        value={prefs[keyName]}
-        onValueChange={() => toggle(keyName)}
+        value={value}
+        onValueChange={onToggle}
+        disabled={disabled}
         trackColor={{ false: '#E5E7EB', true: '#2D6A4F' }}
         thumbColor="#fff"
       />
     </View>
   );
+}
+
+export default function NotificationPreferencesScreen() {
+  const { profile, updateUserProfile } = useAuth();
+  const [prefs, setPrefs] = useState({ ...DEFAULT_PREFS, ...(profile?.notificationPrefs || {}) });
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async (key) => {
+    const updated = { ...prefs, [key]: !prefs[key] };
+    setPrefs(updated); // optimistic update so the switch responds instantly
+    setSaving(true);
+    try {
+      await updateUserProfile({ notificationPrefs: updated });
+    } catch (e) {
+      // Revert on failure so the UI doesn't claim a preference that wasn't saved.
+      setPrefs(prefs);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -37,20 +58,23 @@ export default function NotificationPreferencesScreen() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40, alignItems: 'flex-end' }}>
+          {saving && <ActivityIndicator size="small" color="#fff" />}
+        </View>
       </View>
       <ScrollView>
         <Text style={styles.sectionLabel}>Activity</Text>
         <View style={styles.section}>
-          <Item label="Likes" desc="When someone likes your post" keyName="likes" />
-          <Item label="Comments" desc="When someone comments on your post" keyName="comments" />
+          <NotificationItem label="Likes" desc="When someone likes your post" value={prefs.likes} onToggle={() => toggle('likes')} />
+          <NotificationItem label="Comments" desc="When someone comments on your post" value={prefs.comments} onToggle={() => toggle('comments')} />
         </View>
         <Text style={styles.sectionLabel}>Community</Text>
         <View style={styles.section}>
-          <Item label="Safety Alerts" desc="Urgent safety alerts in your suburb" keyName="safety" />
-          <Item label="Events" desc="New events posted in your suburb" keyName="events" />
-          <Item label="Buy and Sell" desc="New listings in your suburb" keyName="marketplace" />
-          <Item label="Lost and Found" desc="Lost and found posts in your suburb" keyName="lostfound" />
+          <NotificationItem label="Safety Alerts" desc="Urgent safety alerts in your suburb" value={prefs.safety} onToggle={() => toggle('safety')} />
+          <NotificationItem label="Events" desc="New events posted in your suburb" value={prefs.events} onToggle={() => toggle('events')} />
+          <NotificationItem label="Buy and Sell" desc="New listings in your suburb" value={prefs.marketplace} onToggle={() => toggle('marketplace')} />
+          <NotificationItem label="Lost and Found" desc="Lost and found posts in your suburb" value={prefs.lostfound} onToggle={() => toggle('lostfound')} />
+          <NotificationItem label="Services" desc="New service posts in your suburb" value={prefs.services} onToggle={() => toggle('services')} />
         </View>
       </ScrollView>
     </View>

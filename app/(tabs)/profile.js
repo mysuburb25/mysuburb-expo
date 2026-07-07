@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl, Image, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +38,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showSuburbs, setShowSuburbs] = useState(false);
 
   const fetchMyPosts = useCallback(async () => {
     if (!user) return;
@@ -103,6 +104,27 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleToggleSuburb = async (index) => {
+    if (!profile?.suburbs) return;
+
+    // Primary suburb (index 0) is locked — it's where posts are created.
+    if (index === 0) {
+      Alert.alert(
+        'Primary suburb is locked',
+        'Your Primary suburb can\'t be turned off. Use "Change Suburb" to replace it, or manage your Second/Third suburbs instead.'
+      );
+      return;
+    }
+
+    const updated = profile.suburbs.map((s, i) =>
+      i === index ? { ...s, active: !s.active } : s
+    );
+    const activeSuburbKeys = updated
+      .filter(s => s.active)
+      .map(s => `${s.state}|${s.suburb}`);
+    await updateUserProfile({ suburbs: updated, activeSuburbKeys });
+  };
+
   const handleDeletePost = (postId) => {
     Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
       { text: 'Cancel', style: 'cancel' },
@@ -160,7 +182,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={styles.name}>{profile?.displayName}</Text>
-        <Text style={styles.location}>{profile?.suburb}, {profile?.state}</Text>
         <Text style={styles.email}>{profile?.email}</Text>
 
         <View style={styles.actions}>
@@ -179,9 +200,64 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* My Suburbs section — tap the bar to expand/collapse */}
+      {profile?.suburbs && profile.suburbs.length > 0 && (
+        <View>
+          <TouchableOpacity
+            style={styles.postsSectionHeader}
+            onPress={() => setShowSuburbs(prev => !prev)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.sectionTitle}>Selected Suburbs</Text>
+            <Ionicons
+              name={showSuburbs ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={Colors.brandGreen}
+              style={styles.postsChevron}
+            />
+          </TouchableOpacity>
+
+          {showSuburbs && (
+            <View style={styles.suburbsSection}>
+              <Text style={styles.suburbsSectionSubtitle}>Toggle suburbs to control your feed. Tap Change Suburb to manage.</Text>
+              {profile.suburbs.map((s, index) => (
+                index === 0 ? (
+                  <TouchableOpacity key={index} style={styles.suburbRow} onPress={() => handleToggleSuburb(index)} activeOpacity={0.6}>
+                    <View style={styles.suburbRowLeft}>
+                      <View style={styles.suburbNumberBadge}>
+                        <Text style={styles.suburbNumberText}>{index + 1}</Text>
+                      </View>
+                      <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                      <Text style={styles.primaryLabel}>Primary</Text>
+                    </View>
+                    <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
+                  </TouchableOpacity>
+                ) : (
+                  <View key={index} style={styles.suburbRow}>
+                    <View style={styles.suburbRowLeft}>
+                      <View style={styles.suburbNumberBadge}>
+                        <Text style={styles.suburbNumberText}>{index + 1}</Text>
+                      </View>
+                      <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                    </View>
+                    <Switch
+                      value={s.active}
+                      onValueChange={() => handleToggleSuburb(index)}
+                      trackColor={{ false: Colors.lightGrey, true: Colors.brandGreen }}
+                      thumbColor={Colors.white}
+                      ios_backgroundColor={Colors.lightGrey}
+                    />
+                  </View>
+                )
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       {/* Posts section header */}
       <View style={styles.postsSectionHeader}>
-        <Text style={styles.sectionTitle}>My Posts ({posts.length})</Text>
+        <Text style={styles.sectionTitle}>My Posts</Text>
       </View>
 
       {/* Scrollable posts list */}
@@ -250,14 +326,22 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 36, fontWeight: '800', color: Colors.brandGreen },
   cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: Colors.white },
   name: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, marginBottom: 2 },
-  location: { fontSize: 14, color: Colors.midGrey, marginBottom: 2 },
   email: { fontSize: 13, color: Colors.midGrey, marginBottom: 12 },
   actions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', justifyContent: 'center' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.brandGreen },
   actionBtnRed: { borderColor: '#E53935' },
   actionText: { fontSize: 13, color: Colors.brandGreen, fontWeight: '600' },
-  postsSectionHeader: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey, backgroundColor: Colors.white },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen },
+  suburbsSection: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  suburbsSectionSubtitle: { fontSize: 12, color: Colors.midGrey, marginBottom: 10 },
+  suburbRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  suburbRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  suburbNumberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  suburbNumberText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
+  suburbRowText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
+  primaryLabel: { fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  postsSectionHeader: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  postsChevron: { marginLeft: 6 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center' },
   list: { padding: 16, gap: 10, paddingBottom: 40 },
   card: { backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },

@@ -43,14 +43,38 @@ export default function BuySellScreen() {
   const fetchListings = useCallback(async () => {
     if (!profile?.suburb) return;
     try {
-      let q;
-      if (activeFilter.key === 'all') {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'marketplace'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
-      } else {
-        q = query(collection(db, 'posts'), where('suburb', '==', profile.suburb), where('category', '==', 'marketplace'), where('marketplaceType', '==', activeFilter.key), where('isRemoved', '==', false), orderBy('createdAt', 'desc'));
-      }
-      const snap = await getDocs(q);
-      setListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
+      const activeSuburbs = profile?.suburbs
+        ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+        : [{ suburb: profile.suburb, state: profile.state }];
+      if (activeSuburbs.length === 0) return;
+
+      // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
+      // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
+      const queryPromises = activeSuburbs.map(({ suburb, state }) => {
+        const filters = [
+          where('suburb', '==', suburb),
+          where('state', '==', state),
+          where('category', '==', 'marketplace'),
+        ];
+        if (activeFilter.key !== 'all') {
+          filters.push(where('marketplaceType', '==', activeFilter.key));
+        }
+        filters.push(where('isRemoved', '==', false));
+        const q = query(collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc'));
+        return getDocs(q);
+      });
+
+      const snaps = await Promise.all(queryPromises);
+      let allListings = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Sort merged results by date since each suburb's listings arrive independently
+      allListings.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(0);
+        const bTime = b.createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime;
+      });
+      setListings(allListings);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, [profile, activeFilter]);

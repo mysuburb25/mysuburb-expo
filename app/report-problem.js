@@ -2,24 +2,44 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = ['Bug or technical issue', 'Inappropriate content', 'Account issue', 'Safety concern', 'Other'];
 
 export default function ReportProblemScreen() {
+  const { user, profile } = useAuth();
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!category) { Alert.alert('Error', 'Please select a category.'); return; }
     if (!description.trim()) { Alert.alert('Error', 'Please describe the problem.'); return; }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await addDoc(collection(db, 'reports'), {
+        category,
+        description: description.trim(),
+        userId: user?.uid || null,
+        userEmail: profile?.email || user?.email || null,
+        userDisplayName: profile?.displayName || null,
+        suburb: profile?.suburb || null,
+        state: profile?.state || null,
+        status: 'open',
+        createdAt: serverTimestamp(),
+      });
+
       Alert.alert('Report Submitted', 'Thank you for your report. We will review it within 24 hours.', [
         { text: 'OK', onPress: () => router.back() }
       ]);
-    }, 1000);
+    } catch (e) {
+      Alert.alert('Error', 'Could not submit your report. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
