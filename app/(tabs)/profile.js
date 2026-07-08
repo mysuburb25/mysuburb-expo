@@ -33,7 +33,7 @@ function formatTime(date) {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, logout, updateUserProfile, unreadCount } = useAuth();
+  const { user, profile, logout, updateUserProfile, unreadCount, unreadMessageCount } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -143,7 +143,14 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       {/* Fixed top header */}
       <View style={styles.topHeader}>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+          <Ionicons name="chatbubbles-outline" size={26} color="#fff" />
+          {unreadMessageCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
@@ -287,12 +294,10 @@ export default function ProfileScreen() {
                     <Ionicons name="trash-outline" size={16} color="#E53935" />
                   </TouchableOpacity>
                 </View>
-                {/* Post content */}
-                <Text style={styles.cardContent} numberOfLines={3}>{item.content}</Text>
-                {/* Date & time bottom right */}
-                <View style={styles.cardFooter}>
-                  <View style={{ flex: 1 }} />
-                  <Text style={styles.cardMeta}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
+                {/* Content truncates on the left; timestamp stays fixed and fully visible on the right */}
+                <View style={styles.cardOneLineRow}>
+                  <Text style={styles.cardOneLine} numberOfLines={1} ellipsizeMode="tail">{item.content}</Text>
+                  <Text style={styles.cardMetaInline}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -349,6 +354,9 @@ const styles = StyleSheet.create({
   catBadgeText: { fontSize: 12, fontWeight: '700' },
   deleteBtn: { padding: 4 },
   cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, padding: 12 },
+  cardOneLineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  cardOneLine: { flex: 1, fontSize: 14, color: Colors.charcoal },
+  cardMetaInline: { fontSize: 11, color: Colors.midGrey, fontWeight: '600', flexShrink: 0 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10 },
   cardMeta: { fontSize: 11, color: Colors.midGrey },
   empty: { alignItems: 'center', paddingTop: 40, gap: 8 },

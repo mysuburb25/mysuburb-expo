@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -26,13 +27,14 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfile(null);
         setUnreadCount(0);
+        setUnreadMessageCount(0);
       }
       setLoading(false);
     });
     return unsub;
   }, []);
 
-  // Real-time unread notification count
+  // Real-time unread notification count (likes, comments, new posts, messages — everything)
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -43,6 +45,21 @@ export function AuthProvider({ children }) {
     const unsub = onSnapshot(q, (snap) => {
       setUnreadCount(snap.size);
     }, (e) => console.error('notification listener error:', e));
+    return unsub;
+  }, [user]);
+
+  // Real-time unread message count — summed across all conversations' per-user
+  // unread counters, separate from the general notification bell count above.
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', user.uid)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const total = snap.docs.reduce((sum, d) => sum + (d.data().unreadCount?.[user.uid] || 0), 0);
+      setUnreadMessageCount(total);
+    }, (e) => console.error('message listener error:', e));
     return unsub;
   }, [user]);
 
@@ -70,6 +87,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setProfile(null);
     setUnreadCount(0);
+    setUnreadMessageCount(0);
   };
 
   const createProfile = async (uid, data) => {
@@ -90,7 +108,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, unreadCount, setUnreadCount,
+      user, profile, loading, unreadCount, setUnreadCount, unreadMessageCount,
       login, register, logout,
       createProfile, updateUserProfile, reloadProfile,
     }}>

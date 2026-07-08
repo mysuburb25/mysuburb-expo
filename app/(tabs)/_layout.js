@@ -34,7 +34,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ color }) => <Ionicons name="home" size={22} color={color} /> }} />
       <Tabs.Screen name="events" options={{ title: 'Events', tabBarIcon: ({ color }) => <Ionicons name="calendar" size={22} color={color} /> }} />
-      <Tabs.Screen name="marketplace" options={{ title: 'Buy & Sell', tabBarIcon: ({ color }) => <Ionicons name="pricetag" size={22} color={color} /> }} />
+      <Tabs.Screen name="buy-sell" options={{ title: 'Buy & Sell', tabBarIcon: ({ color }) => <Ionicons name="pricetag" size={22} color={color} /> }} />
       <Tabs.Screen name="services" options={{ title: 'Services', tabBarIcon: ({ color }) => <Ionicons name="briefcase" size={22} color={color} /> }} />
       <Tabs.Screen name="lost-found" options={{ title: 'Lost & Found', tabBarIcon: ({ color }) => <Ionicons name="search" size={22} color={color} /> }} />
       <Tabs.Screen
@@ -53,6 +53,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="messages" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ href: null }} />
     </Tabs>
   );

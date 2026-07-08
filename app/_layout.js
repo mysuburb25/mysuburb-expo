@@ -16,7 +16,9 @@ export default function RootLayout() {
         <Stack.Screen name="terms-of-service" />
         <Stack.Screen name="community-guidelines" />
         <Stack.Screen name="change-password" />
+        <Stack.Screen name="delete-account" />
         <Stack.Screen name="notification-preferences" />
+        <Stack.Screen name="blocked-users" />
         <Stack.Screen name="help-faq" />
         <Stack.Screen name="report-problem" />
       </Stack>

@@ -37,6 +37,7 @@ export default function SettingsScreen() {
         <MenuItem icon="location-outline" label="Change Suburb" onPress={() => router.push('/(auth)/select-suburb')} />
         <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/change-password')} />
         <MenuItem icon="notifications-outline" label="Notification Preferences" onPress={() => router.push('/notification-preferences')} />
+        <MenuItem icon="ban-outline" label="Blocked Users" onPress={() => router.push('/blocked-users')} />
       </View>
 
       <Text style={styles.sectionLabel}>Legal</Text>
@@ -56,7 +57,7 @@ export default function SettingsScreen() {
       <Text style={styles.sectionLabel}>Account Actions</Text>
       <View style={styles.section}>
         <MenuItem icon="log-out-outline" label="Sign Out" onPress={handleLogout} danger />
-        <MenuItem icon="trash-outline" label="Delete Account" onPress={() => Alert.alert('Delete Account', 'To delete your account please contact support@mysuburb.com.au')} danger />
+        <MenuItem icon="trash-outline" label="Delete Account" onPress={() => router.push('/delete-account')} danger />
       </View>
 
       <Text style={styles.version}>My Suburb v1.0.0 - Made with love in Australia</Text>

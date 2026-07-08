@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -65,7 +65,8 @@ export default function LostFoundScreen() {
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      setItems(allItems);
+      const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
+      setItems(blockedIds.length ? allItems.filter(i => !blockedIds.includes(i.authorId)) : allItems);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, [profile]);
@@ -102,7 +103,11 @@ export default function LostFoundScreen() {
     <View style={styles.container}>
       <View style={styles.topHeader}>
         <TouchableOpacity style={styles.profileAvatar} onPress={() => router.push('/(tabs)/profile')}>
-          <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
+          {profile?.photoURL ? (
+            <Image source={{ uri: profile.photoURL }} style={styles.profileAvatarImage} />
+          ) : (
+            <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
+          )}
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.mySuburb}>My Suburb</Text>
@@ -200,7 +205,8 @@ const styles = StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
-  profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
+  profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },

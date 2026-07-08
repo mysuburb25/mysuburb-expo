@@ -357,33 +357,45 @@ export default function CreatePostScreen() {
               </TouchableOpacity>
             </View>
             <Modal visible={showServiceModal} transparent animationType="slide">
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalSheet}>
-                  <View style={styles.modalHandle} />
-                  <Text style={styles.modalTitle}>Select a Service</Text>
+              <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowServiceModal(false)}>
+                <TouchableOpacity activeOpacity={1} style={styles.modalSheet} onPress={() => {}}>
+                  <View style={styles.modalHeaderBar}>
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalHeaderBarText}>Select a Service</Text>
+                  </View>
                   <FlatList
                     data={SERVICE_CATEGORIES}
                     keyExtractor={item => item.key}
                     showsVerticalScrollIndicator={false}
-                    ListFooterComponent={<View style={{ height: 20 }} />}
+                    style={styles.modalList}
+                    contentContainerStyle={styles.modalListContent}
                     renderItem={({ item: s }) => {
                       const isSelected = selectedService?.key === s.key;
                       return (
-                        <TouchableOpacity style={[styles.modalItem, isSelected && styles.modalItemActive]} onPress={() => { setSelectedService(s); setShowServiceModal(false); }}>
+                        <TouchableOpacity
+                          style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                          activeOpacity={0.7}
+                          onPress={() => { setSelectedService(s); setShowServiceModal(false); }}
+                        >
                           <View style={[styles.modalItemIcon, isSelected && styles.modalItemIconActive]}>
-                            <Ionicons name={s.icon} size={20} color={isSelected ? Colors.white : Colors.brandGreen} />
+                            <Ionicons name={s.icon} size={21} color={isSelected ? Colors.white : Colors.brandGreen} />
                           </View>
                           <Text style={[styles.modalItemText, isSelected && styles.modalItemTextActive]}>{s.label}</Text>
-                          {isSelected && <Ionicons name="checkmark-circle" size={22} color={Colors.brandGreen} />}
+                          {isSelected
+                            ? <Ionicons name="checkmark-circle" size={22} color={Colors.brandGreen} />
+                            : <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+                          }
                         </TouchableOpacity>
                       );
                     }}
                   />
-                  <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowServiceModal(false)}>
-                    <Text style={styles.modalCloseBtnText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                  <View style={styles.modalFooter}>
+                    <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowServiceModal(false)}>
+                      <Text style={styles.modalCloseBtnText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              </TouchableOpacity>
             </Modal>
           </>
         )}
@@ -509,15 +521,20 @@ const styles = StyleSheet.create({
   addImageText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
   // Service modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, maxHeight: '80%' },
-  modalHandle: { width: 40, height: 4, backgroundColor: Colors.lightGrey, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  modalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '80%', overflow: 'hidden' },
+  modalHandle: { width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
+  modalHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, alignItems: 'center', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalHeaderBarText: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  modalList: { flexGrow: 0 },
+  modalListContent: { padding: 16, paddingBottom: 8 },
+  modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: Colors.lightGrey, backgroundColor: Colors.white },
   modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 16 },
-  modalItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 14, marginBottom: 4 },
-  modalItemActive: { backgroundColor: Colors.brandGreenPale },
-  modalItemIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
-  modalItemIconActive: { backgroundColor: Colors.brandGreen },
+  modalItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 14, marginBottom: 8, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EFEFEF' },
+  modalItemActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
+  modalItemIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#EFEFEF' },
+  modalItemIconActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
   modalItemText: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '600' },
   modalItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   modalCloseBtn: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  modalCloseBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
+  modalCloseBtnText: { fontSize: 18, fontWeight: '700', color: Colors.white },
 });

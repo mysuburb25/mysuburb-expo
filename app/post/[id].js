@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image, Keyboard } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -24,6 +24,34 @@ function formatDateTime(date) {
     ' · ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Turns a flat comments array into a depth-first ordered list with a `depth`
+// property, so replies can nest under any comment (not just top-level ones)
+// while still rendering in a single flat FlatList.
+function flattenCommentTree(comments) {
+  const byParent = {};
+  comments.forEach(c => {
+    const key = c.parentCommentId || 'root';
+    if (!byParent[key]) byParent[key] = [];
+    byParent[key].push(c);
+  });
+  const result = [];
+  const walk = (parentKey, depth) => {
+    (byParent[parentKey] || []).forEach(c => {
+      result.push({ ...c, depth });
+      walk(c.id, depth + 1);
+    });
+  };
+  walk('root', 0);
+  return result;
+}
+
+// All descendant comment IDs under a given comment, at any depth — used so
+// deleting a comment cleans up its whole reply chain, not just direct replies.
+function getDescendantIds(commentId, allComments) {
+  const direct = allComments.filter(c => c.parentCommentId === commentId);
+  return direct.reduce((acc, d) => [...acc, d.id, ...getDescendantIds(d.id, allComments)], []);
+}
+
 const PAGE_TITLES = {
   updates: 'Community Hub', notices: 'Community Hub', safety: 'Community Hub',
   events: 'Events', marketplace: 'Buy & Sell', lostfound: 'Lost & Found', services: 'Services',
@@ -36,7 +64,7 @@ const CATEGORY_LABELS = {
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { user, profile } = useAuth();
+  const { user, profile, updateUserProfile } = useAuth();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +74,8 @@ export default function PostDetailScreen() {
   const [liking, setLiking] = useState(false);
   const [showPostMenu, setShowPostMenu] = useState(false);
   const [deletingPost, setDeletingPost] = useState(false);
+  const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
+  const inputRef = useRef(null);
   const flatListRef = useRef(null);
 
   useEffect(() => { fetchPost(); fetchComments(); }, [id]);
@@ -95,17 +125,64 @@ export default function PostDetailScreen() {
     finally { setLiking(false); }
   };
 
+  const handleCommentLike = async (item) => {
+    const isLiked = item.likedBy?.includes(user.uid) || false;
+    const newLiked = !isLiked;
+    setComments(prev => prev.map(c => c.id === item.id ? {
+      ...c,
+      likeCount: (c.likeCount || 0) + (newLiked ? 1 : -1),
+      likedBy: newLiked ? [...(c.likedBy || []), user.uid] : (c.likedBy || []).filter(u => u !== user.uid),
+    } : c));
+    try {
+      await updateDoc(doc(db, 'comments', item.id), {
+        likeCount: increment(newLiked ? 1 : -1),
+        likedBy: newLiked
+          ? [...(item.likedBy || []), user.uid]
+          : (item.likedBy || []).filter(u => u !== user.uid),
+      });
+      if (newLiked && item.authorId !== user.uid) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: item.authorId, type: 'comment_like',
+          message: `${profile.displayName} liked your comment`,
+          postId: id, fromUserId: user.uid, fromUserName: profile.displayName,
+          isRead: false, createdAt: serverTimestamp(),
+        });
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const startReply = (targetComment) => {
+    setReplyTarget({ id: targetComment.id, authorName: targetComment.authorName });
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const cancelReply = () => setReplyTarget(null);
+
   const handleComment = async () => {
     if (!comment.trim()) return;
     setPosting(true);
+    const parentCommentId = replyTarget?.id || null;
     try {
       await addDoc(collection(db, 'comments'), {
         postId: id, content: comment.trim(),
         authorId: user.uid, authorName: profile.displayName,
-        createdAt: serverTimestamp(), likeCount: 0,
+        createdAt: serverTimestamp(), likeCount: 0, likedBy: [],
+        parentCommentId,
       });
       await updateDoc(doc(db, 'posts', id), { commentCount: increment(1) });
-      if (post.authorId !== user.uid) {
+
+      if (parentCommentId) {
+        // Notify the specific comment author being replied to, if not ourselves.
+        const parentComment = comments.find(c => c.id === parentCommentId);
+        if (parentComment && parentComment.authorId !== user.uid) {
+          await addDoc(collection(db, 'notifications'), {
+            userId: parentComment.authorId, type: 'comment_reply',
+            message: `${profile.displayName} replied to your comment`,
+            postId: id, fromUserId: user.uid, fromUserName: profile.displayName,
+            isRead: false, createdAt: serverTimestamp(),
+          });
+        }
+      } else if (post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'comment',
           message: `${profile.displayName} commented on your post`,
@@ -113,7 +190,11 @@ export default function PostDetailScreen() {
           isRead: false, createdAt: serverTimestamp(),
         });
       }
+
       setComment('');
+      setReplyTarget(null);
+      Keyboard.dismiss();
+      inputRef.current?.blur();
       setPost(prev => ({ ...prev, commentCount: (prev.commentCount || 0) + 1 }));
       await fetchComments();
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -143,16 +224,46 @@ export default function PostDetailScreen() {
     Alert.alert('Report Post', 'Thank you for reporting. Our team will review this post.');
   };
 
+  const handleBlockUser = () => {
+    setShowPostMenu(false);
+    Alert.alert(
+      `Block ${post.authorName}?`,
+      "They won't be able to message you, and their posts will be hidden from your feed.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block', style: 'destructive', onPress: async () => {
+            const current = profile?.blockedUsers || [];
+            if (current.some(b => b.uid === post.authorId)) return;
+            try {
+              await updateUserProfile({
+                blockedUsers: [...current, { uid: post.authorId, displayName: post.authorName, blockedAt: new Date().toISOString() }]
+              });
+              router.back();
+            } catch (e) {
+              Alert.alert('Error', 'Could not block this user. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleDeleteComment = (commentId) => {
     Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           try {
+            // Remove the whole reply chain under this comment, at any depth,
+            // so nothing is left pointing at a parent that no longer exists.
+            const descendantIds = getDescendantIds(commentId, comments);
             await deleteDoc(doc(db, 'comments', commentId));
-            await updateDoc(doc(db, 'posts', id), { commentCount: increment(-1) });
-            setComments(prev => prev.filter(c => c.id !== commentId));
-            setPost(prev => ({ ...prev, commentCount: Math.max((prev.commentCount || 1) - 1, 0) }));
+            await Promise.all(descendantIds.map(cid => deleteDoc(doc(db, 'comments', cid))));
+            const removedCount = 1 + descendantIds.length;
+            await updateDoc(doc(db, 'posts', id), { commentCount: increment(-removedCount) });
+            setComments(prev => prev.filter(c => c.id !== commentId && !descendantIds.includes(c.id)));
+            setPost(prev => ({ ...prev, commentCount: Math.max((prev.commentCount || removedCount) - removedCount, 0) }));
           } catch (e) { Alert.alert('Error', e.message); }
         }
       }
@@ -183,9 +294,23 @@ export default function PostDetailScreen() {
   const formatEventDate = (d) => d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formatEventTime = (d) => d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 
+  const goToChat = () => {
+    if (post.authorId !== user?.uid) {
+      router.push({ pathname: '/chat/' + post.authorId, params: { userId: post.authorId, userName: post.authorName } });
+    }
+  };
+
+  const goToUserProfile = () => {
+    if (post.authorId !== user?.uid) {
+      router.push('/user/' + post.authorId);
+    }
+  };
+
+  const topLevelCount = comments.filter(c => !c.parentCommentId).length;
+  const nestedComments = flattenCommentTree(comments);
   const listData = [
     { type: 'post' },
-    ...comments.map(c => ({ type: 'comment', ...c })),
+    ...nestedComments.map(c => ({ type: 'comment', ...c })),
   ];
 
   return (
@@ -244,27 +369,18 @@ export default function PostDetailScreen() {
 
                 <View style={styles.postCard}>
                   <View style={styles.authorRow}>
-                    <TouchableOpacity
-                      style={styles.avatar}
-                      onPress={() => {
-                        if (post.authorId !== user?.uid) {
-                          router.push({ pathname: '/chat/' + post.authorId, params: { userId: post.authorId, userName: post.authorName } });
-                        }
-                      }}
-                    >
+                    <TouchableOpacity style={styles.avatar} onPress={goToUserProfile}>
                       <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase()}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{ flex: 1 }}
-                      onPress={() => {
-                        if (post.authorId !== user?.uid) {
-                          router.push({ pathname: '/chat/' + post.authorId, params: { userId: post.authorId, userName: post.authorName } });
-                        }
-                      }}
-                    >
+                    <TouchableOpacity style={{ flex: 1 }} onPress={goToUserProfile}>
                       <Text style={styles.authorName}>{post.authorName}</Text>
                       <Text style={styles.dateTime}>{formatDateTime(post.createdAt)}</Text>
                     </TouchableOpacity>
+                    {!isOwner && (
+                      <TouchableOpacity style={styles.messageBtn} onPress={goToChat}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.brandGreen} />
+                      </TouchableOpacity>
+                    )}
                     {isLostFound && post.lostFoundType && (
                       <View style={[styles.pillTag, { backgroundColor: post.lostFoundType === 'lost' ? '#C62828' : Colors.brandGreen }]}>
                         <Text style={styles.pillTagText}>{post.lostFoundType === 'lost' ? 'Lost' : 'Found'}</Text>
@@ -322,7 +438,7 @@ export default function PostDetailScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.commentsTitle}>Comments ({comments.length})</Text>
+                <Text style={styles.commentsTitle}>Comments ({topLevelCount})</Text>
                 {comments.length === 0 && (
                   <View style={styles.noComments}>
                     <Ionicons name="chatbubble-outline" size={32} color={Colors.lightGrey} />
@@ -333,20 +449,79 @@ export default function PostDetailScreen() {
             );
           }
 
+          const depth = item.depth || 0;
+          const isTopLevel = depth === 0;
           const isMyComment = item.authorId === user?.uid;
-          return (
-            <View style={styles.comment}>
-              <View style={styles.commentAvatar}>
-                <Text style={styles.commentAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
+          const commentLiked = item.likedBy?.includes(user?.uid) || false;
+          // Cap visual indent so deep threads don't squeeze the text column
+          // down to nothing on a narrow phone — logically still unlimited depth.
+          const indent = Math.min(depth, 3) * 20;
+
+          const FooterRow = (
+            <View style={styles.commentFooter}>
+              <Text style={styles.commentTime}>{timeAgo(item.createdAt)}</Text>
+              <TouchableOpacity style={styles.likeRow} onPress={() => handleCommentLike(item)}>
+                <Ionicons name={commentLiked ? 'heart' : 'heart-outline'} size={13} color={commentLiked ? '#E53935' : Colors.midGrey} />
+                {item.likeCount > 0 && <Text style={[styles.likeCountText, commentLiked && { color: '#E53935' }]}>{item.likeCount}</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => startReply(item)}>
+                <Text style={styles.replyBtnText}>Reply</Text>
+              </TouchableOpacity>
+            </View>
+          );
+
+          if (isTopLevel) {
+            return (
+              <View style={styles.commentCard}>
+                <View style={styles.commentRow}>
+                  <TouchableOpacity
+                    style={styles.commentAvatar}
+                    onPress={() => !isMyComment && router.push('/user/' + item.authorId)}
+                    disabled={isMyComment}
+                  >
+                    <Text style={styles.commentAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
+                      <Text style={styles.commentAuthor}>{item.authorName}</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.commentContent}>{item.content}</Text>
+                    {FooterRow}
+                  </View>
+                  {isMyComment && (
+                    <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
+                      <Ionicons name="trash-outline" size={15} color="#E53935" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
+            );
+          }
+
+          // Nested reply — compact threaded style with a connecting line,
+          // instead of a full bordered card nested inside another card.
+          return (
+            <View style={[styles.replyRow, { marginLeft: indent }]}>
+              <View style={styles.threadLine} />
+              <TouchableOpacity
+                style={styles.replyAvatar}
+                onPress={() => !isMyComment && router.push('/user/' + item.authorId)}
+                disabled={isMyComment}
+              >
+                <Text style={styles.replyAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
+              </TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <Text style={styles.commentAuthor}>{item.authorName}</Text>
-                <Text style={styles.commentContent}>{item.content}</Text>
-                <Text style={styles.commentTime}>{formatDateTime(item.createdAt)}</Text>
+                <View style={styles.replyBubble}>
+                  <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
+                    <Text style={styles.replyAuthorInline}>{item.authorName}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.replyText}>{item.content}</Text>
+                </View>
+                {FooterRow}
               </View>
               {isMyComment && (
                 <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
-                  <Ionicons name="trash-outline" size={16} color="#E53935" />
+                  <Ionicons name="trash-outline" size={14} color="#E53935" />
                 </TouchableOpacity>
               )}
             </View>
@@ -354,11 +529,22 @@ export default function PostDetailScreen() {
         }}
       />
 
+      {/* Reply banner */}
+      {replyTarget && (
+        <View style={styles.replyBanner}>
+          <Text style={styles.replyBannerText}>Replying to {replyTarget.authorName}</Text>
+          <TouchableOpacity onPress={cancelReply}>
+            <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Comment Input */}
       <View style={styles.commentInputRow}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
-          placeholder="Write a comment..."
+          placeholder={replyTarget ? `Reply to ${replyTarget.authorName}...` : 'Write a comment...'}
           placeholderTextColor={Colors.midGrey}
           value={comment}
           onChangeText={setComment}
@@ -387,12 +573,20 @@ export default function PostDetailScreen() {
                 </TouchableOpacity>
               </>
             ) : (
-              <TouchableOpacity style={styles.menuItem} onPress={handleReportPost}>
-                <View style={styles.menuItemIcon}>
-                  <Ionicons name="flag-outline" size={20} color="#E65100" />
-                </View>
-                <Text style={styles.menuItemTextWarn}>Report Post</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={styles.menuItem} onPress={handleReportPost}>
+                  <View style={styles.menuItemIcon}>
+                    <Ionicons name="flag-outline" size={20} color="#E65100" />
+                  </View>
+                  <Text style={styles.menuItemTextWarn}>Report Post</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
+                  <View style={styles.menuItemIcon}>
+                    <Ionicons name="ban-outline" size={20} color="#E53935" />
+                  </View>
+                  <Text style={styles.menuItemTextDanger}>Block {post.authorName}</Text>
+                </TouchableOpacity>
+              </>
             )}
             <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowPostMenu(false)}>
               <Text style={styles.menuCancelText}>Cancel</Text>
@@ -413,7 +607,7 @@ const styles = StyleSheet.create({
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  scroll: { padding: 16, gap: 12, paddingBottom: 20 },
+  scroll: { padding: 16, gap: 10, paddingBottom: 20 },
   eventBanner: { backgroundColor: Colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', gap: 16, borderWidth: 1, borderColor: Colors.lightGrey, alignItems: 'center', marginBottom: 12 },
   eventDateBox: { width: 60, alignItems: 'center', backgroundColor: Colors.brandGreenPale, borderRadius: 12, paddingVertical: 10 },
   eventDay: { fontSize: 28, fontWeight: '800', color: Colors.brandGreen },
@@ -429,7 +623,7 @@ const styles = StyleSheet.create({
   dateTime: { fontSize: 11, color: Colors.midGrey, marginTop: 2 },
   pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   pillTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
-  messageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.white, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: 1, borderColor: Colors.brandGreen },
+  messageBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
   messageBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   menuBtn: { padding: 4 },
   contentBold: { fontSize: 17, color: Colors.charcoal, lineHeight: 26, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 6 },
@@ -445,17 +639,36 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
-  commentsTitle: { fontSize: 16, fontWeight: '700', color: Colors.charcoal, marginBottom: 8 },
+  commentsTitle: { fontSize: 16, fontWeight: '700', color: Colors.charcoal, marginBottom: 4 },
   noComments: { alignItems: 'center', paddingVertical: 16, gap: 8 },
   noCommentsText: { fontSize: 14, color: Colors.midGrey },
-  comment: { backgroundColor: Colors.white, borderRadius: 12, padding: 12, flexDirection: 'row', gap: 10, borderWidth: 1, borderColor: Colors.lightGrey, marginBottom: 8 },
+
+  // Top-level comment card
+  commentCard: { backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.lightGrey, padding: 12 },
+  commentRow: { flexDirection: 'row', gap: 10 },
   commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
-  inputAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   commentAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   commentAuthor: { fontSize: 13, fontWeight: '700', color: Colors.charcoal },
   commentContent: { fontSize: 14, fontWeight: '500', color: Colors.charcoal, marginTop: 2, lineHeight: 20 },
-  commentTime: { fontSize: 11, color: Colors.midGrey, marginTop: 4 },
-  deleteCommentBtn: { padding: 6, justifyContent: 'center' },
+
+  // Threaded reply — compact, no boxed nesting
+  replyRow: { flexDirection: 'row', gap: 8, paddingTop: 8, alignItems: 'flex-start' },
+  threadLine: { width: 16, height: 20, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: Colors.lightGrey, borderBottomLeftRadius: 8, marginTop: -8 },
+  replyAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  replyAvatarText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
+  replyBubble: { backgroundColor: '#F2F2F2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
+  replyAuthorInline: { fontSize: 13, fontWeight: '700', color: Colors.charcoal, marginBottom: 2 },
+  replyText: { fontSize: 13, color: Colors.charcoal, lineHeight: 18 },
+
+  commentFooter: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 5, paddingLeft: 2 },
+  commentTime: { fontSize: 11, color: Colors.midGrey },
+  likeRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  likeCountText: { fontSize: 11, color: Colors.midGrey, fontWeight: '600' },
+  replyBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
+  deleteCommentBtn: { padding: 6, justifyContent: 'flex-start' },
+
+  replyBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.brandGreenPale, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  replyBannerText: { fontSize: 13, color: Colors.brandGreen, fontWeight: '600' },
   commentInputRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.brandGreen, borderTopWidth: 1, borderTopColor: Colors.brandGreen, alignItems: 'flex-end' },
   input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
