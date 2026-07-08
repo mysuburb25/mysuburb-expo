@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -155,10 +155,13 @@ export default function LostFoundScreen() {
                   </View>
                   {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
                   {item.lostFoundLocation ? (
-                    <View style={styles.locationRow}>
-                      <Ionicons name="location-outline" size={13} color={Colors.midGrey} />
-                      <Text style={styles.locationText}>{item.lostFoundLocation}</Text>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.locationRow}
+                      onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.lostFoundLocation)}`).catch(() => {})}
+                    >
+                      <Ionicons name="location-outline" size={13} color={Colors.brandGreen} />
+                      <Text style={[styles.locationText, styles.locationLink]}>{item.lostFoundLocation}</Text>
+                    </TouchableOpacity>
                   ) : null}
                   <View style={styles.metaRow}>
                     <Text style={styles.cardAuthor}>by {item.authorName}</Text>
@@ -225,6 +228,7 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationText: { fontSize: 13, color: Colors.midGrey },
+  locationLink: { color: Colors.brandGreen, textDecorationLine: 'underline', fontWeight: '600' },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   cardAuthor: { fontSize: 12, color: Colors.midGrey },
   metaText: { fontSize: 11, color: Colors.midGrey },

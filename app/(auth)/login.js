@@ -21,7 +21,7 @@ export default function LoginScreen() {
     try {
       const emailToUse = identifier.includes('@')
         ? identifier.trim()
-        : `${identifier.replace(/\s/g, '')}@mysuburb.app`;
+        : `${identifier.replace(/\D/g, '')}@mysuburb.app`;
       await login(emailToUse, password);
       router.replace('/(tabs)');
     } catch (e) {

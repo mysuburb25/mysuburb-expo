@@ -68,7 +68,7 @@ export default function SignupScreen() {
       // For phone signup, create a fake email format
       const emailToUse = signupMethod === 'email'
         ? email.trim()
-        : `${phone.replace(/\s/g, '')}@mysuburb.app`;
+        : `${phone.replace(/\D/g, '')}@mysuburb.app`;
 
       const cred = await register(emailToUse, password, displayName);
 

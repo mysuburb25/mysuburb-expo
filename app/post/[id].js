@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image, Keyboard, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, deleteDoc } from 'firebase/firestore';
@@ -306,6 +306,13 @@ export default function PostDetailScreen() {
     }
   };
 
+  const handleGetDirections = () => {
+    const address = post.eventLocation || post.lostFoundLocation;
+    if (!address) return;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+    Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open Maps.'));
+  };
+
   const topLevelCount = comments.filter(c => !c.parentCommentId).length;
   const nestedComments = flattenCommentTree(comments);
   const listData = [
@@ -358,10 +365,16 @@ export default function PostDetailScreen() {
                         <Text style={styles.eventInfoText}>{formatEventDate(eventDate)}</Text>
                       </View>
                       {post.eventLocation ? (
-                        <View style={styles.eventInfoRow}>
-                          <Ionicons name="location-outline" size={16} color={Colors.brandGreen} />
-                          <Text style={styles.eventInfoText}>{post.eventLocation}</Text>
-                        </View>
+                        <>
+                          <TouchableOpacity style={styles.eventInfoRow} onPress={handleGetDirections}>
+                            <Ionicons name="location-outline" size={16} color={Colors.brandGreen} />
+                            <Text style={[styles.eventInfoText, styles.eventLocationLink]}>{post.eventLocation}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.directionsBtn} onPress={handleGetDirections}>
+                            <Ionicons name="navigate-outline" size={14} color={Colors.white} />
+                            <Text style={styles.directionsBtnText}>Get Directions</Text>
+                          </TouchableOpacity>
+                        </>
                       ) : null}
                     </View>
                   </View>
@@ -412,10 +425,16 @@ export default function PostDetailScreen() {
                     <Text style={styles.description}>{post.description}</Text>
                   ) : null}
                   {isLostFound && post.lostFoundLocation ? (
-                    <View style={styles.locationRow}>
-                      <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
-                      <Text style={styles.locationText}>{post.lostFoundLocation}</Text>
-                    </View>
+                    <>
+                      <TouchableOpacity style={styles.locationRow} onPress={handleGetDirections}>
+                        <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
+                        <Text style={[styles.locationText, styles.eventLocationLink]}>{post.lostFoundLocation}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.directionsBtn, { marginLeft: 16, marginBottom: 10 }]} onPress={handleGetDirections}>
+                        <Ionicons name="navigate-outline" size={14} color={Colors.white} />
+                        <Text style={styles.directionsBtnText}>Get Directions</Text>
+                      </TouchableOpacity>
+                    </>
                   ) : null}
 
                   {post.category === 'marketplace' && (
@@ -614,6 +633,9 @@ const styles = StyleSheet.create({
   eventMonth: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   eventBannerInfo: { flex: 1, gap: 6 },
   eventInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  eventLocationLink: { textDecorationLine: 'underline' },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.brandGreen, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, marginTop: 4 },
+  directionsBtnText: { fontSize: 12, fontWeight: '700', color: Colors.white },
   eventInfoText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500', flex: 1 },
   postCard: { backgroundColor: Colors.brandGreenPale, borderRadius: 16, borderWidth: 1, borderColor: Colors.brandGreen + '30', marginBottom: 12, overflow: 'hidden' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 8 },

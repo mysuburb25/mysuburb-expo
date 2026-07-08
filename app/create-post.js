@@ -65,6 +65,10 @@ export default function CreatePostScreen() {
   const [lfItem, setLfItem] = useState('');
   const [lfDescription, setLfDescription] = useState('');
   const [lfLocation, setLfLocation] = useState('');
+  const [lfLocationSuggestions, setLfLocationSuggestions] = useState([]);
+  const [showLfLocationSuggestions, setShowLfLocationSuggestions] = useState(false);
+  const [loadingLfSuggestions, setLoadingLfSuggestions] = useState(false);
+  const lfLocationDebounceRef = useRef(null);
   const [mpTitle, setMpTitle] = useState('');
   const [mpDescription, setMpDescription] = useState('');
   const [mpPrice, setMpPrice] = useState('');
@@ -119,6 +123,51 @@ export default function CreatePostScreen() {
 
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const fetchLfLocationSuggestions = async (text) => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return;
+    setLoadingLfSuggestions(true);
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'suggestions.placePrediction.text,suggestions.placePrediction.placeId',
+        },
+        body: JSON.stringify({ input: text, includedRegionCodes: ['au'], languageCode: 'en' }),
+      });
+      const data = await response.json();
+      const suggestions = (data.suggestions || [])
+        .filter(s => s.placePrediction)
+        .map(s => ({ placeId: s.placePrediction.placeId, text: s.placePrediction.text.text }));
+      setLfLocationSuggestions(suggestions);
+      setShowLfLocationSuggestions(suggestions.length > 0);
+    } catch (e) {
+      console.error('Places autocomplete error:', e);
+      setLfLocationSuggestions([]);
+    } finally {
+      setLoadingLfSuggestions(false);
+    }
+  };
+
+  const handleLfLocationChange = (text) => {
+    setLfLocation(text);
+    if (lfLocationDebounceRef.current) clearTimeout(lfLocationDebounceRef.current);
+    if (text.trim().length < 3) {
+      setLfLocationSuggestions([]);
+      setShowLfLocationSuggestions(false);
+      return;
+    }
+    lfLocationDebounceRef.current = setTimeout(() => fetchLfLocationSuggestions(text.trim()), 350);
+  };
+
+  const handleSelectLfLocationSuggestion = (suggestion) => {
+    setLfLocation(suggestion.text);
+    setLfLocationSuggestions([]);
+    setShowLfLocationSuggestions(false);
   };
 
   const uploadImages = async (postId) => {
@@ -463,7 +512,36 @@ export default function CreatePostScreen() {
             </View>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Location</Text></View>
             <View style={styles.fieldPad}>
-              <TextInput style={styles.input2Line} placeholder={selectedCategory === 'lost' ? 'Where did you last see it?' : 'Where did you find it?'} placeholderTextColor={Colors.midGrey} value={lfLocation} onChangeText={setLfLocation} multiline numberOfLines={2} textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
+              <TextInput
+                style={styles.input2Line}
+                placeholder={selectedCategory === 'lost' ? 'Where did you last see it?' : 'Where did you find it?'}
+                placeholderTextColor={Colors.midGrey}
+                value={lfLocation}
+                onChangeText={handleLfLocationChange}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                autoCorrect={true}
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
+              />
+              {loadingLfSuggestions && (
+                <ActivityIndicator size="small" color={Colors.brandGreen} style={{ marginTop: 8 }} />
+              )}
+              {showLfLocationSuggestions && lfLocationSuggestions.length > 0 && (
+                <View style={styles.suggestionsBox}>
+                  {lfLocationSuggestions.map(item => (
+                    <TouchableOpacity
+                      key={item.placeId}
+                      style={styles.suggestionItem}
+                      onPress={() => handleSelectLfLocationSuggestion(item)}
+                    >
+                      <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
+                      <Text style={styles.suggestionText} numberOfLines={2}>{item.text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
             <ImagePickerSection />
             <View style={styles.fieldPad}>
@@ -508,6 +586,9 @@ const styles = StyleSheet.create({
   serviceSelectorPlaceholderText: { flex: 1, fontSize: 15, color: Colors.midGrey },
   input: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   input2Line: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, height: 68, textAlignVertical: 'top' },
+  suggestionsBox: { marginTop: 6, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, overflow: 'hidden' },
+  suggestionItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
+  suggestionText: { flex: 1, fontSize: 14, color: Colors.charcoal },
   inputLarge: { minHeight: 100, textAlignVertical: 'top' },
   inputSingle: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   postBtnBottom: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,11 +31,66 @@ export default function EventsScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const locationDebounceRef = useRef(null);
   const [eventDate, setEventDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
   const scrollRef = useRef(null);
+
+  const fetchLocationSuggestions = async (text) => {
+    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return; // Autocomplete silently does nothing if no key is configured yet
+    setLoadingSuggestions(true);
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'suggestions.placePrediction.text,suggestions.placePrediction.placeId',
+        },
+        body: JSON.stringify({
+          input: text,
+          includedRegionCodes: ['au'],
+          languageCode: 'en',
+        }),
+      });
+      const data = await response.json();
+      const suggestions = (data.suggestions || [])
+        .filter(s => s.placePrediction)
+        .map(s => ({ placeId: s.placePrediction.placeId, text: s.placePrediction.text.text }));
+      setLocationSuggestions(suggestions);
+      setShowLocationSuggestions(suggestions.length > 0);
+    } catch (e) {
+      console.error('Places autocomplete error:', e);
+      setLocationSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const handleLocationChange = (text) => {
+    setLocation(text);
+    if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
+    if (text.trim().length < 3) {
+      setLocationSuggestions([]);
+      setShowLocationSuggestions(false);
+      return;
+    }
+    // Debounce so we don't fire a request on every keystroke.
+    locationDebounceRef.current = setTimeout(() => fetchLocationSuggestions(text.trim()), 350);
+  };
+
+  const handleSelectLocationSuggestion = (suggestion) => {
+    setLocation(suggestion.text);
+    setLocationSuggestions([]);
+    setShowLocationSuggestions(false);
+    Keyboard.dismiss();
+  };
 
   const fetchEvents = useCallback(async () => {
     if (!profile?.suburb) return;
@@ -114,6 +169,7 @@ export default function EventsScreen() {
       });
       setShowModal(false);
       setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
+      setLocationSuggestions([]); setShowLocationSuggestions(false);
       fetchEvents();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setPosting(false); }
@@ -193,10 +249,13 @@ export default function EventsScreen() {
                       <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
                       {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
                       {item.eventLocation ? (
-                        <View style={styles.infoRow}>
-                          <Ionicons name="location-outline" size={13} color={Colors.midGrey} />
-                          <Text style={styles.infoText}>{item.eventLocation}</Text>
-                        </View>
+                        <TouchableOpacity
+                          style={styles.infoRow}
+                          onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.eventLocation)}`).catch(() => {})}
+                        >
+                          <Ionicons name="location-outline" size={13} color={Colors.brandGreen} />
+                          <Text style={[styles.infoText, styles.locationLink]}>{item.eventLocation}</Text>
+                        </TouchableOpacity>
                       ) : null}
                       {ed && (
                         <View style={styles.infoRow}>
@@ -294,7 +353,35 @@ export default function EventsScreen() {
             </View>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Location</Text></View>
             <View style={styles.fieldPad}>
-              <TextInput style={styles.input2Line} placeholder="e.g. Paddington Park, cnr Given Tce & Latrobe St" placeholderTextColor={Colors.midGrey} value={location} onChangeText={setLocation} multiline numberOfLines={2} textAlignVertical="top" autoCapitalize="sentences" onFocus={() => { setShowDatePicker(false); setShowTimePicker(false); setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300); }} />
+              <TextInput
+                style={styles.input2Line}
+                placeholder="e.g. Paddington Park, cnr Given Tce & Latrobe St"
+                placeholderTextColor={Colors.midGrey}
+                value={location}
+                onChangeText={handleLocationChange}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                autoCapitalize="sentences"
+                onFocus={() => { setShowDatePicker(false); setShowTimePicker(false); setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300); }}
+              />
+              {loadingSuggestions && (
+                <ActivityIndicator size="small" color={Colors.brandGreen} style={{ marginTop: 8 }} />
+              )}
+              {showLocationSuggestions && locationSuggestions.length > 0 && (
+                <View style={styles.suggestionsBox}>
+                  {locationSuggestions.map(item => (
+                    <TouchableOpacity
+                      key={item.placeId}
+                      style={styles.suggestionItem}
+                      onPress={() => handleSelectLocationSuggestion(item)}
+                    >
+                      <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
+                      <Text style={styles.suggestionText} numberOfLines={2}>{item.text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
@@ -335,6 +422,10 @@ const styles = StyleSheet.create({
   cardDesc: { fontSize: 13, color: Colors.midGrey },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoText: { fontSize: 13, color: Colors.midGrey },
+  locationLink: { color: Colors.brandGreen, textDecorationLine: 'underline', fontWeight: '600' },
+  suggestionsBox: { marginTop: 6, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, overflow: 'hidden' },
+  suggestionItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
+  suggestionText: { flex: 1, fontSize: 14, color: Colors.charcoal },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   cardAuthor: { fontSize: 11, color: Colors.midGrey },
   metaText: { fontSize: 11, color: Colors.midGrey },

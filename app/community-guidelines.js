@@ -14,7 +14,7 @@ export default function CommunityGuidelinesScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Community Guidelines</Text>
-        <Text style={styles.updated}>Last updated: 29 June 2026</Text>
+        <Text style={styles.updated}>Last updated: 8 July 2026</Text>
         <Text style={styles.intro}>My Suburb is your local community. These guidelines help keep our community safe, respectful and useful for everyone.</Text>
 
         <Text style={styles.heading}>Be Respectful</Text>
@@ -31,6 +31,7 @@ export default function CommunityGuidelinesScreen() {
         <Text style={styles.bullet}>- Events: Local events with date, time and location</Text>
         <Text style={styles.bullet}>- Buy and Sell: Items for sale, give away or seeking</Text>
         <Text style={styles.bullet}>- Lost and Found: Lost or found pets, items and belongings</Text>
+        <Text style={styles.bullet}>- Services: Services you're offering or looking for</Text>
 
         <Text style={styles.heading}>What Is Not Allowed</Text>
         <Text style={styles.body}>The following content will be removed and may result in account suspension:</Text>
@@ -41,7 +42,8 @@ export default function CommunityGuidelinesScreen() {
         <Text style={styles.bullet}>- Spam, scams or fraudulent listings</Text>
         <Text style={styles.bullet}>- Unsolicited advertising or commercial promotion</Text>
         <Text style={styles.bullet}>- False emergency alerts or misleading safety warnings</Text>
-        <Text style={styles.bullet}>- Sharing someone private information without consent</Text>
+        <Text style={styles.bullet}>- Sharing someone's private information without consent</Text>
+        <Text style={styles.bullet}>- Cyberbullying, image-based abuse, or other seriously harmful content</Text>
         <Text style={styles.bullet}>- Content that violates Australian law</Text>
 
         <Text style={styles.heading}>Buy and Sell Guidelines</Text>
@@ -56,9 +58,15 @@ export default function CommunityGuidelinesScreen() {
         <Text style={styles.body}>Safety alerts should only be used for genuine safety concerns such as suspicious activity, dangerous road conditions, or local emergencies.</Text>
         <Text style={styles.body}>For life-threatening emergencies, always call 000 first before posting to the app. False safety alerts will result in immediate account suspension.</Text>
 
-        <Text style={styles.heading}>Enforcement</Text>
+        <Text style={styles.heading}>Reporting and Enforcement</Text>
+        <Text style={styles.body}>You can report a post, comment, or user directly within the app. Our moderation team reviews reports promptly.</Text>
+        <Text style={styles.body}>You can also block another user at any time — this stops them from messaging you and hides their posts from your feed.</Text>
+        <Text style={styles.body}>For cyberbullying, image-based abuse, or other seriously harmful content, you can report directly to the eSafety Commissioner at esafety.gov.au in addition to reporting within the app.</Text>
         <Text style={styles.body}>Violations of these guidelines may result in content removal, a warning, temporary suspension or permanent account ban.</Text>
         <Text style={styles.body}>Serious violations including threats of violence, illegal content or repeat offending will result in immediate permanent banning and may be referred to Australian authorities.</Text>
+
+        <Text style={styles.heading}>Appeals</Text>
+        <Text style={styles.body}>If you believe a moderation decision was made in error, you can appeal by contacting community@mysuburb.com.au with details of the decision and why you believe it should be reviewed.</Text>
 
         <Text style={styles.heading}>Contact Us</Text>
         <Text style={styles.body}>To report a serious issue or appeal a moderation decision, contact us at community@mysuburb.com.au</Text>

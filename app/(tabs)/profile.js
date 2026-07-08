@@ -215,6 +215,7 @@ export default function ProfileScreen() {
             onPress={() => setShowSuburbs(prev => !prev)}
             activeOpacity={0.85}
           >
+            <Ionicons name="location" size={18} color={Colors.brandGreen} style={styles.sectionIcon} />
             <Text style={styles.sectionTitle}>Selected Suburbs</Text>
             <Ionicons
               name={showSuburbs ? 'chevron-up' : 'chevron-down'}
@@ -264,6 +265,7 @@ export default function ProfileScreen() {
 
       {/* Posts section header */}
       <View style={styles.postsSectionHeader}>
+        <Ionicons name="document-text" size={18} color={Colors.brandGreen} style={styles.sectionIcon} />
         <Text style={styles.sectionTitle}>My Posts</Text>
       </View>
 
@@ -344,11 +346,12 @@ const styles = StyleSheet.create({
   suburbNumberText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
   suburbRowText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
   primaryLabel: { fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  postsSectionHeader: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  postsChevron: { marginLeft: 6 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center' },
-  list: { padding: 16, gap: 10, paddingBottom: 40 },
-  card: { backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
+  postsSectionHeader: { paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  sectionIcon: { marginRight: 8 },
+  postsChevron: { marginLeft: 8 },
+  sectionTitle: { fontSize: 19, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center' },
+  list: { padding: 16, gap: 12, paddingBottom: 40 },
+  card: { backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1, borderColor: '#EFEFEF', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   catBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
   catBadgeText: { fontSize: 12, fontWeight: '700' },
