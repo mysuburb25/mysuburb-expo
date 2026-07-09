@@ -2,10 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image, Keyboard, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+
+const REPORT_REASONS = [
+  'Spam or scam',
+  'Harassment or bullying',
+  'Inappropriate content',
+  'False or misleading information',
+  'Other',
+];
 
 function timeAgo(date) {
   if (!date) return '';
@@ -45,13 +53,6 @@ function flattenCommentTree(comments) {
   return result;
 }
 
-// All descendant comment IDs under a given comment, at any depth — used so
-// deleting a comment cleans up its whole reply chain, not just direct replies.
-function getDescendantIds(commentId, allComments) {
-  const direct = allComments.filter(c => c.parentCommentId === commentId);
-  return direct.reduce((acc, d) => [...acc, d.id, ...getDescendantIds(d.id, allComments)], []);
-}
-
 const PAGE_TITLES = {
   updates: 'Community Hub', notices: 'Community Hub', safety: 'Community Hub',
   events: 'Events', marketplace: 'Buy & Sell', lostfound: 'Lost & Found', services: 'Services',
@@ -73,6 +74,10 @@ export default function PostDetailScreen() {
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
   const [showPostMenu, setShowPostMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState(null);
+  const [reportDetails, setReportDetails] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
   const [deletingPost, setDeletingPost] = useState(false);
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const inputRef = useRef(null);
@@ -221,7 +226,41 @@ export default function PostDetailScreen() {
 
   const handleReportPost = () => {
     setShowPostMenu(false);
-    Alert.alert('Report Post', 'Thank you for reporting. Our team will review this post.');
+    setReportReason(null);
+    setReportDetails('');
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason) {
+      Alert.alert('Select a reason', 'Please choose a reason for reporting this post.');
+      return;
+    }
+    setSubmittingReport(true);
+    try {
+      await addDoc(collection(db, 'reports'), {
+        category: 'Post content',
+        reason: reportReason,
+        description: reportDetails.trim() || null,
+        postId: post.id,
+        postContent: (post.content || '').slice(0, 300),
+        postAuthorId: post.authorId,
+        postAuthorName: post.authorName,
+        userId: user.uid,
+        userEmail: profile?.email || user.email || null,
+        userDisplayName: profile?.displayName || null,
+        suburb: post.suburb || null,
+        state: post.state || null,
+        status: 'open',
+        createdAt: serverTimestamp(),
+      });
+      setShowReportModal(false);
+      Alert.alert('Report Submitted', 'Thank you for reporting this post. Our team will review it within 24 hours.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not submit your report. Please check your connection and try again.');
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   const handleBlockUser = () => {
@@ -249,21 +288,20 @@ export default function PostDetailScreen() {
     );
   };
 
+  const DELETED_COMMENT_TEXT = '[This comment was deleted]';
+
   const handleDeleteComment = (commentId) => {
-    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
+    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment? Replies to it will stay visible.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           try {
-            // Remove the whole reply chain under this comment, at any depth,
-            // so nothing is left pointing at a parent that no longer exists.
-            const descendantIds = getDescendantIds(commentId, comments);
-            await deleteDoc(doc(db, 'comments', commentId));
-            await Promise.all(descendantIds.map(cid => deleteDoc(doc(db, 'comments', cid))));
-            const removedCount = 1 + descendantIds.length;
-            await updateDoc(doc(db, 'posts', id), { commentCount: increment(-removedCount) });
-            setComments(prev => prev.filter(c => c.id !== commentId && !descendantIds.includes(c.id)));
-            setPost(prev => ({ ...prev, commentCount: Math.max((prev.commentCount || removedCount) - removedCount, 0) }));
+            // Soft-delete only — replace the content with a placeholder rather
+            // than hard-deleting, since replies from other users may depend
+            // on this comment still existing (and Firestore rules only allow
+            // authors to modify their own comments, not delete others' replies).
+            await updateDoc(doc(db, 'comments', commentId), { content: DELETED_COMMENT_TEXT, isDeleted: true });
+            setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: DELETED_COMMENT_TEXT, isDeleted: true } : c));
           } catch (e) { Alert.alert('Error', e.message); }
         }
       }
@@ -479,10 +517,12 @@ export default function PostDetailScreen() {
           const FooterRow = (
             <View style={styles.commentFooter}>
               <Text style={styles.commentTime}>{timeAgo(item.createdAt)}</Text>
-              <TouchableOpacity style={styles.likeRow} onPress={() => handleCommentLike(item)}>
-                <Ionicons name={commentLiked ? 'heart' : 'heart-outline'} size={13} color={commentLiked ? '#E53935' : Colors.midGrey} />
-                {item.likeCount > 0 && <Text style={[styles.likeCountText, commentLiked && { color: '#E53935' }]}>{item.likeCount}</Text>}
-              </TouchableOpacity>
+              {!item.isDeleted && (
+                <TouchableOpacity style={styles.likeRow} onPress={() => handleCommentLike(item)}>
+                  <Ionicons name={commentLiked ? 'heart' : 'heart-outline'} size={13} color={commentLiked ? '#E53935' : Colors.midGrey} />
+                  {item.likeCount > 0 && <Text style={[styles.likeCountText, commentLiked && { color: '#E53935' }]}>{item.likeCount}</Text>}
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => startReply(item)}>
                 <Text style={styles.replyBtnText}>Reply</Text>
               </TouchableOpacity>
@@ -504,10 +544,10 @@ export default function PostDetailScreen() {
                     <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
                       <Text style={styles.commentAuthor}>{item.authorName}</Text>
                     </TouchableOpacity>
-                    <Text style={styles.commentContent}>{item.content}</Text>
+                    <Text style={[styles.commentContent, item.isDeleted && styles.deletedText]}>{item.content}</Text>
                     {FooterRow}
                   </View>
-                  {isMyComment && (
+                  {isMyComment && !item.isDeleted && (
                     <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
                       <Ionicons name="trash-outline" size={15} color="#E53935" />
                     </TouchableOpacity>
@@ -534,11 +574,11 @@ export default function PostDetailScreen() {
                   <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
                     <Text style={styles.replyAuthorInline}>{item.authorName}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.replyText}>{item.content}</Text>
+                  <Text style={[styles.replyText, item.isDeleted && styles.deletedText]}>{item.content}</Text>
                 </View>
                 {FooterRow}
               </View>
-              {isMyComment && (
+              {isMyComment && !item.isDeleted && (
                 <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
                   <Ionicons name="trash-outline" size={14} color="#E53935" />
                 </TouchableOpacity>
@@ -613,6 +653,57 @@ export default function PostDetailScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Report reason modal */}
+      <Modal visible={showReportModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowReportModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.reportSheet} onPress={() => {}}>
+            <View style={styles.menuHandle} />
+            <Text style={styles.reportTitle}>Report this post</Text>
+            <Text style={styles.reportSubtitle}>Why are you reporting this post?</Text>
+
+            {REPORT_REASONS.map(reason => (
+              <TouchableOpacity
+                key={reason}
+                style={[styles.reasonChip, reportReason === reason && styles.reasonChipActive]}
+                onPress={() => setReportReason(reason)}
+              >
+                <Ionicons
+                  name={reportReason === reason ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={reportReason === reason ? Colors.brandGreen : Colors.midGrey}
+                />
+                <Text style={[styles.reasonChipText, reportReason === reason && styles.reasonChipTextActive]}>{reason}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <TextInput
+              style={styles.reportDetailsInput}
+              placeholder="Add any extra details (optional)"
+              placeholderTextColor={Colors.midGrey}
+              value={reportDetails}
+              onChangeText={setReportDetails}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={[styles.reportSubmitBtn, submittingReport && { opacity: 0.7 }]}
+              onPress={handleSubmitReport}
+              disabled={submittingReport}
+            >
+              {submittingReport
+                ? <ActivityIndicator color={Colors.white} size="small" />
+                : <Text style={styles.reportSubmitBtnText}>Submit Report</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reportCancelBtn} onPress={() => setShowReportModal(false)} disabled={submittingReport}>
+              <Text style={styles.reportCancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -672,6 +763,7 @@ const styles = StyleSheet.create({
   commentAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   commentAuthor: { fontSize: 13, fontWeight: '700', color: Colors.charcoal },
   commentContent: { fontSize: 14, fontWeight: '500', color: Colors.charcoal, marginTop: 2, lineHeight: 20 },
+  deletedText: { fontStyle: 'italic', color: Colors.midGrey, fontWeight: '400' },
 
   // Threaded reply — compact, no boxed nesting
   replyRow: { flexDirection: 'row', gap: 8, paddingTop: 8, alignItems: 'flex-start' },
@@ -706,4 +798,16 @@ const styles = StyleSheet.create({
   menuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100' },
   menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
+  reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },
+  reportTitle: { fontSize: 19, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 4 },
+  reportSubtitle: { fontSize: 13, color: Colors.midGrey, textAlign: 'center', marginBottom: 16 },
+  reasonChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EFEFEF', marginBottom: 8 },
+  reasonChipActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
+  reasonChipText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
+  reasonChipTextActive: { color: Colors.brandGreen, fontWeight: '700' },
+  reportDetailsInput: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 14, color: Colors.charcoal, minHeight: 70, marginTop: 4, marginBottom: 16 },
+  reportSubmitBtn: { backgroundColor: '#E53935', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  reportSubmitBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
+  reportCancelBtn: { paddingVertical: 12, alignItems: 'center' },
+  reportCancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.midGrey },
 });

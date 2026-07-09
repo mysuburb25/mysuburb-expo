@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -48,6 +48,38 @@ const COMMUNITY_PLACEHOLDERS = {
   safety:  "Report a safety concern — suspicious activity, hazards, emergencies in your area...",
 };
 
+// Defined at module level (not inside CreatePostScreen) so React treats it as
+// the same component across renders — keeping it inside the screen component
+// recreated a "new" component type on every keystroke, forcing the photos to
+// unmount/remount and visibly flicker every time the user typed.
+function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
+  return (
+    <>
+      <View style={styles.sectionBar}>
+        <Text style={styles.sectionBarText}>Photos ({images.length}/3)</Text>
+      </View>
+      <View style={styles.fieldPad}>
+        <View style={styles.imageRow}>
+          {images.map((img, index) => (
+            <View key={index} style={styles.imageThumbWrap}>
+              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveImage(index)}>
+                <Ionicons name="close-circle" size={20} color="#E53935" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {images.length < 3 && (
+            <TouchableOpacity style={styles.addImageBtn} onPress={onAddPhoto}>
+              <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
+              <Text style={styles.addImageText}>Add Photo</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </>
+  );
+}
+
 export default function CreatePostScreen() {
   const { category: initialCategory, preselect } = useLocalSearchParams();
   const { user, profile } = useAuth();
@@ -95,7 +127,10 @@ export default function CreatePostScreen() {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
           const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, aspect: [4, 3] });
-          if (!result.canceled) setImages(prev => [...prev, { uri: result.assets[0].uri }]);
+          if (!result.canceled) {
+            setImages(prev => [...prev, { uri: result.assets[0].uri }]);
+            Keyboard.dismiss();
+          }
         },
       },
       {
@@ -114,6 +149,7 @@ export default function CreatePostScreen() {
           if (!result.canceled) {
             const newImages = result.assets.slice(0, remaining).map(a => ({ uri: a.uri }));
             setImages(prev => [...prev, ...newImages]);
+            Keyboard.dismiss();
           }
         },
       },
@@ -288,33 +324,6 @@ export default function CreatePostScreen() {
 
   const tabs = isCommunity ? COMMUNITY_TABS : isMarketplace ? MARKETPLACE_TABS : isServices ? SERVICE_TABS : null;
 
-  // Image picker section — reusable
-  const ImagePickerSection = () => (
-    <>
-      <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos ({images.length}/3)</Text>
-      </View>
-      <View style={styles.fieldPad}>
-        <View style={styles.imageRow}>
-          {images.map((img, index) => (
-            <View key={index} style={styles.imageThumbWrap}>
-              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
-              <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImage(index)}>
-                <Ionicons name="close-circle" size={20} color="#E53935" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          {images.length < 3 && (
-            <TouchableOpacity style={styles.addImageBtn} onPress={handlePickImage}>
-              <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
-              <Text style={styles.addImageText}>Add Photo</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </>
-  );
-
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
       <View style={styles.header}>
@@ -399,7 +408,7 @@ export default function CreatePostScreen() {
                 onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
               />
             </View>
-            <ImagePickerSection />
+            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
@@ -460,7 +469,7 @@ export default function CreatePostScreen() {
             <View style={styles.fieldPad}>
               <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
             </View>
-            <ImagePickerSection />
+            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
@@ -490,7 +499,7 @@ export default function CreatePostScreen() {
                 </View>
               </>
             )}
-            <ImagePickerSection />
+            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
@@ -543,7 +552,7 @@ export default function CreatePostScreen() {
                 </View>
               )}
             </View>
-            <ImagePickerSection />
+            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}

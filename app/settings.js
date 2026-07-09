@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
 export default function SettingsScreen() {
-  const { logout } = useAuth();
+  const { logout, profile } = useAuth();
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure?', [
@@ -53,6 +53,15 @@ export default function SettingsScreen() {
         <MenuItem icon="flag-outline" label="Report a Problem" onPress={() => router.push('/report-problem')} />
         <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', 'Version 1.0.0 - Built for Australian communities.')} />
       </View>
+
+      {profile?.isAdmin && (
+        <>
+          <Text style={styles.sectionLabel}>Admin</Text>
+          <View style={styles.section}>
+            <MenuItem icon="shield-checkmark-outline" label="Moderation" onPress={() => router.push('/moderation')} />
+          </View>
+        </>
+      )}
 
       <Text style={styles.sectionLabel}>Account Actions</Text>
       <View style={styles.section}>

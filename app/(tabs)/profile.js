@@ -90,7 +90,6 @@ export default function ProfileScreen() {
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
       await updateUserProfile({ photoURL: downloadURL });
-      Alert.alert('Success', 'Profile photo updated!');
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to upload photo. Please try again.');
@@ -170,7 +169,7 @@ export default function ProfileScreen() {
         <Text style={styles.pageTitle}>Profile</Text>
       </View>
 
-      {/* Fixed profile section */}
+      {/* Fixed profile section — compact horizontal row instead of a tall vertical stack */}
       <View style={styles.profileSection}>
         <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickPhoto} disabled={uploadingPhoto}>
           {profile?.photoURL ? (
@@ -183,51 +182,58 @@ export default function ProfileScreen() {
           <View style={styles.cameraBtn}>
             {uploadingPhoto
               ? <ActivityIndicator size="small" color={Colors.white} />
-              : <Ionicons name="camera" size={16} color={Colors.white} />
+              : <Ionicons name="camera" size={12} color={Colors.white} />
             }
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.name}>{profile?.displayName}</Text>
-        <Text style={styles.email}>{profile?.email}</Text>
+        <View style={styles.profileInfo}>
+          <Text style={styles.name} numberOfLines={1}>{profile?.displayName}</Text>
+          <Text style={styles.email} numberOfLines={1}>{profile?.email}</Text>
+        </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(auth)/select-suburb')}>
-            <Ionicons name="location-outline" size={16} color={Colors.brandGreen} />
-            <Text style={styles.actionText}>Change Suburb</Text>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/settings')}>
+            <Ionicons name="settings-outline" size={14} color={Colors.brandGreen} />
+            <Text style={styles.iconBtnText}>Settings</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={16} color={Colors.brandGreen} />
-            <Text style={styles.actionText}>Settings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnRed]} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={16} color="#E53935" />
-            <Text style={[styles.actionText, { color: '#E53935' }]}>Sign Out</Text>
+          <TouchableOpacity style={[styles.iconBtn, styles.iconBtnRed]} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={14} color="#E53935" />
+            <Text style={[styles.iconBtnText, styles.iconBtnTextRed]}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* My Suburbs section — tap the bar to expand/collapse */}
+      {/* My Suburbs section — tap the bar to expand/collapse, edit icon jumps to Change Suburb */}
       {profile?.suburbs && profile.suburbs.length > 0 && (
-        <View>
+        <View style={styles.sectionCard}>
           <TouchableOpacity
-            style={styles.postsSectionHeader}
+            style={styles.sectionCardHeader}
             onPress={() => setShowSuburbs(prev => !prev)}
             activeOpacity={0.85}
           >
-            <Ionicons name="location" size={18} color={Colors.brandGreen} style={styles.sectionIcon} />
+            <View style={styles.sectionIconBadge}>
+              <Ionicons name="location" size={14} color={Colors.brandGreen} />
+            </View>
             <Text style={styles.sectionTitle}>Selected Suburbs</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/select-suburb')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.headerEditBtn}
+            >
+              <Ionicons name="create-outline" size={18} color={Colors.white} />
+            </TouchableOpacity>
             <Ionicons
               name={showSuburbs ? 'chevron-up' : 'chevron-down'}
               size={18}
-              color={Colors.brandGreen}
+              color={Colors.white}
               style={styles.postsChevron}
             />
           </TouchableOpacity>
 
           {showSuburbs && (
             <View style={styles.suburbsSection}>
-              <Text style={styles.suburbsSectionSubtitle}>Toggle suburbs to control your feed. Tap Change Suburb to manage.</Text>
+              <Text style={styles.suburbsSectionSubtitle}>Toggle suburbs to control your feed. Tap the pencil to change a suburb.</Text>
               {profile.suburbs.map((s, index) => (
                 index === 0 ? (
                   <TouchableOpacity key={index} style={styles.suburbRow} onPress={() => handleToggleSuburb(index)} activeOpacity={0.6}>
@@ -236,6 +242,12 @@ export default function ProfileScreen() {
                         <Text style={styles.suburbNumberText}>{index + 1}</Text>
                       </View>
                       <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                      <TouchableOpacity
+                        onPress={() => router.push('/(auth)/select-suburb')}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="pencil" size={14} color={Colors.brandGreen} />
+                      </TouchableOpacity>
                       <Text style={styles.primaryLabel}>Primary</Text>
                     </View>
                     <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
@@ -247,6 +259,12 @@ export default function ProfileScreen() {
                         <Text style={styles.suburbNumberText}>{index + 1}</Text>
                       </View>
                       <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                      <TouchableOpacity
+                        onPress={() => router.push('/(auth)/select-suburb')}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="pencil" size={14} color={Colors.brandGreen} />
+                      </TouchableOpacity>
                     </View>
                     <Switch
                       value={s.active}
@@ -264,9 +282,13 @@ export default function ProfileScreen() {
       )}
 
       {/* Posts section header */}
-      <View style={styles.postsSectionHeader}>
-        <Ionicons name="document-text" size={18} color={Colors.brandGreen} style={styles.sectionIcon} />
-        <Text style={styles.sectionTitle}>My Posts</Text>
+      <View style={[styles.sectionCard, styles.postsHeaderCard]}>
+        <View style={[styles.sectionCardHeader, { borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }]}>
+          <View style={styles.sectionIconBadge}>
+            <Ionicons name="document-text" size={14} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.sectionTitle}>My Posts</Text>
+        </View>
       </View>
 
       {/* Scrollable posts list */}
@@ -281,7 +303,11 @@ export default function ProfileScreen() {
           renderItem={({ item }) => {
             const catStyle = CATEGORY_COLORS[item.category] || CATEGORY_COLORS.updates;
             return (
-              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={[styles.card, { borderLeftColor: catStyle.text, borderLeftWidth: 4 }]}
+                onPress={() => router.push('/post/' + item.id)}
+                activeOpacity={0.85}
+              >
                 {/* Card header with category badge and delete button */}
                 <View style={styles.cardHeader}>
                   <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
@@ -317,7 +343,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: '#F2F2F2' },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
@@ -325,40 +351,56 @@ const styles = StyleSheet.create({
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  profileSection: { backgroundColor: Colors.white, alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  avatarWrapper: { position: 'relative', marginBottom: 10 },
-  avatarLarge: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#FFFFC5', borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center' },
-  avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: Colors.brandGreen },
-  avatarText: { fontSize: 36, fontWeight: '800', color: Colors.brandGreen },
-  cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: Colors.white },
-  name: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, marginBottom: 2 },
-  email: { fontSize: 13, color: Colors.midGrey, marginBottom: 12 },
-  actions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', justifyContent: 'center' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.brandGreen },
-  actionBtnRed: { borderColor: '#E53935' },
-  actionText: { fontSize: 13, color: Colors.brandGreen, fontWeight: '600' },
-  suburbsSection: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageTitle: { fontSize: 21, fontWeight: '700', color: Colors.brandGreen },
+  profileSection: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  avatarWrapper: { position: 'relative' },
+  avatarLarge: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFC5', borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: Colors.brandGreen },
+  avatarText: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen },
+  cameraBtn: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#F2F2F2' },
+  profileInfo: { flex: 1, minWidth: 0, marginRight: 6 },
+  name: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
+  email: { fontSize: 11, color: Colors.midGrey, marginTop: 1 },
+  actions: { flexDirection: 'row', gap: 6 },
+  iconBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: Colors.brandGreenPale, borderWidth: 1.2, borderColor: Colors.brandGreen },
+  iconBtnRed: { backgroundColor: '#FCE8E7', borderColor: '#E53935' },
+  iconBtnText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
+  iconBtnTextRed: { color: '#E53935' },
+
+  // Card wrapper shared by "Selected Suburbs" and "My Posts" headers
+  sectionCard: {
+    backgroundColor: Colors.white, marginHorizontal: 16, marginBottom: 12, borderRadius: 18, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
+  },
+  postsHeaderCard: { paddingVertical: 2 },
+  sectionCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.brandGreen, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
+  sectionIconBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  postsChevron: { marginLeft: 8 },
+  headerEditBtn: { marginLeft: 10, padding: 2 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.white, textAlign: 'center' },
+
+  suburbsSection: { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
   suburbsSectionSubtitle: { fontSize: 12, color: Colors.midGrey, marginBottom: 10 },
-  suburbRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  suburbRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
   suburbRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   suburbNumberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
-  suburbNumberText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
+  suburbNumberText: { fontSize: 12, fontWeight: '900', color: Colors.brandGreen },
   suburbRowText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
-  primaryLabel: { fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  postsSectionHeader: { paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  sectionIcon: { marginRight: 8 },
-  postsChevron: { marginLeft: 8 },
-  sectionTitle: { fontSize: 19, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center' },
-  list: { padding: 16, gap: 12, paddingBottom: 40 },
-  card: { backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1, borderColor: '#EFEFEF', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 12, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  catBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
-  catBadgeText: { fontSize: 12, fontWeight: '700' },
+  primaryLabel: { fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+
+  list: { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
+  card: {
+    backgroundColor: Colors.white, borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.brandGreen + '40',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
+  catBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  catBadgeText: { fontSize: 11, fontWeight: '700' },
   deleteBtn: { padding: 4 },
   cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, padding: 12 },
-  cardOneLineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },
-  cardOneLine: { flex: 1, fontSize: 14, color: Colors.charcoal },
+  cardOneLineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 14 },
+  cardOneLine: { flex: 1, fontSize: 15, color: Colors.charcoal, fontWeight: '500' },
   cardMetaInline: { fontSize: 11, color: Colors.midGrey, fontWeight: '600', flexShrink: 0 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10 },
   cardMeta: { fontSize: 11, color: Colors.midGrey },

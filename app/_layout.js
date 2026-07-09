@@ -10,6 +10,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="post/[id]" />
         <Stack.Screen name="chat/[userId]" />
+        <Stack.Screen name="user/[userId]" />
         <Stack.Screen name="create-post" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="privacy-policy" />
@@ -21,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="blocked-users" />
         <Stack.Screen name="help-faq" />
         <Stack.Screen name="report-problem" />
+        <Stack.Screen name="moderation" />
       </Stack>
     </AuthProvider>
   );

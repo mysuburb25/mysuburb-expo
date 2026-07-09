@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +13,10 @@ export default function ReportProblemScreen() {
   const { user, profile } = useAuth();
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [issueLocation, setIssueLocation] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const isTechnicalIssue = category === 'Bug or technical issue';
 
   const handleSubmit = async () => {
     if (!category) { Alert.alert('Error', 'Please select a category.'); return; }
@@ -20,7 +24,7 @@ export default function ReportProblemScreen() {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'reports'), {
+      const reportData = {
         category,
         description: description.trim(),
         userId: user?.uid || null,
@@ -30,7 +34,24 @@ export default function ReportProblemScreen() {
         state: profile?.state || null,
         status: 'open',
         createdAt: serverTimestamp(),
-      });
+      };
+
+      // For bug reports specifically, capture technical context automatically
+      // (device/app details, which are always accurate) alongside the
+      // user's own description of where in the app it happened — auto-
+      // detecting the screen isn't reliable here, since it would only ever
+      // reflect wherever they navigated to in order to open this form, not
+      // necessarily where the actual problem occurred.
+      if (isTechnicalIssue) {
+        reportData.reportedLocation = issueLocation.trim() || null;
+        reportData.technicalContext = {
+          platform: Platform.OS,
+          osVersion: String(Platform.Version),
+          appVersion: Constants.expoConfig?.version || null,
+        };
+      }
+
+      await addDoc(collection(db, 'reports'), reportData);
 
       Alert.alert('Report Submitted', 'Thank you for your report. We will review it within 24 hours.', [
         { text: 'OK', onPress: () => router.back() }
@@ -65,10 +86,25 @@ export default function ReportProblemScreen() {
           ))}
         </View>
 
+        {isTechnicalIssue && (
+          <>
+            <Text style={styles.label}>Where did this happen?</Text>
+            <TextInput
+              style={styles.locationInput}
+              placeholder="e.g. Home feed, Create Post, Chat with a neighbour..."
+              placeholderTextColor="#9CA3AF"
+              value={issueLocation}
+              onChangeText={setIssueLocation}
+            />
+          </>
+        )}
+
         <Text style={styles.label}>Describe the Problem</Text>
         <TextInput
           style={styles.input}
-          placeholder="Please describe what happened in as much detail as possible..."
+          placeholder={isTechnicalIssue
+            ? "What were you trying to do, and what happened instead? Include any error message you saw..."
+            : "Please describe what happened in as much detail as possible..."}
           placeholderTextColor="#9CA3AF"
           value={description}
           onChangeText={setDescription}
@@ -76,6 +112,15 @@ export default function ReportProblemScreen() {
           numberOfLines={6}
           textAlignVertical="top"
         />
+
+        {isTechnicalIssue && (
+          <View style={styles.techNote}>
+            <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+            <Text style={styles.techNoteText}>
+              We'll automatically include your device type and app version to help us investigate.
+            </Text>
+          </View>
+        )}
 
         <Text style={styles.hint}>We aim to review all reports within 24 hours. For urgent safety issues please call 000.</Text>
 
@@ -100,6 +145,9 @@ const styles = StyleSheet.create({
   catText: { fontSize: 14, color: '#1B1F23', fontWeight: '500' },
   catTextActive: { color: '#fff', fontWeight: '700' },
   input: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#1B1F23', minHeight: 140 },
+  locationInput: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#1B1F23' },
+  techNote: { flexDirection: 'row', gap: 8, backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, marginTop: 4, alignItems: 'flex-start' },
+  techNoteText: { flex: 1, fontSize: 12, color: '#6B7280', lineHeight: 17 },
   hint: { fontSize: 13, color: '#9CA3AF', lineHeight: 20, marginTop: 8 },
   btn: { backgroundColor: '#2D6A4F', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 16 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },

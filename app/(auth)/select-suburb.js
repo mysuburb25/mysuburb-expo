@@ -25,6 +25,11 @@ const SUBURB_SLOTS = [
 
 const emptySlot = () => ({ state: '', suburb: '', active: true });
 
+// Builds the "STATE|suburb" key used by activeSuburbKeys so Firestore can
+// array-contains query for any user who has this suburb active, regardless
+// of whether it's their Primary, Second, or Third suburb.
+const suburbKey = (state, suburb) => `${state}|${suburb}`;
+
 export default function SelectSuburbScreen() {
   const { uid, email, displayName } = useLocalSearchParams();
   const { createProfile, updateUserProfile, user, profile } = useAuth();
@@ -104,13 +109,31 @@ export default function SelectSuburbScreen() {
       Alert.alert('Error', 'Please select your primary suburb.');
       return;
     }
+
+    const filledSlots = slots.filter(s => s.suburb && s.state);
+
+    // Guard against selecting the same suburb+state in more than one slot.
+    const seen = new Set();
+    for (const s of filledSlots) {
+      const key = suburbKey(s.state, s.suburb);
+      if (seen.has(key)) {
+        Alert.alert('Duplicate suburb', 'You\'ve selected the same suburb more than once.');
+        return;
+      }
+      seen.add(key);
+    }
+
     setLoading(true);
     try {
-      const filledSlots = slots.filter(s => s.suburb && s.state);
+      const activeSuburbKeys = filledSlots
+        .filter(s => s.active)
+        .map(s => suburbKey(s.state, s.suburb));
+
       const data = {
         suburb: slots[0].suburb,
         state: slots[0].state,
         suburbs: filledSlots,
+        activeSuburbKeys,
       };
       if (isEditing) {
         await updateUserProfile(data);
@@ -135,6 +158,9 @@ export default function SelectSuburbScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>My Suburb</Text>
+        <Text style={styles.headerTagline}>
+          {isEditing ? `${profile?.suburb}, ${profile?.state}` : 'Bringing suburbs together'}
+        </Text>
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} automaticallyAdjustKeyboardInsets={true}>
@@ -145,7 +171,7 @@ export default function SelectSuburbScreen() {
           {SUBURB_SLOTS.map((slot, index) => (
             <View key={slot.key} style={styles.slotSection}>
               <Text style={styles.slotLabel}>
-                {slot.label} {slot.required && <Text style={styles.required}>*</Text>}
+                {slot.label} {slot.required ? <Text style={styles.required}>*</Text> : <Text style={styles.optionalLabel}>(optional)</Text>}
               </Text>
 
               {/* State selector */}
@@ -191,6 +217,7 @@ export default function SelectSuburbScreen() {
                   <TouchableOpacity onPress={() => {
                     setSlots(prev => prev.map((s, i) => i === index ? { ...s, suburb: '' } : s));
                     setActiveSlotIndex(index);
+                    setSearch('');
                     setShowSuburbList(true);
                     setTimeout(() => searchRef.current?.focus(), 100);
                   }}>
@@ -267,11 +294,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   headerBar: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, alignItems: 'center' },
   headerTitle: { fontSize: 27, fontWeight: '800', color: Colors.white },
+  headerTagline: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   topSection: { padding: 20 },
   title: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, marginBottom: 6 },
   subtitle: { fontSize: 13, color: Colors.midGrey, marginBottom: 24, lineHeight: 18 },
   slotSection: { marginBottom: 24 },
   slotLabel: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen, marginBottom: 8 },
+  optionalLabel: { fontSize: 13, fontWeight: '500', color: Colors.midGrey },
   required: { color: '#E53935' },
   selectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FAFAFA' },
   selectorBtnActive: { borderColor: Colors.brandGreen, backgroundColor: Colors.brandGreenPale },

@@ -1,10 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -19,6 +21,37 @@ function formatTime(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
   return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Defined at module level, not inside EventsScreen, so React treats it as the
+// same component across renders — keeping it inside the screen would recreate
+// it on every keystroke and cause the selected photos to flicker.
+function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
+  return (
+    <>
+      <View style={styles.sectionBar}>
+        <Text style={styles.sectionBarText}>Photos ({images.length}/3)</Text>
+      </View>
+      <View style={styles.fieldPad}>
+        <View style={styles.imageRow}>
+          {images.map((img, index) => (
+            <View key={index} style={styles.imageThumbWrap}>
+              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveImage(index)}>
+                <Ionicons name="close-circle" size={20} color="#E53935" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {images.length < 3 && (
+            <TouchableOpacity style={styles.addImageBtn} onPress={onAddPhoto}>
+              <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
+              <Text style={styles.addImageText}>Add Photo</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </>
+  );
 }
 
 export default function EventsScreen() {
@@ -39,6 +72,7 @@ export default function EventsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [images, setImages] = useState([]);
   const scrollRef = useRef(null);
 
   const fetchLocationSuggestions = async (text) => {
@@ -156,20 +190,84 @@ export default function EventsScreen() {
     } catch (e) { console.error(e); }
   };
 
+  const handlePickImage = () => {
+    if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
+    const remaining = 3 - images.length;
+    Alert.alert('Add Photos', 'Choose an option', [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
+          const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, aspect: [4, 3] });
+          if (!result.canceled) {
+            setImages(prev => [...prev, { uri: result.assets[0].uri }]);
+            Keyboard.dismiss();
+          }
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            quality: 0.7,
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            selectionLimit: remaining,
+            allowsEditing: false,
+          });
+          if (!result.canceled) {
+            const newImages = result.assets.slice(0, remaining).map(a => ({ uri: a.uri }));
+            setImages(prev => [...prev, ...newImages]);
+            Keyboard.dismiss();
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (postId) => {
+    const urls = [];
+    for (let i = 0; i < images.length; i++) {
+      const response = await fetch(images[i].uri);
+      const blob = await response.blob();
+      const storageRef = ref(storage, `posts/${postId}/image_${i}.jpg`);
+      await uploadBytes(storageRef, blob);
+      const url = await getDownloadURL(storageRef);
+      urls.push(url);
+    }
+    return urls;
+  };
+
   const handlePost = async () => {
     if (!title.trim()) { Alert.alert('Error', 'Please enter an event title.'); return; }
     setPosting(true);
     try {
-      await addDoc(collection(db, 'posts'), {
+      const postRef = await addDoc(collection(db, 'posts'), {
         content: title.trim(), description: description.trim(),
         eventLocation: location.trim(), eventDate: eventDate,
         category: 'events', suburb: profile.suburb, state: profile.state,
         authorId: user.uid, authorName: profile.displayName,
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, isRemoved: false,
+        images: [],
       });
+
+      if (images.length > 0) {
+        const imageUrls = await uploadImages(postRef.id);
+        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
+      }
+
       setShowModal(false);
       setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
       setLocationSuggestions([]); setShowLocationSuggestions(false);
+      setImages([]);
       fetchEvents();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setPosting(false); }
@@ -316,7 +414,7 @@ export default function EventsScreen() {
             </View>
             <View style={{ width: 60 }} />
           </View>
-          <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
+          <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Event Title</Text></View>
             <View style={styles.fieldPad}>
               <TextInput style={styles.input2Line} placeholder="e.g. Community Garage Sale, Street Festival..." placeholderTextColor={Colors.midGrey} value={title} onChangeText={setTitle} multiline numberOfLines={2} textAlignVertical="top" autoCapitalize="sentences" />
@@ -325,26 +423,23 @@ export default function EventsScreen() {
             <View style={styles.fieldPad}>
               <TextInput style={styles.input2Line} placeholder="Tell your neighbours what this event is about..." placeholderTextColor={Colors.midGrey} value={description} onChangeText={setDescription} multiline numberOfLines={2} textAlignVertical="top" autoCapitalize="sentences" />
             </View>
-            <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Date</Text></View>
+            <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Date & Time</Text></View>
             <View style={styles.fieldPad}>
-              <TouchableOpacity style={styles.pickerBtn} onPress={openDatePicker}>
-                <Ionicons name="calendar-outline" size={18} color={Colors.brandGreen} />
-                <Text style={styles.pickerText}>{formatDateFull(eventDate)}</Text>
-                <Ionicons name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.midGrey} />
-              </TouchableOpacity>
+              <View style={styles.dateTimeRow}>
+                <TouchableOpacity style={[styles.pickerBtn, styles.pickerBtnHalf]} onPress={openDatePicker}>
+                  <Ionicons name="calendar-outline" size={18} color={Colors.brandGreen} />
+                  <Text style={styles.pickerText} numberOfLines={1}>{formatDateFull(eventDate)}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.pickerBtn, styles.pickerBtnHalf]} onPress={openTimePicker}>
+                  <Ionicons name="time-outline" size={18} color={Colors.brandGreen} />
+                  <Text style={styles.pickerText} numberOfLines={1}>{formatTime(eventDate)}</Text>
+                </TouchableOpacity>
+              </View>
               {showDatePicker && (
                 <View style={styles.pickerCenter}>
                   <DateTimePicker value={eventDate} mode="date" display="inline" minimumDate={new Date()} onChange={onDateChange} style={{ backgroundColor: '#fff' }} />
                 </View>
               )}
-            </View>
-            <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Time</Text></View>
-            <View style={styles.fieldPad}>
-              <TouchableOpacity style={styles.pickerBtn} onPress={openTimePicker}>
-                <Ionicons name="time-outline" size={18} color={Colors.brandGreen} />
-                <Text style={styles.pickerText}>{formatTime(eventDate)}</Text>
-                <Ionicons name={showTimePicker ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.midGrey} />
-              </TouchableOpacity>
               {showTimePicker && (
                 <View style={styles.pickerCenter}>
                   <DateTimePicker value={eventDate} mode="time" display="spinner" onChange={onTimeChange} style={{ backgroundColor: '#fff', width: 320 }} />
@@ -383,6 +478,7 @@ export default function EventsScreen() {
                 </View>
               )}
             </View>
+            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post Event</Text>}
@@ -440,14 +536,22 @@ const styles = StyleSheet.create({
   fabText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   modalContainer: { flex: 1, backgroundColor: Colors.white },
   modalHeader: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },
-  modalBody: { flex: 1 },
-  sectionBar: { backgroundColor: Colors.brandGreenPale, paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.lightGrey },
+  modalBody: { flex: 1, backgroundColor: '#FAFAFA' },
+  sectionBar: { backgroundColor: 'transparent', paddingTop: 18, paddingBottom: 6, paddingHorizontal: 16 },
   sectionBarText: { fontSize: 17, fontWeight: '700', color: Colors.brandGreen },
-  fieldPad: { paddingHorizontal: 16, paddingVertical: 8 },
-  input2Line: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, height: 68, textAlignVertical: 'top' },
-  pickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 14 },
+  fieldPad: { paddingHorizontal: 16, paddingVertical: 4 },
+  input2Line: { borderWidth: 1, borderColor: '#EFEFEF', borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, height: 68, textAlignVertical: 'top', backgroundColor: Colors.white, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  pickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#EFEFEF', borderRadius: 12, padding: 14, backgroundColor: Colors.white, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
+  dateTimeRow: { flexDirection: 'row', gap: 10 },
+  pickerBtnHalf: { flex: 1 },
   pickerText: { flex: 1, fontSize: 15, color: Colors.charcoal },
   pickerCenter: { alignItems: 'center', marginTop: 8 },
   postBtnBottom: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   postBtnBottomText: { fontSize: 20, fontWeight: '800', color: Colors.white },
+  imageRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  imageThumbWrap: { position: 'relative' },
+  imageThumb: { width: 90, height: 90, borderRadius: 10, borderWidth: 1, borderColor: Colors.lightGrey },
+  removeImageBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: Colors.white, borderRadius: 10 },
+  addImageBtn: { width: 90, height: 90, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.brandGreen, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 4 },
+  addImageText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
 });
