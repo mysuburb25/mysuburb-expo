@@ -224,6 +224,8 @@ const styles = StyleSheet.create({
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },

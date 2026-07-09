@@ -33,12 +33,11 @@ function formatTime(date) {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, logout, updateUserProfile, unreadCount, unreadMessageCount } = useAuth();
+  const { user, profile, logout, updateUserProfile, unreadMessageCount } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [showSuburbs, setShowSuburbs] = useState(false);
 
   const fetchMyPosts = useCallback(async () => {
     if (!user) return;
@@ -143,7 +142,7 @@ export default function ProfileScreen() {
       {/* Fixed top header */}
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
-          <Ionicons name="chatbubbles-outline" size={26} color="#fff" />
+          <Ionicons name="chatbubbles-outline" size={28} color="#fff" />
           {unreadMessageCount > 0 && (
             <View style={styles.bellBadge}>
               <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
@@ -154,13 +153,8 @@ export default function ProfileScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
-          <Ionicons name="notifications-outline" size={26} color="#fff" />
-          {unreadCount > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
+        <TouchableOpacity onPress={() => router.push('/settings')}>
+          <Ionicons name="settings-outline" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -193,10 +187,6 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={14} color={Colors.brandGreen} />
-            <Text style={styles.iconBtnText}>Settings</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={[styles.iconBtn, styles.iconBtnRed]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={14} color="#E53935" />
             <Text style={[styles.iconBtnText, styles.iconBtnTextRed]}>Sign Out</Text>
@@ -204,14 +194,10 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* My Suburbs section — tap the bar to expand/collapse, edit icon jumps to Change Suburb */}
+      {/* My Suburbs section — always expanded, edit icon jumps to Change Suburb */}
       {profile?.suburbs && profile.suburbs.length > 0 && (
         <View style={styles.sectionCard}>
-          <TouchableOpacity
-            style={styles.sectionCardHeader}
-            onPress={() => setShowSuburbs(prev => !prev)}
-            activeOpacity={0.85}
-          >
+          <View style={[styles.sectionCardHeader, { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
             <View style={styles.sectionIconBadge}>
               <Ionicons name="location" size={14} color={Colors.brandGreen} />
             </View>
@@ -221,19 +207,12 @@ export default function ProfileScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={styles.headerEditBtn}
             >
-              <Ionicons name="create-outline" size={18} color={Colors.white} />
+              <Ionicons name="create-outline" size={26} color={Colors.brandGreen} />
             </TouchableOpacity>
-            <Ionicons
-              name={showSuburbs ? 'chevron-up' : 'chevron-down'}
-              size={18}
-              color={Colors.white}
-              style={styles.postsChevron}
-            />
-          </TouchableOpacity>
+          </View>
 
-          {showSuburbs && (
-            <View style={styles.suburbsSection}>
-              <Text style={styles.suburbsSectionSubtitle}>Toggle suburbs to control your feed. Tap the pencil to change a suburb.</Text>
+          <View style={styles.suburbsSection}>
+              <Text style={styles.suburbsSectionSubtitle}>Toggle suburbs to control your feed.</Text>
               {profile.suburbs.map((s, index) => (
                 index === 0 ? (
                   <TouchableOpacity key={index} style={styles.suburbRow} onPress={() => handleToggleSuburb(index)} activeOpacity={0.6}>
@@ -242,12 +221,6 @@ export default function ProfileScreen() {
                         <Text style={styles.suburbNumberText}>{index + 1}</Text>
                       </View>
                       <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
-                      <TouchableOpacity
-                        onPress={() => router.push('/(auth)/select-suburb')}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons name="pencil" size={14} color={Colors.brandGreen} />
-                      </TouchableOpacity>
                       <Text style={styles.primaryLabel}>Primary</Text>
                     </View>
                     <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
@@ -259,12 +232,6 @@ export default function ProfileScreen() {
                         <Text style={styles.suburbNumberText}>{index + 1}</Text>
                       </View>
                       <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
-                      <TouchableOpacity
-                        onPress={() => router.push('/(auth)/select-suburb')}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons name="pencil" size={14} color={Colors.brandGreen} />
-                      </TouchableOpacity>
                     </View>
                     <Switch
                       value={s.active}
@@ -276,8 +243,7 @@ export default function ProfileScreen() {
                   </View>
                 )
               ))}
-            </View>
-          )}
+          </View>
         </View>
       )}
 
@@ -373,11 +339,10 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
   },
   postsHeaderCard: { paddingVertical: 2 },
-  sectionCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.brandGreen, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
+  sectionCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.brandGreenPale, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
   sectionIconBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
-  postsChevron: { marginLeft: 8 },
   headerEditBtn: { marginLeft: 10, padding: 2 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.white, textAlign: 'center' },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center' },
 
   suburbsSection: { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
   suburbsSectionSubtitle: { fontSize: 12, color: Colors.midGrey, marginBottom: 10 },
@@ -391,7 +356,6 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
   card: {
     backgroundColor: Colors.white, borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1, borderColor: Colors.brandGreen + '40',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
