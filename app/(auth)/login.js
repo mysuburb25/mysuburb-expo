@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 
@@ -23,7 +25,17 @@ export default function LoginScreen() {
         ? identifier.trim()
         : `${identifier.replace(/\D/g, '')}@mysuburb.app`;
       await login(emailToUse, password);
-      router.replace('/(tabs)');
+
+      // A fresh direct read here, rather than AuthContext's profile state,
+      // since that loads asynchronously after login and may not be ready
+      // by the time we need to decide where to navigate.
+      let skipDashboard = false;
+      try {
+        const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        skipDashboard = snap.exists() && snap.data().skipDashboard === true;
+      } catch (e) { console.error(e); }
+
+      router.replace(skipDashboard ? '/(tabs)' : '/dashboard');
     } catch (e) {
       Alert.alert('Login Failed', 'Incorrect email/phone or password. Please try again.');
     } finally {

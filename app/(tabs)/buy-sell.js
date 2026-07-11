@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Share, Alert, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -25,6 +25,11 @@ const TYPE_CONFIG = {
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -35,7 +40,8 @@ function formatTime(date) {
 }
 
 export default function BuySellScreen() {
-  const { profile, user } = useAuth();
+  const { profile, user, updateUserProfile } = useAuth();
+  const [newCutoff, setNewCutoff] = useState(null);
   const [listings, setListings] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -83,7 +89,22 @@ export default function BuySellScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [profile, activeFilter]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); fetchListings(); }, [fetchListings]));
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  const fetchListingsRef = useRef(fetchListings);
+  useEffect(() => { fetchListingsRef.current = fetchListings; }, [fetchListings]);
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    fetchListingsRef.current();
+
+    const stored = profileRef.current?.lastVisited?.marketplace;
+    setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
+
+    return () => {
+      updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), marketplace: new Date() } });
+    };
+  }, []));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
@@ -183,6 +204,8 @@ export default function BuySellScreen() {
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
             const typeConf = TYPE_CONFIG[item.marketplaceType] || TYPE_CONFIG.forsale;
+            const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
+            const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== user?.uid;
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
                 <View style={styles.cardHeader}>
@@ -197,8 +220,15 @@ export default function BuySellScreen() {
                     <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                   </View>
-                  <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
-                    <Text style={styles.typeText}>{typeConf.label}</Text>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    {isNew && (
+                      <View style={styles.newBadge}>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                      </View>
+                    )}
+                    <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
+                      <Text style={styles.typeText}>{typeConf.label}</Text>
+                    </View>
                   </View>
                 </View>
                 <View style={styles.cardBody}>
@@ -311,6 +341,8 @@ const styles = StyleSheet.create({
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
   cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },
+  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
+  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
   typeBadge: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   typeText: { fontSize: 13, fontWeight: '800', color: Colors.white },
   price: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },

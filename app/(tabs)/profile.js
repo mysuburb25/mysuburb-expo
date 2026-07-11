@@ -23,6 +23,11 @@ const CATEGORY_COLORS = {
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -268,6 +273,23 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      <View style={styles.dashboardRow}>
+        <View style={styles.dashboardRowLeft}>
+          <Ionicons name="grid-outline" size={20} color={Colors.brandGreen} />
+          <Text style={styles.dashboardRowLabel}>Dashboard</Text>
+          <TouchableOpacity style={styles.dashboardViewBtn} onPress={() => router.push('/dashboard')}>
+            <Text style={styles.dashboardViewBtnText}>View Now</Text>
+          </TouchableOpacity>
+        </View>
+        <Switch
+          value={!profile?.skipDashboard}
+          onValueChange={(v) => updateUserProfile({ skipDashboard: !v })}
+          trackColor={{ false: Colors.lightGrey, true: Colors.brandGreen }}
+          thumbColor={Colors.white}
+          ios_backgroundColor={Colors.lightGrey}
+        />
+      </View>
+
       {/* 3-way tab bar — only the selected tab's content shows below */}
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'suburbs' && styles.tabBtnActive]} onPress={() => setActiveTab('suburbs')}>
@@ -391,6 +413,11 @@ const styles = StyleSheet.create({
   iconBtnText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
   iconBtnTextRed: { color: '#E53935' },
 
+  dashboardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  dashboardRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  dashboardRowLabel: { fontSize: 17, fontWeight: '600', color: Colors.charcoal },
+  dashboardViewBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: Colors.brandGreenPale, borderWidth: 1, borderColor: Colors.brandGreen },
+  dashboardViewBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   tabRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },

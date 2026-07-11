@@ -29,8 +29,13 @@ function timeAgo(date) {
 function formatDateTime(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
-  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ' · ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const time = d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === today.toDateString()) return 'Today · ' + time;
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday · ' + time;
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + time;
 }
 
 // Turns a flat comments array into a depth-first ordered list with a `depth`

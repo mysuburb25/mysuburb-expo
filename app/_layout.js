@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="create-post" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="dashboard" />
         <Stack.Screen name="privacy-policy" />
         <Stack.Screen name="terms-of-service" />
         <Stack.Screen name="community-guidelines" />

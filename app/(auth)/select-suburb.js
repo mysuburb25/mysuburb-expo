@@ -145,7 +145,7 @@ export default function SelectSuburbScreen() {
           photoURL: null,
           ...data,
         });
-        router.replace('/(tabs)');
+        router.replace('/dashboard');
       }
     } catch (e) {
       Alert.alert('Error', e.message);

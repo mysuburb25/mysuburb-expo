@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Linking, Share, Alert, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -18,6 +18,11 @@ const TABS = [
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -28,7 +33,8 @@ function formatTime(date) {
 }
 
 export default function LostFoundScreen() {
-  const { profile, user } = useAuth();
+  const { profile, user, updateUserProfile } = useAuth();
+  const [newCutoff, setNewCutoff] = useState(null);
   const [items, setItems] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -74,7 +80,22 @@ export default function LostFoundScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [profile]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); fetchItems(); }, [fetchItems]));
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  const fetchItemsRef = useRef(fetchItems);
+  useEffect(() => { fetchItemsRef.current = fetchItems; }, [fetchItems]);
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    fetchItemsRef.current();
+
+    const stored = profileRef.current?.lastVisited?.lostfound;
+    setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
+
+    return () => {
+      updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), lostfound: new Date() } });
+    };
+  }, []));
 
   const filteredItems = activeTab === 'all' ? items : items.filter(p => p.lostFoundType === activeTab);
 
@@ -176,6 +197,8 @@ export default function LostFoundScreen() {
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
             const isLost = item.lostFoundType === 'lost';
+            const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
+            const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== user?.uid;
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
                 <View style={styles.cardHeader}>
@@ -190,8 +213,15 @@ export default function LostFoundScreen() {
                     <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                   </View>
-                  <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
-                    <Text style={styles.typeText}>{isLost ? 'Lost' : 'Found'}</Text>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    {isNew && (
+                      <View style={styles.newBadge}>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                      </View>
+                    )}
+                    <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
+                      <Text style={styles.typeText}>{isLost ? 'Lost' : 'Found'}</Text>
+                    </View>
                   </View>
                 </View>
                 <View style={styles.cardBody}>
@@ -313,6 +343,8 @@ const styles = StyleSheet.create({
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 6 },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
+  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
+  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
   typeBadge: { width: 72, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   typeText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },

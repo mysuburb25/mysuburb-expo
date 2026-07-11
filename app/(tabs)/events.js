@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking, Share } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -15,6 +15,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -78,7 +83,8 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
 }
 
 export default function EventsScreen() {
-  const { profile, user } = useAuth();
+  const { profile, user, updateUserProfile } = useAuth();
+  const [newCutoff, setNewCutoff] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -191,7 +197,24 @@ export default function EventsScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [profile]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); fetchEvents(); }, [fetchEvents]));
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  const fetchEventsRef = useRef(fetchEvents);
+  useEffect(() => { fetchEventsRef.current = fetchEvents; }, [fetchEvents]);
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    fetchEventsRef.current();
+
+    // Capture the cutoff BEFORE updating it, so "NEW" badges stay visible
+    // for this entire visit — only the NEXT visit sees a fresh cutoff.
+    const stored = profileRef.current?.lastVisited?.events;
+    setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
+
+    return () => {
+      updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), events: new Date() } });
+    };
+  }, []));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
@@ -434,6 +457,8 @@ export default function EventsScreen() {
             const saved = item.savedBy?.includes(user?.uid) || false;
             const eventIsToday = ed && isToday(ed);
             const shortLoc = shortenLocation(item.eventLocation);
+            const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
+            const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== user?.uid;
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.9}>
               <View style={styles.cardInner}>
@@ -460,11 +485,17 @@ export default function EventsScreen() {
                           <Text style={styles.authorAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
                         )}
                       </View>
-                      <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
-                      <Text style={styles.metaDot}>·</Text>
-                      <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
+                        <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
+                      </View>
                     </View>
                   </View>
+                  {isNew && (
+                    <View style={styles.newBadge}>
+                      <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                    </View>
+                  )}
                   {tab === 'past' && (
                     <View style={styles.completedBadge}>
                       <Text style={styles.completedText}>Done</Text>
@@ -767,11 +798,12 @@ const styles = StyleSheet.create({
   authorAvatarImage: { width: 30, height: 30, borderRadius: 15 },
   authorAvatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   cardAuthor: { fontSize: 17, color: Colors.charcoal, fontWeight: '600', flexShrink: 1 },
-  metaDot: { fontSize: 12, color: Colors.midGrey },
-  postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic' },
+  postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   suggestionsBox: { marginTop: 6, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, overflow: 'hidden' },
   suggestionItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   suggestionText: { flex: 1, fontSize: 14, color: Colors.charcoal },
+  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
+  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
   completedBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
   completedText: { fontSize: 11, color: Colors.midGrey, fontWeight: '700' },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', marginTop: 12, marginHorizontal: -14, marginBottom: -14, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0', borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Share, Alert, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -26,6 +26,11 @@ const CATEGORY_CONFIG = {
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -36,7 +41,8 @@ function formatTime(date) {
 }
 
 export default function HomeScreen() {
-  const { profile, user, unreadCount} = useAuth();
+  const { profile, user, unreadCount, updateUserProfile } = useAuth();
+  const [newCutoff, setNewCutoff] = useState(null);
   const [posts, setPosts] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -85,7 +91,22 @@ export default function HomeScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [profile, activeFilter]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); fetchPosts(); }, [fetchPosts]));
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  const fetchPostsRef = useRef(fetchPosts);
+  useEffect(() => { fetchPostsRef.current = fetchPosts; }, [fetchPosts]);
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    fetchPostsRef.current();
+
+    const stored = profileRef.current?.lastVisited?.home;
+    setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
+
+    return () => {
+      updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), home: new Date() } });
+    };
+  }, []));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
@@ -192,6 +213,8 @@ export default function HomeScreen() {
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
             const catConf = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.updates;
+            const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
+            const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== user?.uid;
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
                 <View style={styles.cardHeader}>
@@ -206,8 +229,15 @@ export default function HomeScreen() {
                     <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                   </View>
-                  <View style={[styles.badge, { backgroundColor: catConf.bg }]}>
-                    <Text style={styles.badgeText}>{catConf.label}</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                    {isNew && (
+                      <View style={styles.newBadge}>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                      </View>
+                    )}
+                    <View style={[styles.badge, { backgroundColor: catConf.bg }]}>
+                      <Text style={styles.badgeText}>{catConf.label}</Text>
+                    </View>
                   </View>
                 </View>
                 <View style={styles.cardBody}>
@@ -321,6 +351,8 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
+  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
+  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },

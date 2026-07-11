@@ -19,6 +19,8 @@ export default function Index() {
       router.replace('/(auth)/login');
     } else if (!profile?.suburb) {
       router.replace('/(auth)/select-suburb');
+    } else if (!profile?.skipDashboard) {
+      router.replace('/dashboard');
     } else {
       router.replace('/(tabs)');
     }
