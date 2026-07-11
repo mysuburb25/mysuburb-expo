@@ -262,6 +262,7 @@ export default function CreatePostScreen() {
         state: profile.state,
         authorId: user.uid,
         authorName: profile.displayName,
+        authorPhotoURL: profile.photoURL || null,
         createdAt: serverTimestamp(),
         likeCount: 0,
         commentCount: 0,
@@ -463,7 +464,7 @@ export default function CreatePostScreen() {
           <>
             <View style={styles.sectionBar}>
               <Text style={styles.sectionBarText}>
-                {selectedCategory === 'updates' ? "What's in your suburb?" : selectedCategory === 'notices' ? 'Post a notice...' : 'Report a safety concern...'}
+                {selectedCategory === 'updates' ? "What's Happening" : selectedCategory === 'notices' ? 'Post a notice...' : 'Report a safety concern...'}
               </Text>
             </View>
             <View style={styles.fieldPad}>

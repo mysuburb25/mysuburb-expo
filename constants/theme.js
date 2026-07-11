@@ -6,22 +6,9 @@ export const Colors = {
   offWhite: '#F8FFF8',
   charcoal: '#1B1F23',
   midGrey: '#6B7280',
-  lightGrey: '#c8e6c9',
+  lightGrey: '#E5E7EB',
   sand: '#FFFFFF',
 };
-
-export const Categories = [
-  { key: 'general', label: 'General', icon: 'home' },
-  { key: 'notices', label: 'Notices', icon: 'megaphone' },
-  { key: 'safety', label: 'Safety', icon: 'shield-checkmark' },
-];
-
-export const MarketCategories = [
-  { key: 'all', label: 'All' },
-  { key: 'forsale', label: 'For Sale' },
-  { key: 'donate', label: 'Donate' },
-  { key: 'wanted', label: 'Wanted' },
-];
 
 export const AustralianStates = [
   'New South Wales',

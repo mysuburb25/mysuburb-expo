@@ -24,12 +24,50 @@ function formatDate(date) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 }
 
+// Splits message text around any mysuburb://post/{id} deep links so they
+// can render as real tappable text instead of inert plain text — since
+// we're already inside the app, tapping navigates directly rather than
+// going through the OS-level Linking API.
+const DEEP_LINK_REGEX = /mysuburb:\/\/post\/([a-zA-Z0-9_-]+)/g;
+
+function renderMessageText(text, isMe, styles) {
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  DEEP_LINK_REGEX.lastIndex = 0;
+  while ((match = DEEP_LINK_REGEX.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: 'link', value: match[0], postId: match[1] });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+  if (parts.length === 0) return <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{text}</Text>;
+
+  return (
+    <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>
+      {parts.map((part, i) =>
+        part.type === 'link' ? (
+          <Text key={i} style={[styles.bubbleLink, isMe && styles.bubbleLinkMe]} onPress={() => router.push('/post/' + part.postId)}>
+            {part.value}
+          </Text>
+        ) : (
+          <Text key={i}>{part.value}</Text>
+        )
+      )}
+    </Text>
+  );
+}
+
 export default function ChatScreen() {
-  const { userId, userName: userNameParam } = useLocalSearchParams();
+  const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
   const { user, profile, updateUserProfile } = useAuth();
   const [resolvedUserName, setResolvedUserName] = useState(userNameParam || null);
   const [messages, setMessages] = useState([]);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(prefillText || '');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -177,7 +215,7 @@ export default function ChatScreen() {
             </View>
           )}
           <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-            <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{item.text}</Text>
+            {renderMessageText(item.text, isMe, styles)}
             <Text style={[styles.bubbleTime, isMe && styles.bubbleTimeMe]}>
               {item.createdAt ? formatTime(item.createdAt) : ''}
             </Text>
@@ -297,10 +335,12 @@ const styles = StyleSheet.create({
   msgRowMe: { justifyContent: 'flex-end' },
   avatarSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   avatarSmallText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
-  bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2 },
+  bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2, flexShrink: 1 },
   bubbleMe: { backgroundColor: Colors.brandGreen, borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: Colors.white, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: Colors.lightGrey },
-  bubbleText: { fontSize: 15, color: Colors.charcoal, lineHeight: 20 },
+  bubbleText: { fontSize: 15, color: Colors.charcoal, lineHeight: 20, flexShrink: 1 },
+  bubbleLink: { fontSize: 15, lineHeight: 20, color: '#0D47A1', textDecorationLine: 'underline', fontWeight: '600' },
+  bubbleLinkMe: { color: '#FFD700' },
   bubbleTextMe: { color: Colors.white },
   bubbleTime: { fontSize: 10, color: Colors.midGrey, alignSelf: 'flex-end' },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.7)' },

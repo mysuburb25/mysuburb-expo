@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking, Share } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -9,6 +9,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import NotificationBell from '../../components/NotificationBell';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 function formatDate(date) {
@@ -21,6 +22,28 @@ function formatTime(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
   return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Shortens a full Google Places address down to venue/street/suburb only —
+// drops the trailing state and "Australia" that Places always appends,
+// since that's noise for a quick glance at an event card. The FULL address
+// is still what's stored and used for the actual "Get Directions" link.
+function shortenLocation(loc) {
+  if (!loc) return '';
+  let parts = loc.split(',').map(p => p.trim()).filter(Boolean);
+  if (parts[parts.length - 1]?.toLowerCase() === 'australia') parts.pop();
+  if (parts.length > 0) {
+    const stateAbbrevs = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
+    const regex = new RegExp(`\\s+(${stateAbbrevs.join('|')})(\\s+\\d{4})?$`, 'i');
+    parts[parts.length - 1] = parts[parts.length - 1].replace(regex, '').trim();
+  }
+  return parts.join(', ');
+}
+
+function isToday(date) {
+  if (!date) return false;
+  const today = new Date();
+  return date.toDateString() === today.toDateString();
 }
 
 // Defined at module level, not inside EventsScreen, so React treats it as the
@@ -55,7 +78,7 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
 }
 
 export default function EventsScreen() {
-  const { profile, user, unreadCount} = useAuth();
+  const { profile, user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,6 +96,10 @@ export default function EventsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
   const [images, setImages] = useState([]);
+  const [priceType, setPriceType] = useState('free'); // 'free' or 'paid'
+  const [eventPrice, setEventPrice] = useState('');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareTarget, setShareTarget] = useState(null);
   const scrollRef = useRef(null);
 
   const fetchLocationSuggestions = async (text) => {
@@ -190,6 +217,73 @@ export default function EventsScreen() {
     } catch (e) { console.error(e); }
   };
 
+  const handleToggleAttending = async (post) => {
+    const attending = post.attendees?.includes(user.uid) || false;
+    const newAttending = !attending;
+    setEvents(prev => prev.map(p => p.id === post.id ? {
+      ...p,
+      attendeeCount: (p.attendeeCount || 0) + (newAttending ? 1 : -1),
+      attendees: newAttending ? [...(p.attendees || []), user.uid] : (p.attendees || []).filter(u => u !== user.uid),
+    } : p));
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        attendeeCount: increment(newAttending ? 1 : -1),
+        attendees: newAttending ? [...(post.attendees || []), user.uid] : (post.attendees || []).filter(u => u !== user.uid),
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not update. Please try again.');
+    }
+  };
+
+  const handleToggleSave = async (post) => {
+    const saved = post.savedBy?.includes(user.uid) || false;
+    const newSaved = !saved;
+    setEvents(prev => prev.map(p => p.id === post.id ? {
+      ...p,
+      savedBy: newSaved ? [...(p.savedBy || []), user.uid] : (p.savedBy || []).filter(u => u !== user.uid),
+    } : p));
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        savedBy: newSaved ? [...(post.savedBy || []), user.uid] : (post.savedBy || []).filter(u => u !== user.uid),
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not update. Please try again.');
+    }
+  };
+
+  const buildShareText = (item) => {
+    const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
+    const when = ed ? `${isToday(ed) ? 'Today' : formatDate(ed)}, ${formatTime(ed)}` : '';
+    const deepLink = `mysuburb://post/${item.id}`;
+    const lines = [
+      `Event Title: ${item.content}`,
+      item.description ? `Description: ${item.description}` : null,
+      item.isFree !== undefined ? `Price: ${item.isFree === false ? `$${item.eventPrice?.toFixed(2)}` : 'Free'}` : null,
+      when ? `Date & Time: ${when}` : null,
+      item.eventLocation ? `Location: ${item.eventLocation}` : null,
+    ].filter(Boolean);
+    return `${lines.join('\n')}\n\n${deepLink}\n(Tap to open in My Suburb — you'll need the app installed)\n\nShared from My Suburb`;
+  };
+
+  const handleShare = (item) => {
+    setShareTarget(item);
+    setShowShareModal(true);
+  };
+
+  const handleShareToUser = () => {
+    setShowShareModal(false);
+    router.push({ pathname: '/share-picker', params: { shareText: buildShareText(shareTarget), sharePostId: shareTarget.id } });
+  };
+
+  const handleShareExternal = async () => {
+    setShowShareModal(false);
+    try {
+      await Share.share({ message: buildShareText(shareTarget) });
+    } catch (e) { console.error(e); }
+  };
+
   const handlePickImage = () => {
     if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
     const remaining = 3 - images.length;
@@ -248,15 +342,19 @@ export default function EventsScreen() {
 
   const handlePost = async () => {
     if (!title.trim()) { Alert.alert('Error', 'Please enter an event title.'); return; }
+    if (priceType === 'paid' && !eventPrice.trim()) { Alert.alert('Error', 'Please enter a price, or switch to Free.'); return; }
     setPosting(true);
     try {
       const postRef = await addDoc(collection(db, 'posts'), {
         content: title.trim(), description: description.trim(),
         eventLocation: location.trim(), eventDate: eventDate,
         category: 'events', suburb: profile.suburb, state: profile.state,
-        authorId: user.uid, authorName: profile.displayName,
+        authorId: user.uid, authorName: profile.displayName, authorPhotoURL: profile.photoURL || null,
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, isRemoved: false,
         images: [],
+        isFree: priceType === 'free',
+        eventPrice: priceType === 'paid' ? parseFloat(eventPrice) || 0 : 0,
+        attendeeCount: 0, attendees: [], savedBy: [],
       });
 
       if (images.length > 0) {
@@ -268,16 +366,22 @@ export default function EventsScreen() {
       setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
       setLocationSuggestions([]); setShowLocationSuggestions(false);
       setImages([]);
+      setPriceType('free'); setEventPrice('');
       fetchEvents();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setPosting(false); }
   };
 
   const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const filteredEvents = events.filter(item => {
     if (!item.eventDate) return tab === 'upcoming';
     const ed = item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate);
-    return tab === 'upcoming' ? ed >= now : ed < now;
+    // Compare by calendar date, not exact time — an event happening later
+    // today shouldn't flip to "past" the moment its clock time passes if
+    // the day itself hasn't ended yet.
+    const edDateOnly = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    return tab === 'upcoming' ? edDateOnly >= todayStart : edDateOnly < todayStart;
   });
 
   const formatDateFull = (date) => date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
@@ -301,14 +405,7 @@ export default function EventsScreen() {
           <Text style={styles.mySuburb}>My Suburb</Text>
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
-          <Ionicons name="notifications-outline" size={26} color="#fff" />
-          {unreadCount > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <NotificationBell />
       </View>
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Events</Text>
@@ -333,56 +430,123 @@ export default function EventsScreen() {
           renderItem={({ item }) => {
             const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
             const liked = item.likedBy?.includes(user?.uid) || false;
+            const attending = item.attendees?.includes(user?.uid) || false;
+            const saved = item.savedBy?.includes(user?.uid) || false;
+            const eventIsToday = ed && isToday(ed);
+            const shortLoc = shortenLocation(item.eventLocation);
             return (
-              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
-                <View style={styles.cardBody}>
-                  <View style={styles.cardRow}>
-                    {ed && (
-                      <View style={styles.dateBox}>
+              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.9}>
+              <View style={styles.cardInner}>
+                <View style={styles.cardHeader}>
+                  {ed && (
+                    eventIsToday ? (
+                      <View style={styles.todayBadge}>
+                        <Text style={styles.todayBadgeText}>TODAY</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.dateBadge}>
+                        <Text style={styles.dateWeekday}>{ed.toLocaleString('en-AU', { weekday: 'short' }).toUpperCase()}</Text>
                         <Text style={styles.dateDay}>{ed.getDate()}</Text>
                         <Text style={styles.dateMonth}>{ed.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
                       </View>
-                    )}
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                      {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
-                      {item.eventLocation ? (
-                        <TouchableOpacity
-                          style={styles.infoRow}
-                          onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.eventLocation)}`).catch(() => {})}
-                        >
-                          <Ionicons name="location-outline" size={13} color={Colors.brandGreen} />
-                          <Text style={[styles.infoText, styles.locationLink]}>{item.eventLocation}</Text>
-                        </TouchableOpacity>
-                      ) : null}
-                      {ed && (
-                        <View style={styles.infoRow}>
-                          <Ionicons name="time-outline" size={13} color={Colors.midGrey} />
-                          <Text style={styles.infoText}>{formatTime(ed)}</Text>
-                        </View>
-                      )}
-                      <View style={styles.metaRow}>
-                        <Text style={styles.cardAuthor}>by {item.authorName}</Text>
-                        <Text style={styles.metaText}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
+                    )
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.authorRow}>
+                      <View style={styles.authorAvatar}>
+                        {item.authorPhotoURL ? (
+                          <Image source={{ uri: item.authorPhotoURL }} style={styles.authorAvatarImage} />
+                        ) : (
+                          <Text style={styles.authorAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
+                        )}
                       </View>
-                      {tab === 'past' && (
-                        <View style={styles.completedBadge}>
-                          <Text style={styles.completedText}>Completed</Text>
-                        </View>
-                      )}
+                      <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
+                      <Text style={styles.metaDot}>·</Text>
+                      <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                     </View>
                   </View>
+                  {tab === 'past' && (
+                    <View style={styles.completedBadge}>
+                      <Text style={styles.completedText}>Done</Text>
+                    </View>
+                  )}
                 </View>
+
+                <View style={styles.detailsBody}>
+                  <View style={styles.detailField}>
+                    <View style={styles.labelBadgeWrap}>
+                      <View style={[styles.labelBadge, styles.titleBadge]}>
+                        <Text style={styles.labelBadgeText}>EVENT TITLE</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.fieldValue} numberOfLines={2}>{item.content}</Text>
+                  </View>
+                  {item.isFree !== undefined && (
+                    <View style={styles.detailField}>
+                      <View style={styles.labelBadgeWrap}>
+                        <View style={[styles.labelBadge, styles.priceBadge]}>
+                          <Text style={styles.labelBadgeText}>PRICE</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.fieldValue}>
+                        {item.isFree === false ? `$${item.eventPrice?.toFixed(2)}` : 'Free'}
+                      </Text>
+                    </View>
+                  )}
+                  {ed && (
+                    <View style={styles.detailField}>
+                      <View style={styles.labelBadgeWrap}>
+                        <View style={[styles.labelBadge, styles.dateBadgeLabel]}>
+                          <Text style={styles.labelBadgeText}>DATE & TIME</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.fieldValue}>
+                        {eventIsToday ? 'Today' : formatDate(ed)}, {formatTime(ed)}
+                      </Text>
+                    </View>
+                  )}
+                  {item.eventLocation ? (
+                    <TouchableOpacity
+                      style={styles.detailField}
+                      onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.eventLocation)}`).catch(() => {})}
+                    >
+                      <View style={styles.labelBadgeWrap}>
+                        <View style={[styles.labelBadge, styles.locationBadge]}>
+                          <Text style={styles.labelBadgeText}>LOCATION</Text>
+                        </View>
+                      </View>
+                      <View style={styles.locationValueRow}>
+                        <Ionicons name="location-outline" size={14} color={Colors.midGrey} />
+                        <Text style={[styles.fieldValue, styles.whereLink]} numberOfLines={1}>{shortLoc}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
-                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.midGrey} />
+                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
                     <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
-                    <Ionicons name="chatbubble-outline" size={18} color={Colors.midGrey} />
+                    <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
                     <Text style={styles.footerText}>{item.commentCount || 0}</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={styles.footerBtn} onPress={() => handleToggleAttending(item)}>
+                    <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={18} color={attending ? Colors.brandGreen : Colors.charcoal} />
+                    <Text style={[styles.footerText, attending && { color: Colors.brandGreen }]}>
+                      Interested{item.attendeeCount > 0 ? ` · ${item.attendeeCount}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? Colors.brandGreen : Colors.charcoal} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
+                  </TouchableOpacity>
                 </View>
+              </View>
               </TouchableOpacity>
             );
           }}
@@ -398,9 +562,44 @@ export default function EventsScreen() {
       {tab === 'upcoming' && (
         <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
           <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
-          <Text style={styles.fabText}>New Post</Text>
+          <Text style={styles.fabText}>New Event</Text>
         </TouchableOpacity>
       )}
+
+      <Modal visible={showShareModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
+            <View style={styles.shareHeaderBar}>
+              <Text style={styles.shareHeaderText}>Share</Text>
+            </View>
+            <View style={styles.sharePad}>
+              <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: Colors.brandGreenPale }]}>
+                  <Ionicons name="people-outline" size={20} color={Colors.brandGreen} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shareOptionTitle}>Share to a My Suburb User</Text>
+                  <Text style={styles.shareOptionSubtitle}>Send this event as a message</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shareOption} onPress={handleShareExternal}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#E3F2FD' }]}>
+                  <Ionicons name="share-social-outline" size={20} color="#0D47A1" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shareOptionTitle}>Share via Other Apps</Text>
+                  <Text style={styles.shareOptionSubtitle}>WhatsApp, Messages, Email, and more</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareModal(false)}>
+                <Text style={styles.shareCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
@@ -422,6 +621,33 @@ export default function EventsScreen() {
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Description</Text></View>
             <View style={styles.fieldPad}>
               <TextInput style={styles.input2Line} placeholder="Tell your neighbours what this event is about..." placeholderTextColor={Colors.midGrey} value={description} onChangeText={setDescription} multiline numberOfLines={2} textAlignVertical="top" autoCapitalize="sentences" />
+            </View>
+            <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Price</Text></View>
+            <View style={styles.fieldPad}>
+              <View style={styles.priceToggleRow}>
+                <TouchableOpacity
+                  style={[styles.priceToggleBtn, priceType === 'free' && styles.priceToggleBtnActive]}
+                  onPress={() => setPriceType('free')}
+                >
+                  <Text style={[styles.priceToggleText, priceType === 'free' && styles.priceToggleTextActive]}>Free</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.priceToggleBtn, priceType === 'paid' && styles.priceToggleBtnActive]}
+                  onPress={() => setPriceType('paid')}
+                >
+                  <Text style={[styles.priceToggleText, priceType === 'paid' && styles.priceToggleTextActive]}>Paid</Text>
+                </TouchableOpacity>
+              </View>
+              {priceType === 'paid' && (
+                <TextInput
+                  style={[styles.input2Line, { height: 48, marginTop: 8 }]}
+                  placeholder="e.g. 15.00"
+                  placeholderTextColor={Colors.midGrey}
+                  value={eventPrice}
+                  onChangeText={setEventPrice}
+                  keyboardType="decimal-pad"
+                />
+              )}
             </View>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Date & Time</Text></View>
             <View style={styles.fieldPad}>
@@ -501,40 +727,75 @@ const styles = StyleSheet.create({
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
-  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   tabRow: { flexDirection: 'row', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
   tabText: { fontSize: 17, color: Colors.midGrey, fontWeight: '600' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
-  list: { padding: 16, gap: 12, paddingBottom: 100 },
-  card: { borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey, overflow: 'hidden' },
-  cardBody: { backgroundColor: Colors.brandGreenPale, padding: 16 },
-  cardRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  dateBox: { width: 56, alignItems: 'center', backgroundColor: Colors.white, borderRadius: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.lightGrey },
-  dateDay: { fontSize: 24, fontWeight: '800', color: Colors.brandGreen },
-  dateMonth: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.charcoal, lineHeight: 22 },
-  cardDesc: { fontSize: 13, color: Colors.midGrey },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  infoText: { fontSize: 13, color: Colors.midGrey },
-  locationLink: { color: Colors.brandGreen, textDecorationLine: 'underline', fontWeight: '600' },
+  list: { padding: 16, gap: 20, paddingBottom: 100 },
+  card: {
+    backgroundColor: Colors.white, borderRadius: 18,
+    borderWidth: 1, borderColor: '#D5D5D5',
+    borderLeftWidth: 4, borderLeftColor: '#6A1B9A',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
+  },
+  cardInner: { padding: 14, overflow: 'hidden', borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
+  cardHeader: { flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: '#EDF7EF', marginHorizontal: -14, marginTop: -14, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
+  detailsBody: { marginTop: 6, gap: 6 },
+  detailField: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
+  labelBadgeWrap: { width: 98 },
+  labelBadge: { width: 90, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 20, backgroundColor: '#C2D9E8' },
+  labelBadgeText: { fontSize: 8, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
+  titleBadge: {},
+  aboutBadge: {},
+  aboutBadgeText: {},
+  priceBadge: {},
+  dateBadgeLabel: {},
+  locationBadge: {},
+  fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
+  locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
+  whereLink: { textDecorationLine: 'underline' },
+  dateBadge: { width: 56, height: 62, borderRadius: 14, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center', gap: 1 },
+  dateWeekday: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.75)' },
+  dateDay: { fontSize: 19, fontWeight: '900', color: Colors.white, lineHeight: 21 },
+  dateMonth: { fontSize: 10, fontWeight: '900', color: 'rgba(255,255,255,0.85)' },
+  todayBadge: { width: 56, height: 62, borderRadius: 14, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center' },
+  todayBadgeText: { fontSize: 13, fontWeight: '900', color: Colors.white, textAlign: 'center' },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  authorAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  authorAvatarImage: { width: 30, height: 30, borderRadius: 15 },
+  authorAvatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
+  cardAuthor: { fontSize: 17, color: Colors.charcoal, fontWeight: '600', flexShrink: 1 },
+  metaDot: { fontSize: 12, color: Colors.midGrey },
+  postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic' },
   suggestionsBox: { marginTop: 6, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, overflow: 'hidden' },
   suggestionItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   suggestionText: { flex: 1, fontSize: 14, color: Colors.charcoal },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
-  cardAuthor: { fontSize: 11, color: Colors.midGrey },
-  metaText: { fontSize: 11, color: Colors.midGrey },
-  completedBadge: { alignSelf: 'flex-start', marginTop: 4, backgroundColor: Colors.white, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  completedText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
-  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: Colors.white },
-  footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
+  completedBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
+  completedText: { fontSize: 11, color: Colors.midGrey, fontWeight: '700' },
+  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', marginTop: 12, marginHorizontal: -14, marginBottom: -14, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0', borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
+  footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  footerText: { fontSize: 13, color: Colors.charcoal, fontWeight: '700' },
+  priceToggleRow: { flexDirection: 'row', gap: 10 },
+  priceToggleBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  priceToggleBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
+  priceToggleText: { fontSize: 14, fontWeight: '700', color: Colors.midGrey },
+  priceToggleTextActive: { color: Colors.white },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  shareSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  shareHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, alignItems: 'center', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  shareHeaderText: { fontSize: 19, fontWeight: '800', color: Colors.white },
+  sharePad: { padding: 16, paddingBottom: 32 },
+  shareOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 14, marginBottom: 6 },
+  shareOptionIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  shareOptionTitle: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
+  shareOptionSubtitle: { fontSize: 12, color: Colors.midGrey, marginTop: 2 },
+  shareCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  shareCancelText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   fabText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   modalContainer: { flex: 1, backgroundColor: Colors.white },
   modalHeader: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },

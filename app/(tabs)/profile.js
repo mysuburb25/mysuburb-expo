@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl, Image, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl, Image, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,9 +35,12 @@ function formatTime(date) {
 export default function ProfileScreen() {
   const { user, profile, logout, updateUserProfile, unreadMessageCount } = useAuth();
   const [posts, setPosts] = useState([]);
+  const [savedPosts, setSavedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSaved, setLoadingSaved] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activeTab, setActiveTab] = useState('suburbs'); // 'suburbs' | 'posts' | 'saved'
 
   const fetchMyPosts = useCallback(async () => {
     if (!user) return;
@@ -51,10 +54,35 @@ export default function ProfileScreen() {
       const snap = await getDocs(q);
       setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
-    finally { setLoading(false); setRefreshing(false); }
+    finally { setLoading(false); }
   }, [user]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); fetchMyPosts(); }, [fetchMyPosts]));
+  const fetchSavedPosts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = query(
+        collection(db, 'posts'),
+        where('savedBy', 'array-contains', user.uid),
+        where('isRemoved', '==', false),
+        orderBy('createdAt', 'desc')
+      );
+      const snap = await getDocs(q);
+      setSavedPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+    finally { setLoadingSaved(false); }
+  }, [user]);
+
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    setLoadingSaved(true);
+    fetchMyPosts();
+    fetchSavedPosts();
+  }, [fetchMyPosts, fetchSavedPosts]));
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    Promise.all([fetchMyPosts(), fetchSavedPosts()]).finally(() => setRefreshing(false));
+  };
 
   const handlePickPhoto = async () => {
     Alert.alert('Profile Photo', 'Choose an option', [
@@ -137,6 +165,52 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleUnsave = async (post) => {
+    setSavedPosts(prev => prev.filter(p => p.id !== post.id));
+    try {
+      await updateDoc(doc(db, 'posts', post.id), {
+        savedBy: (post.savedBy || []).filter(uid => uid !== user.uid),
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not remove from saved. Please try again.');
+      fetchSavedPosts();
+    }
+  };
+
+  const renderPostCard = (item, { onDelete, onUnsave }) => {
+    const catStyle = CATEGORY_COLORS[item.category] || CATEGORY_COLORS.updates;
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[styles.card, { borderLeftColor: catStyle.text, borderLeftWidth: 4 }]}
+        onPress={() => router.push('/post/' + item.id)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.cardHeader}>
+          <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
+            <Text style={[styles.catBadgeText, { color: catStyle.text }]}>{catStyle.label}</Text>
+          </View>
+          <View style={{ flex: 1 }} />
+          {onDelete && (
+            <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="trash-outline" size={16} color="#E53935" />
+            </TouchableOpacity>
+          )}
+          {onUnsave && (
+            <TouchableOpacity style={styles.deleteBtn} onPress={onUnsave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="bookmark" size={16} color={Colors.brandGreen} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.cardOneLineRow}>
+          <Text style={styles.cardOneLine} numberOfLines={1} ellipsizeMode="tail">{item.content}</Text>
+          <Text style={styles.cardMetaInline}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Fixed top header */}
@@ -163,7 +237,7 @@ export default function ProfileScreen() {
         <Text style={styles.pageTitle}>Profile</Text>
       </View>
 
-      {/* Fixed profile section — compact horizontal row instead of a tall vertical stack */}
+      {/* Fixed profile section */}
       <View style={styles.profileSection}>
         <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickPhoto} disabled={uploadingPhoto}>
           {profile?.photoURL ? (
@@ -194,116 +268,100 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* My Suburbs section — always expanded, edit icon jumps to Change Suburb */}
-      {profile?.suburbs && profile.suburbs.length > 0 && (
-        <View style={styles.sectionCard}>
-          <View style={[styles.sectionCardHeader, { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
-            <View style={styles.sectionIconBadge}>
-              <Ionicons name="location" size={14} color={Colors.brandGreen} />
-            </View>
-            <Text style={styles.sectionTitle}>Selected Suburbs</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(auth)/select-suburb')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.headerEditBtn}
-            >
-              <Ionicons name="create-outline" size={26} color={Colors.brandGreen} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.suburbsSection}>
-              <Text style={styles.suburbsSectionSubtitle}>Toggle suburbs to control your feed.</Text>
-              {profile.suburbs.map((s, index) => (
-                index === 0 ? (
-                  <TouchableOpacity key={index} style={styles.suburbRow} onPress={() => handleToggleSuburb(index)} activeOpacity={0.6}>
-                    <View style={styles.suburbRowLeft}>
-                      <View style={styles.suburbNumberBadge}>
-                        <Text style={styles.suburbNumberText}>{index + 1}</Text>
-                      </View>
-                      <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
-                      <Text style={styles.primaryLabel}>Primary</Text>
-                    </View>
-                    <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
-                  </TouchableOpacity>
-                ) : (
-                  <View key={index} style={styles.suburbRow}>
-                    <View style={styles.suburbRowLeft}>
-                      <View style={styles.suburbNumberBadge}>
-                        <Text style={styles.suburbNumberText}>{index + 1}</Text>
-                      </View>
-                      <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
-                    </View>
-                    <Switch
-                      value={s.active}
-                      onValueChange={() => handleToggleSuburb(index)}
-                      trackColor={{ false: Colors.lightGrey, true: Colors.brandGreen }}
-                      thumbColor={Colors.white}
-                      ios_backgroundColor={Colors.lightGrey}
-                    />
-                  </View>
-                )
-              ))}
-          </View>
-        </View>
-      )}
-
-      {/* Posts section header */}
-      <View style={[styles.sectionCard, styles.postsHeaderCard]}>
-        <View style={[styles.sectionCardHeader, { borderBottomLeftRadius: 18, borderBottomRightRadius: 18 }]}>
-          <View style={styles.sectionIconBadge}>
-            <Ionicons name="document-text" size={14} color={Colors.brandGreen} />
-          </View>
-          <Text style={styles.sectionTitle}>My Posts</Text>
-        </View>
+      {/* 3-way tab bar — only the selected tab's content shows below */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity style={[styles.tabBtn, activeTab === 'suburbs' && styles.tabBtnActive]} onPress={() => setActiveTab('suburbs')}>
+          <Text style={[styles.tabText, activeTab === 'suburbs' && styles.tabTextActive]}>Suburbs</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabBtn, activeTab === 'posts' && styles.tabBtnActive]} onPress={() => setActiveTab('posts')}>
+          <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>My Posts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabBtn, activeTab === 'saved' && styles.tabBtnActive]} onPress={() => setActiveTab('saved')}>
+          <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>Saved</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Scrollable posts list */}
-      {loading ? (
-        <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 20 }} />
-      ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchMyPosts(); }} tintColor={Colors.brandGreen} />}
-          renderItem={({ item }) => {
-            const catStyle = CATEGORY_COLORS[item.category] || CATEGORY_COLORS.updates;
-            return (
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.brandGreen} />}
+      >
+        {/* Suburbs tab */}
+        {activeTab === 'suburbs' && profile?.suburbs && profile.suburbs.length > 0 && (
+          <View style={styles.tabContent}>
+            <View style={styles.tabContentHeader}>
+              <Text style={styles.tabContentSubtitle}>Toggle suburbs to control your feed.</Text>
               <TouchableOpacity
-                style={[styles.card, { borderLeftColor: catStyle.text, borderLeftWidth: 4 }]}
-                onPress={() => router.push('/post/' + item.id)}
-                activeOpacity={0.85}
+                onPress={() => router.push('/(auth)/select-suburb')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                {/* Card header with category badge and delete button */}
-                <View style={styles.cardHeader}>
-                  <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
-                    <Text style={[styles.catBadgeText, { color: catStyle.text }]}>{catStyle.label}</Text>
-                  </View>
-                  <View style={{ flex: 1 }} />
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => handleDeletePost(item.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="trash-outline" size={16} color="#E53935" />
-                  </TouchableOpacity>
-                </View>
-                {/* Content truncates on the left; timestamp stays fixed and fully visible on the right */}
-                <View style={styles.cardOneLineRow}>
-                  <Text style={styles.cardOneLine} numberOfLines={1} ellipsizeMode="tail">{item.content}</Text>
-                  <Text style={styles.cardMetaInline}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
-                </View>
+                <Ionicons name="create-outline" size={24} color={Colors.brandGreen} />
               </TouchableOpacity>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="document-outline" size={48} color={Colors.lightGrey} />
-              <Text style={styles.emptyText}>No posts yet</Text>
             </View>
-          }
-        />
-      )}
+            {profile.suburbs.map((s, index) => (
+              index === 0 ? (
+                <TouchableOpacity key={index} style={styles.suburbRow} onPress={() => handleToggleSuburb(index)} activeOpacity={0.6}>
+                  <View style={styles.suburbRowLeft}>
+                    <View style={styles.suburbNumberBadge}>
+                      <Text style={styles.suburbNumberText}>{index + 1}</Text>
+                    </View>
+                    <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                    <Text style={styles.primaryLabel}>Primary</Text>
+                  </View>
+                  <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
+                </TouchableOpacity>
+              ) : (
+                <View key={index} style={styles.suburbRow}>
+                  <View style={styles.suburbRowLeft}>
+                    <View style={styles.suburbNumberBadge}>
+                      <Text style={styles.suburbNumberText}>{index + 1}</Text>
+                    </View>
+                    <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                  </View>
+                  <Switch
+                    value={s.active}
+                    onValueChange={() => handleToggleSuburb(index)}
+                    trackColor={{ false: Colors.lightGrey, true: Colors.brandGreen }}
+                    thumbColor={Colors.white}
+                    ios_backgroundColor={Colors.lightGrey}
+                  />
+                </View>
+              )
+            ))}
+          </View>
+        )}
+
+        {/* My Posts tab */}
+        {activeTab === 'posts' && (
+          <View style={styles.list}>
+            {loading ? (
+              <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 20 }} />
+            ) : posts.length === 0 ? (
+              <View style={styles.empty}>
+                <Ionicons name="document-outline" size={48} color={Colors.lightGrey} />
+                <Text style={styles.emptyText}>No posts yet</Text>
+              </View>
+            ) : (
+              posts.map(item => renderPostCard(item, { onDelete: () => handleDeletePost(item.id) }))
+            )}
+          </View>
+        )}
+
+        {/* Saved Posts tab */}
+        {activeTab === 'saved' && (
+          <View style={styles.list}>
+            {loadingSaved ? (
+              <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 20 }} />
+            ) : savedPosts.length === 0 ? (
+              <View style={styles.empty}>
+                <Ionicons name="bookmark-outline" size={48} color={Colors.lightGrey} />
+                <Text style={styles.emptyText}>No saved posts yet</Text>
+              </View>
+            ) : (
+              savedPosts.map(item => renderPostCard(item, { onUnsave: () => handleUnsave(item) }))
+            )}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -318,7 +376,7 @@ const styles = StyleSheet.create({
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 21, fontWeight: '700', color: Colors.brandGreen },
-  profileSection: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  profileSection: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   avatarWrapper: { position: 'relative' },
   avatarLarge: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFC5', borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: Colors.brandGreen },
@@ -333,19 +391,15 @@ const styles = StyleSheet.create({
   iconBtnText: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
   iconBtnTextRed: { color: '#E53935' },
 
-  // Card wrapper shared by "Selected Suburbs" and "My Posts" headers
-  sectionCard: {
-    backgroundColor: Colors.white, marginHorizontal: 16, marginBottom: 12, borderRadius: 18, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
-  },
-  postsHeaderCard: { paddingVertical: 2 },
-  sectionCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16, backgroundColor: Colors.brandGreenPale, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
-  sectionIconBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
-  headerEditBtn: { marginLeft: 10, padding: 2 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center' },
+  tabRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
+  tabText: { fontSize: 15, color: Colors.midGrey, fontWeight: '600' },
+  tabTextActive: { color: Colors.white, fontWeight: '700' },
 
-  suburbsSection: { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
-  suburbsSectionSubtitle: { fontSize: 12, color: Colors.midGrey, marginBottom: 10 },
+  tabContent: { backgroundColor: Colors.white, marginHorizontal: 16, marginTop: 16, marginBottom: 12, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#D5D5D5' },
+  tabContentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  tabContentSubtitle: { fontSize: 12, color: Colors.midGrey, flex: 1 },
   suburbRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
   suburbRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   suburbNumberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
@@ -353,21 +407,19 @@ const styles = StyleSheet.create({
   suburbRowText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
   primaryLabel: { fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
 
-  list: { paddingHorizontal: 16, paddingBottom: 40, gap: 12 },
+  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16, gap: 12 },
   card: {
     backgroundColor: Colors.white, borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#D5D5D5',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
   catBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   catBadgeText: { fontSize: 11, fontWeight: '700' },
   deleteBtn: { padding: 4 },
-  cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, padding: 12 },
   cardOneLineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 14 },
   cardOneLine: { flex: 1, fontSize: 15, color: Colors.charcoal, fontWeight: '500' },
   cardMetaInline: { fontSize: 11, color: Colors.midGrey, fontWeight: '600', flexShrink: 0 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10 },
-  cardMeta: { fontSize: 11, color: Colors.midGrey },
   empty: { alignItems: 'center', paddingTop: 40, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
 });

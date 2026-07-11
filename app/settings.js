@@ -34,6 +34,7 @@ export default function SettingsScreen() {
 
       <Text style={styles.sectionLabel}>Account</Text>
       <View style={styles.section}>
+        <MenuItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
         <MenuItem icon="location-outline" label="Change Suburb" onPress={() => router.push('/(auth)/select-suburb')} />
         <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/change-password')} />
         <MenuItem icon="notifications-outline" label="Notification Preferences" onPress={() => router.push('/notification-preferences')} />

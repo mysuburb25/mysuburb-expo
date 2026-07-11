@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { auth, db } from '../config/firebase';
 import {
   signInWithEmailAndPassword,
@@ -7,7 +11,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 const AuthContext = createContext({});
 
@@ -23,6 +27,9 @@ export function AuthProvider({ children }) {
       if (firebaseUser) {
         setUser(firebaseUser);
         await loadProfile(firebaseUser.uid);
+        // Fire-and-forget — don't block app startup on permission prompts
+        // or network calls, and never fail the auth flow if this errors.
+        registerForPushNotifications(firebaseUser.uid);
       } else {
         setUser(null);
         setProfile(null);
@@ -70,6 +77,43 @@ export function AuthProvider({ children }) {
     } catch (e) { console.error('loadProfile error:', e); }
   };
 
+  // Requests notification permission and saves the device's Expo push token
+  // to a private subcollection only the owner can read/write. Silently does
+  // nothing on a simulator/emulator, or if the user declines permission —
+  // push notifications are additive, never required for the app to work.
+  const registerForPushNotifications = async (uid) => {
+    try {
+      if (!Device.isDevice) return; // simulators/emulators don't get real tokens
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.HIGH,
+        });
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') return;
+
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
+
+      await setDoc(doc(db, 'users', uid, 'private', 'push'), {
+        token: tokenResult.data,
+        platform: Platform.OS,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (e) {
+      // Never let a push-registration failure block the rest of the app.
+      console.error('registerForPushNotifications error:', e);
+    }
+  };
+
   const login = async (email, password) => {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     await loadProfile(cred.user.uid);
@@ -91,9 +135,12 @@ export function AuthProvider({ children }) {
   };
 
   const createProfile = async (uid, data) => {
-    const profileData = { ...data, isAdmin: false, isSuspended: false, createdAt: new Date() };
+    const profileData = { ...data, isAdmin: false, isSuspended: false, createdAt: serverTimestamp() };
     await setDoc(doc(db, 'users', uid), profileData);
-    setProfile({ uid, ...profileData });
+    // Reflect locally with a real Date immediately, since serverTimestamp()
+    // resolves to null until the write round-trips back from the server —
+    // reloadProfile() will pick up the true value on next fetch.
+    setProfile({ uid, ...profileData, createdAt: new Date() });
   };
 
   const updateUserProfile = async (data) => {

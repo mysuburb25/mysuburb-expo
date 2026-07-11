@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image, Keyboard, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, FlatList, Modal, Image, Keyboard, Linking, Share } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../../config/firebase';
@@ -63,8 +64,20 @@ const CATEGORY_LABELS = {
   events: 'Event', marketplace: 'Buy & Sell', services: 'Service',
 };
 
+const CATEGORY_ACCENT = {
+  updates: Colors.brandGreen, notices: '#0D47A1', safety: '#E65100',
+  events: '#6A1B9A', marketplace: Colors.brandGreen, lostfound: '#E65100', services: Colors.brandGreen,
+};
+
+const SERVICE_LABELS = {
+  plumbing: 'Plumbing', painting: 'Painting', electrical: 'Electrical', handyman: 'Handyman',
+  massage: 'Massage', physio: 'Physiotherapy', carpentry: 'Carpentry', cleaning: 'Cleaning',
+  gardening: 'Gardening', petcare: 'Pet Care', childcare: 'Child & Aged Care', tutoring: 'Tutoring', others: 'Others',
+};
+
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const { user, profile, updateUserProfile } = useAuth();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
@@ -73,6 +86,9 @@ export default function PostDetailScreen() {
   const [posting, setPosting] = useState(false);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [attending, setAttending] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showPostMenu, setShowPostMenu] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState(null);
@@ -92,6 +108,8 @@ export default function PostDetailScreen() {
         const data = { id: snap.id, ...snap.data() };
         setPost(data);
         setLiked(data.likedBy?.includes(user?.uid) || false);
+        setAttending(data.attendees?.includes(user?.uid) || false);
+        setSaved(data.savedBy?.includes(user?.uid) || false);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -128,6 +146,65 @@ export default function PostDetailScreen() {
       }
     } catch (e) { console.error(e); }
     finally { setLiking(false); }
+  };
+
+  const handleToggleAttending = async () => {
+    if (!post) return;
+    const newAttending = !attending;
+    setAttending(newAttending);
+    setPost(prev => ({ ...prev, attendeeCount: (prev.attendeeCount || 0) + (newAttending ? 1 : -1) }));
+    try {
+      await updateDoc(doc(db, 'posts', id), {
+        attendeeCount: increment(newAttending ? 1 : -1),
+        attendees: newAttending
+          ? [...(post.attendees || []), user.uid]
+          : (post.attendees || []).filter(uid => uid !== user.uid),
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not update. Please try again.');
+    }
+  };
+
+  const handleToggleSave = async () => {
+    if (!post) return;
+    const newSaved = !saved;
+    setSaved(newSaved);
+    try {
+      await updateDoc(doc(db, 'posts', id), {
+        savedBy: newSaved
+          ? [...(post.savedBy || []), user.uid]
+          : (post.savedBy || []).filter(uid => uid !== user.uid),
+      });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not update. Please try again.');
+    }
+  };
+
+  const buildShareText = () => {
+    const when = eventDate ? `${eventIsToday ? 'Today' : formatEventDate(eventDate)}, ${formatEventTime(eventDate)}` : '';
+    const deepLink = `mysuburb://post/${id}`;
+    const lines = [
+      `Event Title: ${post.content}`,
+      post.description ? `Description: ${post.description}` : null,
+      post.isFree !== undefined ? `Price: ${post.isFree === false ? `$${post.eventPrice?.toFixed(2)}` : 'Free'}` : null,
+      when ? `Date & Time: ${when}` : null,
+      post.eventLocation ? `Location: ${post.eventLocation}` : null,
+    ].filter(Boolean);
+    return `${lines.join('\n')}\n\n${deepLink}\n(Tap to open in My Suburb — you'll need the app installed)\n\nShared from My Suburb`;
+  };
+
+  const handleShareToUser = () => {
+    setShowShareModal(false);
+    router.push({ pathname: '/share-picker', params: { shareText: buildShareText(), sharePostId: id } });
+  };
+
+  const handleShareExternal = async () => {
+    setShowShareModal(false);
+    try {
+      await Share.share({ message: buildShareText() });
+    } catch (e) { console.error(e); }
   };
 
   const handleCommentLike = async (item) => {
@@ -322,13 +399,16 @@ export default function PostDetailScreen() {
 
   const isEvent = post.category === 'events';
   const isLostFound = post.category === 'lostfound';
+  const isServices = post.category === 'services';
   const isOwner = post.authorId === user?.uid;
   const pageTitle = PAGE_TITLES[post.category] || 'Community Hub';
   const categoryLabel = CATEGORY_LABELS[post.category];
+  const accentColor = CATEGORY_ACCENT[post.category] || Colors.brandGreen;
 
   const eventDate = isEvent && post.eventDate
     ? (post.eventDate.toDate ? post.eventDate.toDate() : new Date(post.eventDate))
     : null;
+  const eventIsToday = eventDate && eventDate.toDateString() === new Date().toDateString();
   const formatEventDate = (d) => d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formatEventTime = (d) => d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 
@@ -341,6 +421,8 @@ export default function PostDetailScreen() {
   const goToUserProfile = () => {
     if (post.authorId !== user?.uid) {
       router.push('/user/' + post.authorId);
+    } else {
+      router.push('/(tabs)/profile');
     }
   };
 
@@ -387,41 +469,28 @@ export default function PostDetailScreen() {
           if (item.type === 'post') {
             return (
               <View>
-                {isEvent && eventDate && (
-                  <View style={styles.eventBanner}>
-                    <View style={styles.eventDateBox}>
-                      <Text style={styles.eventDay}>{eventDate.getDate()}</Text>
-                      <Text style={styles.eventMonth}>{eventDate.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
-                    </View>
-                    <View style={styles.eventBannerInfo}>
-                      <View style={styles.eventInfoRow}>
-                        <Ionicons name="time-outline" size={16} color={Colors.brandGreen} />
-                        <Text style={styles.eventInfoText}>{formatEventTime(eventDate)}</Text>
-                      </View>
-                      <View style={styles.eventInfoRow}>
-                        <Ionicons name="calendar-outline" size={16} color={Colors.brandGreen} />
-                        <Text style={styles.eventInfoText}>{formatEventDate(eventDate)}</Text>
-                      </View>
-                      {post.eventLocation ? (
-                        <>
-                          <TouchableOpacity style={styles.eventInfoRow} onPress={handleGetDirections}>
-                            <Ionicons name="location-outline" size={16} color={Colors.brandGreen} />
-                            <Text style={[styles.eventInfoText, styles.eventLocationLink]}>{post.eventLocation}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={styles.directionsBtn} onPress={handleGetDirections}>
-                            <Ionicons name="navigate-outline" size={14} color={Colors.white} />
-                            <Text style={styles.directionsBtnText}>Get Directions</Text>
-                          </TouchableOpacity>
-                        </>
-                      ) : null}
-                    </View>
-                  </View>
-                )}
-
-                <View style={styles.postCard}>
-                  <View style={styles.authorRow}>
+                <View style={[styles.postCard, { borderLeftColor: accentColor, borderLeftWidth: 4 }]}>
+                <View style={styles.postCardInner}>
+                  <View style={[styles.authorRow, isEvent && styles.authorRowEvent]}>
+                    {isEvent && eventDate && (
+                      eventIsToday ? (
+                        <View style={styles.eventTodayBadge}>
+                          <Text style={styles.eventTodayBadgeText}>TODAY</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.eventDateBox}>
+                          <Text style={styles.eventWeekday}>{eventDate.toLocaleString('en-AU', { weekday: 'short' }).toUpperCase()}</Text>
+                          <Text style={styles.eventDay}>{eventDate.getDate()}</Text>
+                          <Text style={styles.eventMonth}>{eventDate.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
+                        </View>
+                      )
+                    )}
                     <TouchableOpacity style={styles.avatar} onPress={goToUserProfile}>
-                      <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase()}</Text>
+                      {post.authorPhotoURL ? (
+                        <Image source={{ uri: post.authorPhotoURL }} style={styles.avatarImage} />
+                      ) : (
+                        <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase()}</Text>
+                      )}
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 1 }} onPress={goToUserProfile}>
                       <Text style={styles.authorName}>{post.authorName}</Text>
@@ -448,7 +517,68 @@ export default function PostDetailScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  <Text style={styles.contentBold}>{post.content}</Text>
+                  {isServices && (
+                    <View style={styles.serviceLabelBadge}>
+                      <Text style={styles.serviceLabelBadgeText}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
+                    </View>
+                  )}
+                  {!isEvent && (
+                    <Text style={(post.category === 'marketplace' || isLostFound) ? styles.contentBold : styles.description}>{post.content}</Text>
+                  )}
+
+                  {isEvent && eventDate && (
+                    <View style={styles.eventDetailsBody}>
+                      <View style={styles.detailField}>
+                        <View style={styles.labelBadgeWrap}>
+                          <View style={[styles.labelBadge, styles.titleBadge]}>
+                            <Text style={styles.labelBadgeText}>EVENT TITLE</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.fieldValue}>{post.content}</Text>
+                      </View>
+                      {post.description ? (
+                        <View style={styles.detailField}>
+                          <View style={styles.labelBadgeWrap}>
+                            <View style={[styles.labelBadge, styles.aboutBadge]}>
+                              <Text style={[styles.labelBadgeText, styles.aboutBadgeText]}>DESCRIPTION</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.fieldValue}>{post.description}</Text>
+                        </View>
+                      ) : null}
+                      {post.isFree !== undefined && (
+                        <View style={styles.detailField}>
+                          <View style={styles.labelBadgeWrap}>
+                            <View style={[styles.labelBadge, styles.priceBadge]}>
+                              <Text style={styles.labelBadgeText}>PRICE</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.fieldValue}>{post.isFree === false ? `$${post.eventPrice?.toFixed(2)}` : 'Free'}</Text>
+                        </View>
+                      )}
+                      <View style={styles.detailField}>
+                        <View style={styles.labelBadgeWrap}>
+                          <View style={[styles.labelBadge, styles.dateBadgeLabel]}>
+                            <Text style={styles.labelBadgeText}>DATE & TIME</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.fieldValue}>{eventIsToday ? 'Today' : formatEventDate(eventDate)}, {formatEventTime(eventDate)}</Text>
+                      </View>
+                      {post.eventLocation ? (
+                        <TouchableOpacity style={styles.detailField} onPress={handleGetDirections}>
+                          <View style={styles.labelBadgeWrap}>
+                            <View style={[styles.labelBadge, styles.locationBadge]}>
+                              <Text style={styles.labelBadgeText}>LOCATION</Text>
+                            </View>
+                          </View>
+                          <View style={styles.locationValueRow}>
+                            <Ionicons name="location-outline" size={14} color={Colors.midGrey} />
+                            <Text style={[styles.fieldValue, styles.eventLocationLink]}>{post.eventLocation}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  )}
 
                   {/* Images */}
                   {post.images && post.images.length > 0 && (
@@ -459,20 +589,14 @@ export default function PostDetailScreen() {
                     </View>
                   )}
 
-                  {isLostFound && post.description ? (
+                  {!isEvent && post.description ? (
                     <Text style={styles.description}>{post.description}</Text>
                   ) : null}
                   {isLostFound && post.lostFoundLocation ? (
-                    <>
-                      <TouchableOpacity style={styles.locationRow} onPress={handleGetDirections}>
-                        <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
-                        <Text style={[styles.locationText, styles.eventLocationLink]}>{post.lostFoundLocation}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.directionsBtn, { marginLeft: 16, marginBottom: 10 }]} onPress={handleGetDirections}>
-                        <Ionicons name="navigate-outline" size={14} color={Colors.white} />
-                        <Text style={styles.directionsBtnText}>Get Directions</Text>
-                      </TouchableOpacity>
-                    </>
+                    <TouchableOpacity style={styles.locationRow} onPress={handleGetDirections}>
+                      <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
+                      <Text style={[styles.locationText, styles.eventLocationLink]}>{post.lostFoundLocation}</Text>
+                    </TouchableOpacity>
                   ) : null}
 
                   {post.category === 'marketplace' && (
@@ -485,14 +609,30 @@ export default function PostDetailScreen() {
 
                   <View style={styles.footer}>
                     <TouchableOpacity style={styles.footerBtn} onPress={handleLike} disabled={liking}>
-                      <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.midGrey} />
-                      <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{post.likeCount || 0} likes</Text>
+                      <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
+                      <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{post.likeCount || 0}</Text>
                     </TouchableOpacity>
                     <View style={styles.footerBtn}>
-                      <Ionicons name="chatbubble-outline" size={20} color={Colors.midGrey} />
-                      <Text style={styles.footerText}>{post.commentCount || 0} comments</Text>
+                      <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
+                      <Text style={styles.footerText}>{post.commentCount || 0}</Text>
                     </View>
+                    {isEvent && (
+                      <TouchableOpacity style={[styles.footerBtn, { flexShrink: 1 }]} onPress={handleToggleAttending}>
+                        <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={18} color={attending ? Colors.brandGreen : Colors.charcoal} />
+                        <Text style={[styles.footerText, attending && { color: Colors.brandGreen }]} numberOfLines={1}>
+                          Interested{post.attendeeCount > 0 ? ` · ${post.attendeeCount}` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    <View style={{ flex: 1 }} />
+                    <TouchableOpacity onPress={handleToggleSave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? Colors.brandGreen : Colors.charcoal} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowShareModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
+                    </TouchableOpacity>
                   </View>
+                </View>
                 </View>
 
                 <Text style={styles.commentsTitle}>Comments ({topLevelCount})</Text>
@@ -599,7 +739,7 @@ export default function PostDetailScreen() {
       )}
 
       {/* Comment Input */}
-      <View style={styles.commentInputRow}>
+      <View style={[styles.commentInputRow, { paddingBottom: Math.max(12, insets.bottom) }]}>
         <TextInput
           ref={inputRef}
           style={styles.input}
@@ -651,6 +791,42 @@ export default function PostDetailScreen() {
               <Text style={styles.menuCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Share modal */}
+      <Modal visible={showShareModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
+            <View style={styles.shareHeaderBar}>
+              <Text style={styles.shareHeaderText}>Share</Text>
+            </View>
+            <View style={styles.sharePad}>
+              <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: Colors.brandGreenPale }]}>
+                  <Ionicons name="people-outline" size={20} color={Colors.brandGreen} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shareOptionTitle}>Share to a My Suburb User</Text>
+                  <Text style={styles.shareOptionSubtitle}>Send this as a message</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shareOption} onPress={handleShareExternal}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#E3F2FD' }]}>
+                  <Ionicons name="share-social-outline" size={20} color="#0D47A1" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shareOptionTitle}>Share via Other Apps</Text>
+                  <Text style={styles.shareOptionSubtitle}>WhatsApp, Messages, Email, and more</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareModal(false)}>
+                <Text style={styles.shareCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -718,28 +894,47 @@ const styles = StyleSheet.create({
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   scroll: { padding: 16, gap: 10, paddingBottom: 20 },
-  eventBanner: { backgroundColor: Colors.white, borderRadius: 16, padding: 16, flexDirection: 'row', gap: 16, borderWidth: 1, borderColor: Colors.lightGrey, alignItems: 'center', marginBottom: 12 },
-  eventDateBox: { width: 60, alignItems: 'center', backgroundColor: Colors.brandGreenPale, borderRadius: 12, paddingVertical: 10 },
-  eventDay: { fontSize: 28, fontWeight: '800', color: Colors.brandGreen },
-  eventMonth: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
-  eventBannerInfo: { flex: 1, gap: 6 },
-  eventInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  eventDateBox: { width: 52, height: 58, borderRadius: 12, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center', gap: 1 },
+  eventWeekday: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.75)' },
+  eventDay: { fontSize: 18, fontWeight: '900', color: Colors.white, lineHeight: 20 },
+  eventMonth: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.85)' },
+  eventTodayBadge: { width: 52, height: 58, borderRadius: 12, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center' },
+  eventTodayBadgeText: { fontSize: 12, fontWeight: '900', color: Colors.white, textAlign: 'center' },
+  eventDetailsBody: { padding: 16, paddingTop: 8, gap: 6 },
+  detailField: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
+  labelBadgeWrap: { width: 98 },
+  labelBadge: { width: 90, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 20, backgroundColor: '#C2D9E8' },
+  labelBadgeText: { fontSize: 8, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
+  titleBadge: {},
+  aboutBadge: {},
+  aboutBadgeText: {},
+  priceBadge: {},
+  dateBadgeLabel: {},
+  locationBadge: {},
+  fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
+  locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   eventLocationLink: { textDecorationLine: 'underline' },
-  directionsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.brandGreen, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, marginTop: 4 },
-  directionsBtnText: { fontSize: 12, fontWeight: '700', color: Colors.white },
-  eventInfoText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500', flex: 1 },
-  postCard: { backgroundColor: Colors.brandGreenPale, borderRadius: 16, borderWidth: 1, borderColor: Colors.brandGreen + '30', marginBottom: 12, overflow: 'hidden' },
+  postCard: {
+    backgroundColor: Colors.white, borderRadius: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: '#D5D5D5',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
+  },
+  postCardInner: { borderRadius: 16, overflow: 'hidden' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 8 },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.brandGreen + '40' },
-  avatarText: { fontSize: 18, fontWeight: '700', color: Colors.brandGreen },
-  authorName: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
-  dateTime: { fontSize: 11, color: Colors.midGrey, marginTop: 2 },
+  authorRowEvent: { backgroundColor: '#EDF7EF', paddingBottom: 8, borderTopLeftRadius: 16, borderTopRightRadius: 16, alignItems: 'center' },
+  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  avatarImage: { width: 30, height: 30, borderRadius: 15 },
+  avatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
+  authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
+  dateTime: { fontSize: 12, color: Colors.midGrey, marginTop: 2, fontStyle: 'italic' },
   pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   pillTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   messageBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
   messageBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   menuBtn: { padding: 4 },
   contentBold: { fontSize: 17, color: Colors.charcoal, lineHeight: 26, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 6 },
+  serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginHorizontal: 16, marginBottom: 6 },
+  serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   locationText: { fontSize: 14, color: Colors.charcoal },
@@ -749,9 +944,9 @@ const styles = StyleSheet.create({
   freeTagText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
   seekingTag: { backgroundColor: '#E3F2FD', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   seekingTagText: { fontSize: 13, fontWeight: '700', color: '#0D47A1' },
-  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  footer: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  footerText: { fontSize: 14, color: Colors.midGrey, fontWeight: '600' },
+  footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
   commentsTitle: { fontSize: 16, fontWeight: '700', color: Colors.charcoal, marginBottom: 4 },
   noComments: { alignItems: 'center', paddingVertical: 16, gap: 8 },
   noCommentsText: { fontSize: 14, color: Colors.midGrey },
@@ -791,11 +986,23 @@ const styles = StyleSheet.create({
   // Post menu modal
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },
+  shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  shareSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  shareHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, alignItems: 'center', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  shareHeaderText: { fontSize: 19, fontWeight: '800', color: Colors.white },
+  sharePad: { padding: 16, paddingBottom: 32 },
+  shareOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 14, marginBottom: 6 },
+  shareOptionIcon: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  shareOptionTitle: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
+  shareOptionSubtitle: { fontSize: 12, color: Colors.midGrey, marginTop: 2 },
+  shareCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  shareCancelText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   menuHandle: { width: 40, height: 4, backgroundColor: Colors.lightGrey, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12 },
   menuItemIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
   menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
   menuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100' },
+  menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
   menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
   reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
@@ -21,6 +21,7 @@ function timeAgo(date) {
 
 export default function MessagesScreen() {
   const { user, profile } = useAuth();
+  const { shareText } = useLocalSearchParams();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +61,13 @@ export default function MessagesScreen() {
         <Text style={styles.pageTitle}>Messages</Text>
       </View>
 
+      {shareText && (
+        <View style={styles.shareBanner}>
+          <Ionicons name="share-outline" size={16} color={Colors.brandGreen} />
+          <Text style={styles.shareBannerText}>Pick a neighbour to share with</Text>
+        </View>
+      )}
+
       {loading ? (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
       ) : (
@@ -76,7 +84,10 @@ export default function MessagesScreen() {
             return (
               <TouchableOpacity
                 style={styles.row}
-                onPress={() => router.push({ pathname: '/chat/' + otherUserId, params: { userId: otherUserId, userName: otherUserName } })}
+                onPress={() => router.push({
+                  pathname: '/chat/' + otherUserId,
+                  params: shareText ? { userId: otherUserId, userName: otherUserName, prefillText: shareText } : { userId: otherUserId, userName: otherUserName },
+                })}
               >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{otherUserName[0]?.toUpperCase()}</Text>
@@ -123,6 +134,8 @@ const styles = StyleSheet.create({
   profileAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
+  shareBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 16, paddingVertical: 10 },
+  shareBannerText: { fontSize: 13, fontWeight: '600', color: Colors.brandGreen },
   list: { padding: 12, gap: 4, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },

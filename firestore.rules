@@ -28,6 +28,10 @@ service cloud.firestore {
                     && unchangedField('isSuspended');
 
       allow delete: if isSelf(uid);
+
+      match /private/{document} {
+        allow read, write: if isSelf(uid);
+      }
     }
 
     match /posts/{postId} {
@@ -50,7 +54,15 @@ service cloud.firestore {
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['commentCount']));
+               .hasOnly(['commentCount']))
+        ||
+        (isSignedIn()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['attendeeCount', 'attendees']))
+        ||
+        (isSignedIn()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['savedBy']));
 
       allow delete: if false;
     }
@@ -82,16 +94,27 @@ service cloud.firestore {
                     && request.auth.uid in request.resource.data.participants
                     && request.resource.data.participants.size() == 2;
 
+      // Order-independent check — the same two participants must remain,
+      // but their positions in the array can differ depending on who sends
+      // a message first. A straight array == comparison is order-sensitive
+      // and would incorrectly fail whenever the sender wasn't the person
+      // who originally created the conversation.
       allow update: if isSignedIn()
                     && request.auth.uid in resource.data.participants
-                    && request.resource.data.participants == resource.data.participants;
+                    && request.resource.data.participants.size() == 2
+                    && resource.data.participants[0] in request.resource.data.participants
+                    && resource.data.participants[1] in request.resource.data.participants;
 
       allow delete: if false;
 
       match /messages/{messageId} {
+        // Checks membership directly from the conversationId's structure
+        // (always "sortedUid1_sortedUid2") instead of looking up the parent
+        // conversation document — that document doesn't exist yet for a
+        // brand new conversation before the first message is sent, and
+        // get() on a non-existent doc fails the whole rule evaluation.
         function isParticipant() {
-          return isSignedIn() &&
-            request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+          return isSignedIn() && request.auth.uid in conversationId.split('_');
         }
 
         allow read: if isParticipant();
