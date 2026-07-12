@@ -99,6 +99,7 @@ export default function PostDetailScreen() {
   const [reportReason, setReportReason] = useState(null);
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [showReportSuccess, setShowReportSuccess] = useState(false);
   const [deletingPost, setDeletingPost] = useState(false);
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const inputRef = useRef(null);
@@ -337,7 +338,7 @@ export default function PostDetailScreen() {
         createdAt: serverTimestamp(),
       });
       setShowReportModal(false);
-      Alert.alert('Report Submitted', 'Thank you for reporting this post. Our team will review it within 24 hours.');
+      setShowReportSuccess(true);
     } catch (e) {
       Alert.alert('Error', 'Could not submit your report. Please check your connection and try again.');
     } finally {
@@ -837,53 +838,75 @@ export default function PostDetailScreen() {
 
       {/* Report reason modal */}
       <Modal visible={showReportModal} transparent animationType="slide">
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowReportModal(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.reportSheet} onPress={() => {}}>
-            <View style={styles.menuHandle} />
-            <Text style={styles.reportTitle}>Report this post</Text>
-            <Text style={styles.reportSubtitle}>Why are you reporting this post?</Text>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowReportModal(false)}>
+            <TouchableOpacity activeOpacity={1} style={styles.reportSheet} onPress={() => {}}>
+            <View style={styles.reportHeaderBar}>
+              <View style={styles.shareHandle} />
+              <Text style={styles.reportTitle}>Report this post</Text>
+              <Text style={styles.reportSubtitle}>Why are you reporting this post?</Text>
+            </View>
 
-            {REPORT_REASONS.map(reason => (
+            <View style={styles.reportPad}>
+              {REPORT_REASONS.map(reason => (
+                <TouchableOpacity
+                  key={reason}
+                  style={[styles.reasonChip, reportReason === reason && styles.reasonChipActive]}
+                  onPress={() => setReportReason(reason)}
+                >
+                  <Ionicons
+                    name={reportReason === reason ? 'radio-button-on' : 'radio-button-off'}
+                    size={18}
+                    color={reportReason === reason ? Colors.brandGreen : Colors.midGrey}
+                  />
+                  <Text style={[styles.reasonChipText, reportReason === reason && styles.reasonChipTextActive]}>{reason}</Text>
+                </TouchableOpacity>
+              ))}
+
+              <TextInput
+                style={styles.reportDetailsInput}
+                placeholder="Add any extra details (optional)"
+                placeholderTextColor={Colors.midGrey}
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
               <TouchableOpacity
-                key={reason}
-                style={[styles.reasonChip, reportReason === reason && styles.reasonChipActive]}
-                onPress={() => setReportReason(reason)}
+                style={[styles.reportSubmitBtn, submittingReport && { opacity: 0.7 }]}
+                onPress={handleSubmitReport}
+                disabled={submittingReport}
               >
-                <Ionicons
-                  name={reportReason === reason ? 'radio-button-on' : 'radio-button-off'}
-                  size={18}
-                  color={reportReason === reason ? Colors.brandGreen : Colors.midGrey}
-                />
-                <Text style={[styles.reasonChipText, reportReason === reason && styles.reasonChipTextActive]}>{reason}</Text>
+                {submittingReport
+                  ? <ActivityIndicator color={Colors.white} size="small" />
+                  : <Text style={styles.reportSubmitBtnText}>Submit Report</Text>
+                }
               </TouchableOpacity>
-            ))}
-
-            <TextInput
-              style={styles.reportDetailsInput}
-              placeholder="Add any extra details (optional)"
-              placeholderTextColor={Colors.midGrey}
-              value={reportDetails}
-              onChangeText={setReportDetails}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[styles.reportSubmitBtn, submittingReport && { opacity: 0.7 }]}
-              onPress={handleSubmitReport}
-              disabled={submittingReport}
-            >
-              {submittingReport
-                ? <ActivityIndicator color={Colors.white} size="small" />
-                : <Text style={styles.reportSubmitBtnText}>Submit Report</Text>
-              }
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.reportCancelBtn} onPress={() => setShowReportModal(false)} disabled={submittingReport}>
-              <Text style={styles.reportCancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.reportCancelBtn} onPress={() => setShowReportModal(false)} disabled={submittingReport}>
+                <Text style={styles.reportCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Report submitted confirmation */}
+      <Modal visible={showReportSuccess} transparent animationType="fade">
+        <View style={styles.centerOverlay}>
+          <View style={styles.successCard}>
+            <View style={styles.successIconCircle}>
+              <Ionicons name="checkmark" size={32} color={Colors.white} />
+            </View>
+            <Text style={styles.successTitle}>Report Submitted</Text>
+            <Text style={styles.successMessage}>Thank you for reporting this post. Our team will review it within 24 hours.</Text>
+            <TouchableOpacity style={styles.successOkBtn} onPress={() => setShowReportSuccess(false)}>
+              <Text style={styles.successOkBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -1010,16 +1033,25 @@ const styles = StyleSheet.create({
   menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
   menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
-  reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },
-  reportTitle: { fontSize: 19, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 4 },
-  reportSubtitle: { fontSize: 13, color: Colors.midGrey, textAlign: 'center', marginBottom: 16 },
-  reasonChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EFEFEF', marginBottom: 8 },
-  reasonChipActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
-  reasonChipText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
+  reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  reportHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
+  reportTitle: { fontSize: 19, fontWeight: '800', color: Colors.white, textAlign: 'center', marginBottom: 4 },
+  reportSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  reportPad: { padding: 16, paddingBottom: 32 },
+  reasonChip: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 9, borderLeftWidth: 4, borderLeftColor: 'transparent' },
+  reasonChipActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen, borderLeftColor: Colors.brandGreen },
+  reasonChipText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
   reasonChipTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   reportDetailsInput: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 14, color: Colors.charcoal, minHeight: 70, marginTop: 4, marginBottom: 16 },
-  reportSubmitBtn: { backgroundColor: '#E53935', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  reportSubmitBtn: { backgroundColor: Colors.brandGreen, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   reportSubmitBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
   reportCancelBtn: { paddingVertical: 12, alignItems: 'center' },
   reportCancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.midGrey },
+  centerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  successCard: { backgroundColor: Colors.white, borderRadius: 20, padding: 28, alignItems: 'center', width: '100%', maxWidth: 340 },
+  successIconCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  successTitle: { fontSize: 19, fontWeight: '800', color: Colors.charcoal, marginBottom: 8 },
+  successMessage: { fontSize: 14, color: Colors.midGrey, textAlign: 'center', lineHeight: 20, marginBottom: 22 },
+  successOkBtn: { backgroundColor: Colors.brandGreen, borderRadius: 14, paddingVertical: 13, alignItems: 'center', width: '100%' },
+  successOkBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 });

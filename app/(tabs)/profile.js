@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl, Image, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl, Image, Switch, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -128,11 +128,16 @@ export default function ProfileScreen() {
     } finally { setUploadingPhoto(false); }
   };
 
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); router.replace('/(auth)/login'); } },
-    ]);
+    setShowSignOutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowSignOutModal(false);
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   const handleToggleSuburb = async (index) => {
@@ -384,6 +389,26 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={showSignOutModal} transparent animationType="fade">
+        <View style={styles.centerOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconCircle}>
+              <Ionicons name="log-out-outline" size={28} color="#E53935" />
+            </View>
+            <Text style={styles.confirmTitle}>Sign Out</Text>
+            <Text style={styles.confirmMessage}>Are you sure you want to sign out?</Text>
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setShowSignOutModal(false)}>
+                <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmSignOutBtn} onPress={confirmLogout}>
+                <Text style={styles.confirmSignOutBtnText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -449,4 +474,14 @@ const styles = StyleSheet.create({
   cardMetaInline: { fontSize: 11, color: Colors.midGrey, fontWeight: '600', flexShrink: 0 },
   empty: { alignItems: 'center', paddingTop: 40, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
+  centerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  confirmCard: { backgroundColor: Colors.white, borderRadius: 20, padding: 26, alignItems: 'center', width: '100%', maxWidth: 340 },
+  confirmIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FCE8E7', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  confirmTitle: { fontSize: 19, fontWeight: '800', color: Colors.charcoal, marginBottom: 6 },
+  confirmMessage: { fontSize: 14, color: Colors.midGrey, textAlign: 'center', marginBottom: 20 },
+  confirmBtnRow: { flexDirection: 'row', gap: 10, width: '100%' },
+  confirmCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center', backgroundColor: '#F0F0F0' },
+  confirmCancelBtnText: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
+  confirmSignOutBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center', backgroundColor: '#E53935' },
+  confirmSignOutBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
 });
