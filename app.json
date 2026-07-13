@@ -29,7 +29,9 @@
           "photosPermission": "My Suburb needs access to your photos so you can attach images to your posts.",
           "cameraPermission": "My Suburb needs access to your camera so you can take photos for your posts."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-font"
     ],
     "scheme": "mysuburb",
     "extra": {
