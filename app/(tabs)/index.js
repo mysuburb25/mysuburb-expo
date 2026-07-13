@@ -50,18 +50,27 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
 
+  // Still used for lastVisited tracking in the focus-effect cleanup below,
+  // where we deliberately want the latest value without retriggering effects.
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
+  // fetchPosts now depends directly on the actual profile fields it reads
+  // (not a ref) — this is what makes it automatically re-run the moment
+  // `profile` finishes loading after login. Previously it read profileRef,
+  // which never triggers a re-run when a ref changes, and would return
+  // early (before ever reaching setLoading(false)) if profile hadn't
+  // loaded yet on the very first fetch — leaving the screen stuck on the
+  // loading spinner forever, until the app happened to remount (e.g. a
+  // logout/login) with profile already populated in time.
   const fetchPosts = useCallback(async () => {
-    const currentProfile = profileRef.current;
-    if (!currentProfile?.suburb) return;
+    if (!profile?.suburb) { setLoading(false); setRefreshing(false); return; }
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
-      const activeSuburbs = currentProfile?.suburbs
-        ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
-        : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
-      if (activeSuburbs.length === 0) return;
+      const activeSuburbs = profile?.suburbs
+        ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+        : [{ suburb: profile.suburb, state: profile.state }];
+      if (activeSuburbs.length === 0) { setLoading(false); setRefreshing(false); return; }
 
       const categoryFilter = activeFilter.key === 'all' ? 'updates' : activeFilter.key;
 
@@ -89,15 +98,15 @@ export default function HomeScreen() {
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
+      const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
       setPosts(blockedIds.length ? allPosts.filter(p => !blockedIds.includes(p.authorId)) : allPosts);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [activeFilter]);
+  }, [activeFilter, profile?.suburb, profile?.state, profile?.suburbs, profile?.blockedUsers]);
 
-  // Refetch when the filter tab changes — previously nothing triggered
-  // this at all, since fetchPosts was only ever called from the focus
-  // effect below.
+  // Refetch whenever the filter tab changes OR profile finishes loading —
+  // fetchPosts's identity now changes in both cases, so this effect covers
+  // both triggers automatically.
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   useFocusEffect(useCallback(() => {
