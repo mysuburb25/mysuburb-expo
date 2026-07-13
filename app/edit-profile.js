@@ -10,32 +10,33 @@ import { Colors } from '../constants/theme';
 export default function EditProfileScreen() {
   const { profile, updateUserProfile } = useAuth();
 
-  // A phone-signup account's "email" field is really a system-generated
-  // login identifier ({digits}@mysuburb.app), not a real address the person
-  // chose — so we don't let them edit it directly. Phone-based accounts edit
-  // their phone number instead, which regenerates that identifier under the
-  // hood. Email-signup accounts do the reverse: phone is just a contact
-  // field with no login impact.
+  const parseName = (fullName) => {
+    const trimmed = (fullName || '').trim();
+    if (!trimmed) return { first: '', last: '' };
+    const spaceIndex = trimmed.indexOf(' ');
+    if (spaceIndex === -1) return { first: trimmed, last: '' };
+    return { first: trimmed.slice(0, spaceIndex), last: trimmed.slice(spaceIndex + 1) };
+  };
+  const originalName = parseName(profile?.displayName);
+
   const isPhoneAccount = !!profile?.phone;
 
-  const [name, setName] = useState(profile?.displayName || '');
+  const [firstName, setFirstName] = useState(originalName.first);
+  const [lastName, setLastName] = useState(originalName.last);
   const [email, setEmail] = useState(profile?.email || '');
   const [phone, setPhone] = useState(profile?.phone || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const nameChanged = name.trim() !== (profile?.displayName || '');
+  const nameChanged = firstName.trim() !== originalName.first || lastName.trim() !== originalName.last;
   const emailChanged = !isPhoneAccount && email.trim() !== (profile?.email || '');
   const phoneChanged = phone.trim() !== (profile?.phone || '');
 
-  // Changing the account's actual login identity (email for email-accounts,
-  // phone for phone-accounts) is security-sensitive and needs re-auth.
-  // A plain contact-info phone number on an email-account does not.
   const needsReauth = emailChanged || (isPhoneAccount && phoneChanged);
 
   const handleSave = async () => {
-    if (!name.trim()) { Alert.alert('Error', 'Name cannot be empty.'); return; }
+    if (!firstName.trim()) { Alert.alert('Error', 'First name cannot be empty.'); return; }
     if (emailChanged && !email.trim()) { Alert.alert('Error', 'Email cannot be empty.'); return; }
     if (isPhoneAccount && phoneChanged && !phone.trim()) { Alert.alert('Error', 'Mobile number cannot be empty.'); return; }
     if (!nameChanged && !emailChanged && !phoneChanged) { router.back(); return; }
@@ -52,7 +53,7 @@ export default function EditProfileScreen() {
       }
 
       const firestoreUpdates = {};
-      if (nameChanged) firestoreUpdates.displayName = name.trim();
+      if (nameChanged) firestoreUpdates.displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
 
       if (isPhoneAccount) {
         if (phoneChanged) {
@@ -106,9 +107,14 @@ export default function EditProfileScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>Name</Text>
+        <Text style={styles.label}>First Name</Text>
         <View style={styles.inputRow}>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor="#9CA3AF" autoCapitalize="words" />
+          <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="First name" placeholderTextColor="#9CA3AF" autoCapitalize="words" />
+        </View>
+
+        <Text style={styles.label}>Last Name</Text>
+        <View style={styles.inputRow}>
+          <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Last name" placeholderTextColor="#9CA3AF" autoCapitalize="words" />
         </View>
 
         {isPhoneAccount ? (
