@@ -6,6 +6,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, g
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import useOnlineStatus from '../../utils/useOnlineStatus';
 
 function formatTime(date) {
   if (!date) return '';
@@ -65,6 +66,7 @@ function renderMessageText(text, isMe, styles) {
 export default function ChatScreen() {
   const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
   const { user, profile, updateUserProfile } = useAuth();
+  const isOtherUserOnline = useOnlineStatus(userId);
   const [resolvedUserName, setResolvedUserName] = useState(userNameParam || null);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState(prefillText || '');
@@ -234,6 +236,7 @@ export default function ChatScreen() {
         <View style={styles.headerInfo}>
           <View style={styles.headerAvatar}>
             <Text style={styles.headerAvatarText}>{userName?.[0]?.toUpperCase()}</Text>
+            {isOtherUserOnline && <View style={styles.onlineDot} />}
           </View>
           <Text style={styles.headerName}>{userName}</Text>
         </View>
@@ -326,7 +329,8 @@ const styles = StyleSheet.create({
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'center' },
-  headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
+  headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4CAF50', borderWidth: 2, borderColor: Colors.brandGreen },
   headerAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
   headerName: { fontSize: 18, fontWeight: '800', color: Colors.white },
   list: { padding: 16, gap: 4, paddingBottom: 8 },

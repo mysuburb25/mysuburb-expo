@@ -58,12 +58,16 @@ export default function ServicesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
   const fetchPosts = useCallback(async () => {
-    if (!profile?.suburb) { setLoading(false); return; }
+    const currentProfile = profileRef.current;
+    if (!currentProfile?.suburb) { setLoading(false); return; }
     // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
-    const activeSuburbs = profile?.suburbs
-      ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
-      : [{ suburb: profile.suburb, state: profile.state }];
+    const activeSuburbs = currentProfile?.suburbs
+      ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+      : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
     if (activeSuburbs.length === 0) { setLoading(false); return; }
     setLoading(true);
     try {
@@ -92,20 +96,20 @@ export default function ServicesScreen() {
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
+      const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
       setPosts(blockedIds.length ? allPosts.filter(p => !blockedIds.includes(p.authorId)) : allPosts);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [profile, activeTab]);
+  }, [activeTab]);
 
-  const profileRef = useRef(profile);
-  useEffect(() => { profileRef.current = profile; }, [profile]);
-  const fetchPostsRef = useRef(fetchPosts);
-  useEffect(() => { fetchPostsRef.current = fetchPosts; }, [fetchPosts]);
+  // Refetch when the service tab changes — previously nothing triggered
+  // this at all, since fetchPosts was only ever called from the focus
+  // effect below.
+  useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
-    fetchPostsRef.current();
+    fetchPosts();
 
     const stored = profileRef.current?.lastVisited?.services;
     setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
@@ -113,7 +117,7 @@ export default function ServicesScreen() {
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), services: new Date() } });
     };
-  }, []));
+  }, [fetchPosts]));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;

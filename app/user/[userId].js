@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import useOnlineStatus from '../../utils/useOnlineStatus';
 
 function formatMemberSince(date) {
   if (!date) return '';
@@ -15,6 +16,7 @@ function formatMemberSince(date) {
 
 export default function UserProfileScreen() {
   const { userId } = useLocalSearchParams();
+  const isOnline = useOnlineStatus(userId);
   const { user, profile, updateUserProfile } = useAuth();
   const [targetUser, setTargetUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -101,15 +103,22 @@ export default function UserProfileScreen() {
         <View style={styles.body}>
           {/* Cover card */}
           <View style={styles.coverCard}>
-            {targetUser.photoURL ? (
-              <Image source={{ uri: targetUser.photoURL }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarLarge}>
-                <Text style={styles.avatarText}>{targetUser.displayName?.[0]?.toUpperCase() || '?'}</Text>
-              </View>
-            )}
+            <View style={styles.avatarWrap}>
+              {targetUser.photoURL ? (
+                <Image source={{ uri: targetUser.photoURL }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarLarge}>
+                  <Text style={styles.avatarText}>{targetUser.displayName?.[0]?.toUpperCase() || '?'}</Text>
+                </View>
+              )}
+              {isOnline && <View style={styles.onlineDot} />}
+            </View>
 
             <Text style={styles.name}>{targetUser.displayName}</Text>
+            <View style={styles.statusRow}>
+              <View style={[styles.statusDotInline, { backgroundColor: isOnline ? '#4CAF50' : Colors.lightGrey }]} />
+              <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
+            </View>
 
             {targetUser.suburb && targetUser.state && (
               <View style={styles.locationRow}>
@@ -166,8 +175,13 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   body: { padding: 20 },
   coverCard: { backgroundColor: Colors.brandGreenPale, borderRadius: 20, borderWidth: 1, borderColor: Colors.brandGreen + '30', alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20, marginBottom: 20 },
-  avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#FFFFC5', borderWidth: 2.5, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
-  avatarImage: { width: 96, height: 96, borderRadius: 48, borderWidth: 2.5, borderColor: Colors.brandGreen, marginBottom: 14 },
+  avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#FFFFC5', borderWidth: 2.5, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: 96, height: 96, borderRadius: 48, borderWidth: 2.5, borderColor: Colors.brandGreen },
+  avatarWrap: { position: 'relative', marginBottom: 14 },
+  onlineDot: { position: 'absolute', bottom: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: '#4CAF50', borderWidth: 3, borderColor: Colors.white },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 6 },
+  statusDotInline: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 13, color: Colors.midGrey, fontWeight: '600' },
   avatarText: { fontSize: 36, fontWeight: '800', color: Colors.brandGreen },
   name: { fontSize: 22, fontWeight: '800', color: Colors.charcoal, marginBottom: 8 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },

@@ -159,13 +159,17 @@ export default function EventsScreen() {
     Keyboard.dismiss();
   };
 
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
   const fetchEvents = useCallback(async () => {
-    if (!profile?.suburb) return;
+    const currentProfile = profileRef.current;
+    if (!currentProfile?.suburb) return;
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
-      const activeSuburbs = profile?.suburbs
-        ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
-        : [{ suburb: profile.suburb, state: profile.state }];
+      const activeSuburbs = currentProfile?.suburbs
+        ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+        : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
       if (activeSuburbs.length === 0) return;
 
       // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
@@ -191,20 +195,15 @@ export default function EventsScreen() {
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
+      const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
       setEvents(blockedIds.length ? allEvents.filter(e => !blockedIds.includes(e.authorId)) : allEvents);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [profile]);
-
-  const profileRef = useRef(profile);
-  useEffect(() => { profileRef.current = profile; }, [profile]);
-  const fetchEventsRef = useRef(fetchEvents);
-  useEffect(() => { fetchEventsRef.current = fetchEvents; }, [fetchEvents]);
+  }, []);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
-    fetchEventsRef.current();
+    fetchEvents();
 
     // Capture the cutoff BEFORE updating it, so "NEW" badges stay visible
     // for this entire visit — only the NEXT visit sees a fresh cutoff.
@@ -214,7 +213,7 @@ export default function EventsScreen() {
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), events: new Date() } });
     };
-  }, []));
+  }, [fetchEvents]));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;

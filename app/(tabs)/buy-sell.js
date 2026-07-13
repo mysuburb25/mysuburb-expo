@@ -22,6 +22,14 @@ const TYPE_CONFIG = {
   seeking:  { label: 'Seeking',   bg: '#6A1B9A' },
 };
 
+// "Sold" only makes sense for For Sale listings — Free items get "taken",
+// and Wanted posts get "found" (the seeker found what they were after).
+function soldBadgeWord(marketplaceType) {
+  if (marketplaceType === 'seeking') return 'FOUND';
+  if (marketplaceType === 'giveaway') return 'TAKEN';
+  return 'SOLD';
+}
+
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
@@ -49,13 +57,17 @@ export default function BuySellScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
 
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
   const fetchListings = useCallback(async () => {
-    if (!profile?.suburb) return;
+    const currentProfile = profileRef.current;
+    if (!currentProfile?.suburb) return;
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
-      const activeSuburbs = profile?.suburbs
-        ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
-        : [{ suburb: profile.suburb, state: profile.state }];
+      const activeSuburbs = currentProfile?.suburbs
+        ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+        : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
       if (activeSuburbs.length === 0) return;
 
       // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
@@ -83,20 +95,20 @@ export default function BuySellScreen() {
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
+      const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
       setListings(blockedIds.length ? allListings.filter(l => !blockedIds.includes(l.authorId)) : allListings);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [profile, activeFilter]);
+  }, [activeFilter]);
 
-  const profileRef = useRef(profile);
-  useEffect(() => { profileRef.current = profile; }, [profile]);
-  const fetchListingsRef = useRef(fetchListings);
-  useEffect(() => { fetchListingsRef.current = fetchListings; }, [fetchListings]);
+  // Refetch when the filter tab changes — previously nothing triggered
+  // this at all, since fetchListings was only ever called from the focus
+  // effect below.
+  useEffect(() => { fetchListings(); }, [fetchListings]);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
-    fetchListingsRef.current();
+    fetchListings();
 
     const stored = profileRef.current?.lastVisited?.marketplace;
     setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
@@ -104,7 +116,7 @@ export default function BuySellScreen() {
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), marketplace: new Date() } });
     };
-  }, []));
+  }, [fetchListings]));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
@@ -234,9 +246,16 @@ export default function BuySellScreen() {
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
                   {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
-                  {item.marketplaceType === 'forsale' && item.price > 0 && (
-                    <Text style={styles.price}>${item.price?.toFixed(2)}</Text>
-                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                    {item.marketplaceType === 'forsale' && item.price > 0 && (
+                      <Text style={styles.price}>${item.price?.toFixed(2)}</Text>
+                    )}
+                    {item.isSold && (
+                      <View style={styles.soldTag}>
+                        <Text style={styles.soldTagText}>{soldBadgeWord(item.marketplaceType)}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
@@ -346,6 +365,8 @@ const styles = StyleSheet.create({
   typeBadge: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   typeText: { fontSize: 13, fontWeight: '800', color: Colors.white },
   price: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },
+  soldTag: { backgroundColor: '#424242', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  soldTagText: { fontSize: 12, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   metaText: { fontSize: 11, color: Colors.midGrey },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },

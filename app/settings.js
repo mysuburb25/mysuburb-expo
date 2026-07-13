@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
 export default function SettingsScreen() {
-  const { logout, profile, updateUserProfile } = useAuth();
+  const { logout, profile } = useAuth();
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure?', [
@@ -35,18 +35,6 @@ export default function SettingsScreen() {
       <Text style={styles.sectionLabel}>Account</Text>
       <View style={styles.section}>
         <MenuItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
-        {profile?.skipDashboard && (
-          <MenuItem
-            icon="grid-outline"
-            label="Show Dashboard on Login"
-            onPress={async () => {
-              try {
-                await updateUserProfile({ skipDashboard: false });
-                Alert.alert('Done', "You'll see your Dashboard next time you log in.");
-              } catch (e) { Alert.alert('Error', e.message); }
-            }}
-          />
-        )}
         <MenuItem icon="location-outline" label="Change Suburb" onPress={() => router.push('/(auth)/select-suburb')} />
         <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/change-password')} />
         <MenuItem icon="notifications-outline" label="Notification Preferences" onPress={() => router.push('/notification-preferences')} />

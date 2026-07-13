@@ -42,13 +42,17 @@ export default function LostFoundScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
+  const profileRef = useRef(profile);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
   const fetchItems = useCallback(async () => {
-    if (!profile?.suburb) return;
+    const currentProfile = profileRef.current;
+    if (!currentProfile?.suburb) return;
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
-      const activeSuburbs = profile?.suburbs
-        ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
-        : [{ suburb: profile.suburb, state: profile.state }];
+      const activeSuburbs = currentProfile?.suburbs
+        ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+        : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
       if (activeSuburbs.length === 0) return;
 
       // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
@@ -74,20 +78,15 @@ export default function LostFoundScreen() {
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
-      const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
+      const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
       setItems(blockedIds.length ? allItems.filter(i => !blockedIds.includes(i.authorId)) : allItems);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [profile]);
-
-  const profileRef = useRef(profile);
-  useEffect(() => { profileRef.current = profile; }, [profile]);
-  const fetchItemsRef = useRef(fetchItems);
-  useEffect(() => { fetchItemsRef.current = fetchItems; }, [fetchItems]);
+  }, []);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
-    fetchItemsRef.current();
+    fetchItems();
 
     const stored = profileRef.current?.lastVisited?.lostfound;
     setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
@@ -95,7 +94,7 @@ export default function LostFoundScreen() {
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), lostfound: new Date() } });
     };
-  }, []));
+  }, [fetchItems]));
 
   const filteredItems = activeTab === 'all' ? items : items.filter(p => p.lostFoundType === activeTab);
 

@@ -7,6 +7,7 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import useOnlineStatus from '../../utils/useOnlineStatus';
 
 function timeAgo(date) {
   if (!date) return '';
@@ -17,6 +18,45 @@ function timeAgo(date) {
   if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
   if (seconds < 604800) return Math.floor(seconds / 86400) + 'd';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+}
+
+function ConversationRow({ item, user, shareText }) {
+  const otherUserId = item.participants?.find(p => p !== user.uid);
+  const otherUserName = item.participantNames?.[otherUserId] || 'Neighbour';
+  const unread = item.unreadCount?.[user.uid] || 0;
+  const isLastFromMe = item.lastMessageSenderId === user.uid;
+  const isOnline = useOnlineStatus(otherUserId);
+
+  return (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() => router.push({
+        pathname: '/chat/' + otherUserId,
+        params: shareText ? { userId: otherUserId, userName: otherUserName, prefillText: shareText } : { userId: otherUserId, userName: otherUserName },
+      })}
+    >
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{otherUserName[0]?.toUpperCase()}</Text>
+        {isOnline && <View style={styles.onlineDot} />}
+      </View>
+      <View style={styles.rowBody}>
+        <View style={styles.rowTop}>
+          <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>{otherUserName}</Text>
+          <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
+        </View>
+        <View style={styles.rowBottom}>
+          <Text style={[styles.preview, unread > 0 && styles.previewUnread]} numberOfLines={1}>
+            {isLastFromMe ? 'You: ' : ''}{item.lastMessage || 'Start a conversation'}
+          </Text>
+          {unread > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 export default function MessagesScreen() {
@@ -75,42 +115,9 @@ export default function MessagesScreen() {
           data={conversations}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => {
-            const otherUserId = item.participants?.find(p => p !== user.uid);
-            const otherUserName = item.participantNames?.[otherUserId] || 'Neighbour';
-            const unread = item.unreadCount?.[user.uid] || 0;
-            const isLastFromMe = item.lastMessageSenderId === user.uid;
-
-            return (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => router.push({
-                  pathname: '/chat/' + otherUserId,
-                  params: shareText ? { userId: otherUserId, userName: otherUserName, prefillText: shareText } : { userId: otherUserId, userName: otherUserName },
-                })}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{otherUserName[0]?.toUpperCase()}</Text>
-                </View>
-                <View style={styles.rowBody}>
-                  <View style={styles.rowTop}>
-                    <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>{otherUserName}</Text>
-                    <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
-                  </View>
-                  <View style={styles.rowBottom}>
-                    <Text style={[styles.preview, unread > 0 && styles.previewUnread]} numberOfLines={1}>
-                      {isLastFromMe ? 'You: ' : ''}{item.lastMessage || 'Start a conversation'}
-                    </Text>
-                    {unread > 0 && (
-                      <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadBadgeText}>{unread > 9 ? '9+' : unread}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => (
+            <ConversationRow item={item} user={user} shareText={shareText} />
+          )}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubbles-outline" size={48} color={Colors.lightGrey} />
@@ -138,7 +145,8 @@ const styles = StyleSheet.create({
   shareBannerText: { fontSize: 13, fontWeight: '600', color: Colors.brandGreen },
   list: { padding: 12, gap: 4, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12 },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#4CAF50', borderWidth: 2, borderColor: Colors.white },
   avatarText: { fontSize: 18, fontWeight: '700', color: Colors.brandGreen },
   rowBody: { flex: 1, gap: 3 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

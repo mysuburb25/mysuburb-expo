@@ -22,6 +22,21 @@ export function AuthProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
+  // Heartbeat for online status — Firestore has no built-in presence
+  // detection (unlike Firebase's separate Realtime Database), so "online"
+  // here means "seen recently": we touch lastActive every 60s while the
+  // app is open, and anything else reading it treats a stale value
+  // (older than ~2 minutes) as offline.
+  useEffect(() => {
+    if (!user) return;
+    const touch = () => {
+      updateDoc(doc(db, 'users', user.uid), { lastActive: serverTimestamp() }).catch(() => {});
+    };
+    touch();
+    const interval = setInterval(touch, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {

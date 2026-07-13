@@ -62,7 +62,11 @@ service cloud.firestore {
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['savedBy']));
+               .hasOnly(['savedBy']))
+        ||
+        (request.auth.uid == resource.data.authorId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['isSold']));
 
       allow delete: if false;
     }

@@ -80,6 +80,16 @@ const SERVICE_LABELS = {
   gardening: 'Gardening', petcare: 'Pet Care', childcare: 'Child & Aged Care', tutoring: 'Tutoring', others: 'Others',
 };
 
+// "Sold" only makes sense for For Sale listings — Free items get "taken",
+// and Wanted posts get "found" (the seeker found what they were after).
+// Same underlying isSold field and toggle action for all three, just
+// worded to match what actually happened.
+function getSoldLabels(post) {
+  if (post.isWanted) return { action: 'Mark as Found', undo: 'Mark as Still Needed', badge: 'FOUND' };
+  if (post.isFree) return { action: 'Mark as Taken', undo: 'Mark as Available', badge: 'TAKEN' };
+  return { action: 'Mark as Sold', undo: 'Mark as Available', badge: 'SOLD' };
+}
+
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -100,6 +110,7 @@ export default function PostDetailScreen() {
   const [reportDetails, setReportDetails] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
   const [showReportSuccess, setShowReportSuccess] = useState(false);
+  const [errorModalMessage, setErrorModalMessage] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const inputRef = useRef(null);
@@ -168,7 +179,7 @@ export default function PostDetailScreen() {
       });
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not update. Please try again.');
+      setErrorModalMessage('Could not update. Please try again.');
     }
   };
 
@@ -184,7 +195,7 @@ export default function PostDetailScreen() {
       });
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not update. Please try again.');
+      setErrorModalMessage('Could not update. Please try again.');
     }
   };
 
@@ -288,6 +299,19 @@ export default function PostDetailScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setPosting(false); }
+  };
+
+  const handleToggleSold = async () => {
+    setShowPostMenu(false);
+    const newSold = !post.isSold;
+    setPost(prev => ({ ...prev, isSold: newSold }));
+    try {
+      await updateDoc(doc(db, 'posts', id), { isSold: newSold });
+    } catch (e) {
+      console.error(e);
+      setPost(prev => ({ ...prev, isSold: !newSold }));
+      setErrorModalMessage('Could not update. Please try again.');
+    }
   };
 
   const handleDeletePost = () => {
@@ -610,6 +634,7 @@ export default function PostDetailScreen() {
                       {post.price > 0 && <Text style={styles.priceTag}>${post.price?.toFixed(2)}</Text>}
                       {post.isFree && <View style={styles.freeTag}><Text style={styles.freeTagText}>FREE</Text></View>}
                       {post.isWanted && <View style={styles.seekingTag}><Text style={styles.seekingTagText}>SEEKING</Text></View>}
+                      {post.isSold && <View style={styles.soldTag}><Text style={styles.soldTagText}>{getSoldLabels(post).badge}</Text></View>}
                     </View>
                   )}
 
@@ -767,9 +792,20 @@ export default function PostDetailScreen() {
       <Modal visible={showPostMenu} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowPostMenu(false)}>
           <View style={styles.menuSheet}>
-            <View style={styles.menuHandle} />
+            <View style={styles.menuHeaderBar}>
+              <Text style={styles.menuHeaderText}>Select</Text>
+            </View>
+            <View style={styles.menuPad}>
             {isOwner ? (
               <>
+                {post.category === 'marketplace' && (
+                  <TouchableOpacity style={styles.menuItem} onPress={handleToggleSold}>
+                    <View style={styles.menuItemIcon}>
+                      <Ionicons name={post.isSold ? 'refresh-outline' : 'checkmark-circle-outline'} size={20} color={Colors.brandGreen} />
+                    </View>
+                    <Text style={styles.menuItemText}>{post.isSold ? getSoldLabels(post).undo : getSoldLabels(post).action}</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.menuItem} onPress={handleDeletePost} disabled={deletingPost}>
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="trash-outline" size={20} color="#E53935" />
@@ -796,6 +832,7 @@ export default function PostDetailScreen() {
             <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowPostMenu(false)}>
               <Text style={styles.menuCancelText}>Cancel</Text>
             </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -908,6 +945,22 @@ export default function PostDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Generic error confirmation */}
+      <Modal visible={!!errorModalMessage} transparent animationType="fade">
+        <View style={styles.centerOverlay}>
+          <View style={styles.successCard}>
+            <View style={[styles.successIconCircle, { backgroundColor: '#E53935' }]}>
+              <Ionicons name="alert" size={30} color={Colors.white} />
+            </View>
+            <Text style={styles.successTitle}>Something Went Wrong</Text>
+            <Text style={styles.successMessage}>{errorModalMessage}</Text>
+            <TouchableOpacity style={[styles.successOkBtn, { backgroundColor: '#E53935' }]} onPress={() => setErrorModalMessage(null)}>
+              <Text style={styles.successOkBtnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -970,6 +1023,8 @@ const styles = StyleSheet.create({
   priceTag: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen },
   freeTag: { backgroundColor: Colors.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   freeTagText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
+  soldTag: { backgroundColor: '#424242', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  soldTagText: { fontSize: 13, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
   seekingTag: { backgroundColor: '#E3F2FD', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   seekingTagText: { fontSize: 13, fontWeight: '700', color: '#0D47A1' },
   footer: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
@@ -1013,7 +1068,10 @@ const styles = StyleSheet.create({
   postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },
   // Post menu modal
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },
+  menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  menuHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
+  menuHeaderText: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  menuPad: { padding: 16, paddingBottom: 32 },
   shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   shareSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   shareHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, alignItems: 'center', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
@@ -1025,13 +1083,12 @@ const styles = StyleSheet.create({
   shareOptionSubtitle: { fontSize: 12, color: Colors.midGrey, marginTop: 2 },
   shareCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   shareCancelText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
-  menuHandle: { width: 40, height: 4, backgroundColor: Colors.lightGrey, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12 },
-  menuItemIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  menuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
   menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
   menuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100' },
   menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
-  menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8 },
+  menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8, borderWidth: 0 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
   reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   reportHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
