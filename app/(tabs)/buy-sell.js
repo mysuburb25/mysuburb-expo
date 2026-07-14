@@ -8,6 +8,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import NotificationBell from '../../components/NotificationBell';
+import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -221,13 +222,7 @@ export default function BuySellScreen() {
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
                 <View style={styles.cardHeader}>
-                  <View style={styles.avatar}>
-                    {item.authorPhotoURL ? (
-                      <Image source={{ uri: item.authorPhotoURL }} style={styles.avatarImage} />
-                    ) : (
-                      <Text style={styles.avatarText}>{item.authorName?.[0]?.toUpperCase() || '?'}</Text>
-                    )}
-                  </View>
+                  <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
@@ -351,9 +346,6 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EDF7EF', padding: 14 },
-  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  avatarImage: { width: 30, height: 30, borderRadius: 15 },
-  avatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   cardAuthor: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 6 },

@@ -10,6 +10,7 @@ import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import NotificationBell from '../../components/NotificationBell';
+import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 function formatDate(date) {
@@ -477,13 +478,7 @@ export default function EventsScreen() {
                   )}
                   <View style={{ flex: 1 }}>
                     <View style={styles.authorRow}>
-                      <View style={styles.authorAvatar}>
-                        {item.authorPhotoURL ? (
-                          <Image source={{ uri: item.authorPhotoURL }} style={styles.authorAvatarImage} />
-                        ) : (
-                          <Text style={styles.authorAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
-                        )}
-                      </View>
+                      <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
                         <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
@@ -793,9 +788,6 @@ const styles = StyleSheet.create({
   todayBadge: { width: 56, height: 62, borderRadius: 14, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center' },
   todayBadgeText: { fontSize: 13, fontWeight: '900', color: Colors.white, textAlign: 'center' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  authorAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  authorAvatarImage: { width: 30, height: 30, borderRadius: 15 },
-  authorAvatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   cardAuthor: { fontSize: 17, color: Colors.charcoal, fontWeight: '600', flexShrink: 1 },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   suggestionsBox: { marginTop: 6, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, overflow: 'hidden' },

@@ -136,9 +136,9 @@ export default function DashboardScreen() {
             const items = grouped[section.key];
             if (!items || items.length === 0) return null;
             return (
-              <View key={section.key} style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.sectionIconBadge, { backgroundColor: section.color + '20' }]}>
+              <View key={section.key} style={[styles.panel, { borderColor: section.color + '40' }]}>
+                <View style={[styles.panelHeader, { backgroundColor: section.color + '18' }]}>
+                  <View style={[styles.sectionIconBadge, { backgroundColor: section.color + '30' }]}>
                     <Ionicons name={section.icon} size={17} color={section.color} />
                   </View>
                   <Text style={styles.sectionTitle}>{section.label}</Text>
@@ -146,10 +146,10 @@ export default function DashboardScreen() {
                     <Text style={styles.sectionCountText}>{items.length}</Text>
                   </View>
                 </View>
-                {items.map(item => (
+                {items.map((item, index) => (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.card, { borderLeftColor: section.color, borderLeftWidth: 4 }]}
+                    style={[styles.row, index < items.length - 1 && styles.rowDivider]}
                     onPress={() => router.push('/post/' + item.id)}
                     activeOpacity={0.85}
                   >
@@ -200,24 +200,35 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 20 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
-  section: { marginBottom: 20 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  sectionIconBadge: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.charcoal },
-  sectionCountPill: { marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, minWidth: 26, alignItems: 'center' },
-  sectionCountText: { fontSize: 12, fontWeight: '800', color: Colors.white },
-  card: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 16, padding: 13, marginBottom: 9,
-    borderWidth: 1, borderColor: '#D5D5D5',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
+
+  // Each section is now a single bordered "panel": a tinted header strip
+  // (icon + title + count, centered) sitting on top of its posts, all
+  // inside one rounded, shadowed card — rather than a floating heading
+  // above a stack of separately-carded posts.
+  panel: {
+    backgroundColor: Colors.white,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    marginBottom: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 16 },
+  sectionIconBadge: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: Colors.charcoal },
+  sectionCountPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, minWidth: 26, alignItems: 'center' },
+  sectionCountText: { fontSize: 12, fontWeight: '800', color: Colors.white },
+
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.white },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
+
   cardAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   cardAvatarImage: { width: 32, height: 32, borderRadius: 16 },
   cardAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   cardTitle: { fontSize: 14, fontWeight: '700', color: Colors.charcoal },
   cardMeta: { fontSize: 12, color: Colors.midGrey, marginTop: 2 },
   footer: { backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.lightGrey, padding: 16, gap: 12 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   checkboxLabel: { fontSize: 14, color: Colors.charcoal },
   continueBtn: { backgroundColor: Colors.brandGreen, borderRadius: 28, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: Colors.brandGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   continueBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },

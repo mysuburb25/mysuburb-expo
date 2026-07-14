@@ -8,6 +8,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import NotificationBell from '../../components/NotificationBell';
+import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 
 const TABS = [
   { key: 'all',      label: 'All' },
@@ -224,13 +225,7 @@ export default function ServicesScreen() {
             return (
               <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)}>
                 <View style={styles.cardHeader}>
-                  <View style={styles.avatar}>
-                    {item.authorPhotoURL ? (
-                      <Image source={{ uri: item.authorPhotoURL }} style={styles.avatarImage} />
-                    ) : (
-                      <Text style={styles.avatarText}>{item.authorName?.[0]?.toUpperCase() || '?'}</Text>
-                    )}
-                  </View>
+                  <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
@@ -349,9 +344,6 @@ const styles = StyleSheet.create({
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
   cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  avatarImage: { width: 30, height: 30, borderRadius: 15 },
-  avatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },

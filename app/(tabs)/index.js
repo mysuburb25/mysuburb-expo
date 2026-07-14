@@ -7,38 +7,13 @@ import { collection, query, where, orderBy, limit, getDocs, updateDoc, increment
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import PostCard from '../../components/PostCard';
 
 const FILTERS = [
   { key: 'all', label: 'General', createCategory: 'community', preselect: 'updates' },
   { key: 'notices', label: 'Notices', createCategory: 'community', preselect: 'notices' },
   { key: 'safety', label: 'Safety Alerts', createCategory: 'community', preselect: 'safety' },
 ];
-
-const CATEGORY_CONFIG = {
-  updates:     { label: 'General', bg: Colors.brandGreen },
-  notices:     { label: 'Notice',           bg: '#1565C0' },
-  safety:      { label: 'Safety Alert',     bg: '#E65100' },
-  events:      { label: 'Event',            bg: '#6A1B9A' },
-  marketplace: { label: 'Buy & Sell',       bg: Colors.brandGreen },
-  lostfound:   { label: 'Lost & Found',     bg: '#C62828' },
-};
-
-function formatDate(date) {
-  if (!date) return '';
-  const d = date.toDate ? date.toDate() : new Date(date);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function formatTime(date) {
-  if (!date) return '';
-  const d = date.toDate ? date.toDate() : new Date(date);
-  return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
-}
 
 export default function HomeScreen() {
   const { profile, user, unreadCount, updateUserProfile } = useAuth();
@@ -55,14 +30,10 @@ export default function HomeScreen() {
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  // fetchPosts now depends directly on the actual profile fields it reads
-  // (not a ref) — this is what makes it automatically re-run the moment
-  // `profile` finishes loading after login. Previously it read profileRef,
-  // which never triggers a re-run when a ref changes, and would return
-  // early (before ever reaching setLoading(false)) if profile hadn't
-  // loaded yet on the very first fetch — leaving the screen stuck on the
-  // loading spinner forever, until the app happened to remount (e.g. a
-  // logout/login) with profile already populated in time.
+  // fetchPosts depends directly on the actual profile fields it reads (not
+  // a ref) — this is what makes it automatically re-run the moment `profile`
+  // finishes loading after login, and guarantees setLoading(false) always
+  // fires even on an early return, so the spinner can never get stuck.
   const fetchPosts = useCallback(async () => {
     if (!profile?.suburb) { setLoading(false); setRefreshing(false); return; }
     try {
@@ -223,59 +194,16 @@ export default function HomeScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPosts(); }} tintColor={Colors.brandGreen} />}
-          renderItem={({ item }) => {
-            const liked = item.likedBy?.includes(user?.uid) || false;
-            const catConf = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.updates;
-            const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
-            const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== user?.uid;
-            return (
-              <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.avatar}>
-                    {item.authorPhotoURL ? (
-                      <Image source={{ uri: item.authorPhotoURL }} style={styles.avatarImage} />
-                    ) : (
-                      <Text style={styles.avatarText}>{item.authorName?.[0]?.toUpperCase() || '?'}</Text>
-                    )}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
-                    <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                    {isNew && (
-                      <View style={styles.newBadge}>
-                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
-                      </View>
-                    )}
-                    <View style={[styles.badge, { backgroundColor: catConf.bg }]}>
-                      <Text style={styles.badgeText}>{catConf.label}</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.content} numberOfLines={4}>{item.content}</Text>
-                </View>
-                <View style={styles.footer}>
-                  <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
-                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
-                    <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
-                    <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
-                    <Text style={styles.footerText}>{item.commentCount || 0}</Text>
-                  </TouchableOpacity>
-                  <View style={{ flex: 1 }} />
-                  <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={item.savedBy?.includes(user?.uid) ? 'bookmark' : 'bookmark-outline'} size={18} color={item.savedBy?.includes(user?.uid) ? Colors.brandGreen : Colors.charcoal} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => (
+            <PostCard
+              item={item}
+              currentUserUid={user?.uid}
+              newCutoff={newCutoff}
+              onLikeToggle={handleLikeToggle}
+              onToggleSave={handleToggleSave}
+              onShare={handleShare}
+            />
+          )}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="home-outline" size={48} color={Colors.lightGrey} />
@@ -346,28 +274,6 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   list: { padding: 12, gap: 12, paddingBottom: 100 },
-  card: {
-    borderRadius: 16, borderWidth: 1, borderColor: '#D5D5D5', overflow: 'hidden', backgroundColor: Colors.white,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EDF7EF', padding: 14 },
-  cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  avatarImage: { width: 30, height: 30, borderRadius: 15 },
-  avatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
-  authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
-  postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
-  content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
-  metaRow: { flexDirection: 'row', justifyContent: 'flex-end' },
-  metaText: { fontSize: 11, color: Colors.midGrey },
-  footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
-  footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
-  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
-  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  badgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.charcoal },
   emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
