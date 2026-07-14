@@ -7,6 +7,8 @@ import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, server
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
+import addEventToCalendar from '../../utils/addEventToCalendar';
 
 const REPORT_REASONS = [
   'Spam or scam',
@@ -113,6 +115,7 @@ export default function PostDetailScreen() {
   const [errorModalMessage, setErrorModalMessage] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
+  const [addingToCalendar, setAddingToCalendar] = useState(false);
   const inputRef = useRef(null);
   const flatListRef = useRef(null);
 
@@ -415,6 +418,20 @@ export default function PostDetailScreen() {
     ]);
   };
 
+  // Shared calendar helper defaults to a 1-hour duration since events only
+  // store a start time, not an end time.
+  const handleAddToCalendar = async () => {
+    if (!eventDate || addingToCalendar) return;
+    setAddingToCalendar(true);
+    const result = await addEventToCalendar({ title: post.content, description: post.description, location: post.eventLocation, startDate: eventDate });
+    setAddingToCalendar(false);
+    if (result.success) {
+      Alert.alert('Added to Calendar', 'This event has been added to your calendar.');
+    } else {
+      setErrorModalMessage(result.message);
+    }
+  };
+
   if (loading) return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white }}>
       <ActivityIndicator color={Colors.brandGreen} size="large" />
@@ -515,12 +532,8 @@ export default function PostDetailScreen() {
                         </View>
                       )
                     )}
-                    <TouchableOpacity style={styles.avatar} onPress={goToUserProfile}>
-                      {post.authorPhotoURL ? (
-                        <Image source={{ uri: post.authorPhotoURL }} style={styles.avatarImage} />
-                      ) : (
-                        <Text style={styles.avatarText}>{post.authorName?.[0]?.toUpperCase()}</Text>
-                      )}
+                    <TouchableOpacity onPress={goToUserProfile}>
+                      <AvatarWithOnlineDot authorId={post.authorId} photoURL={post.authorPhotoURL} name={post.authorName} />
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 1 }} onPress={goToUserProfile}>
                       <Text style={styles.authorName}>{post.authorName}</Text>
@@ -540,6 +553,15 @@ export default function PostDetailScreen() {
                       <View style={styles.pillTag}>
                         <Text style={styles.pillTagText}>{categoryLabel}</Text>
                       </View>
+                    )}
+                    {isEvent && eventDate && (
+                      <TouchableOpacity style={styles.calendarBtn} onPress={handleAddToCalendar} disabled={addingToCalendar}>
+                        {addingToCalendar ? (
+                          <ActivityIndicator color={Colors.brandGreen} size="small" />
+                        ) : (
+                          <Ionicons name="calendar-outline" size={16} color={Colors.brandGreen} />
+                        )}
+                      </TouchableOpacity>
                     )}
                     {/* 3-dot menu button */}
                     <TouchableOpacity style={styles.menuBtn} onPress={() => setShowPostMenu(true)}>
@@ -985,7 +1007,7 @@ const styles = StyleSheet.create({
   detailField: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
   labelBadgeWrap: { width: 98 },
   labelBadge: { width: 90, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 20, backgroundColor: '#C2D9E8' },
-  labelBadgeText: { fontSize: 8, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
+  labelBadgeText: { fontSize: 9, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
   titleBadge: {},
   aboutBadge: {},
   aboutBadgeText: {},
@@ -995,17 +1017,15 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
   locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   eventLocationLink: { textDecorationLine: 'underline' },
+  calendarBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   postCard: {
     backgroundColor: Colors.white, borderRadius: 16, marginBottom: 12,
     borderWidth: 1, borderColor: '#D5D5D5',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   postCardInner: { borderRadius: 16, overflow: 'hidden' },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 8 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, paddingBottom: 8 },
   authorRowEvent: { backgroundColor: '#EDF7EF', paddingBottom: 8, borderTopLeftRadius: 16, borderTopRightRadius: 16, alignItems: 'center' },
-  avatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  avatarImage: { width: 30, height: 30, borderRadius: 15 },
-  avatarText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   dateTime: { fontSize: 12, color: Colors.midGrey, marginTop: 2, fontStyle: 'italic' },
   pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },

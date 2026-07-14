@@ -1,0 +1,56 @@
+import { Platform } from 'react-native';
+import * as Calendar from 'expo-calendar';
+
+// Finds (or creates) a writable device calendar to add events into. iOS
+// ships a default calendar tied to the device's local account; Android has
+// no universal equivalent, so we create a dedicated "My Suburb" calendar
+// the first time and reuse it after that.
+async function getTargetCalendarId() {
+  if (Platform.OS === 'ios') {
+    const defaultCal = await Calendar.getDefaultCalendarAsync();
+    return defaultCal.id;
+  }
+  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+  const existing = calendars.find(c => c.title === 'My Suburb' && c.allowsModifications);
+  if (existing) return existing.id;
+
+  const sources = await Calendar.getSourcesAsync();
+  const localSource = sources.find(s => s.type === Calendar.SourceType.LOCAL) || sources[0];
+  return await Calendar.createCalendarAsync({
+    title: 'My Suburb',
+    color: '#2D6A4F',
+    entityType: Calendar.EntityTypes.EVENT,
+    sourceId: localSource?.id,
+    source: localSource,
+    name: 'mySuburbEvents',
+    ownerAccount: 'My Suburb',
+    accessLevel: Calendar.CalendarAccessLevel.OWNER,
+  });
+}
+
+// Adds an event to the device calendar with a default 1-hour duration,
+// since My Suburb events only store a start time, not an end time. Shared
+// by both the Events tab card and the post detail screen so the calendar
+// logic lives in exactly one place. Returns { success, message } rather
+// than showing UI itself — callers decide how to surface the result.
+export default async function addEventToCalendar({ title, description, location, startDate }) {
+  try {
+    const { status } = await Calendar.requestCalendarPermissionsAsync();
+    if (status !== 'granted') {
+      return { success: false, message: 'Please allow calendar access to add this event.' };
+    }
+    const calendarId = await getTargetCalendarId();
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+    await Calendar.createEventAsync(calendarId, {
+      title,
+      notes: description || undefined,
+      location: location || undefined,
+      startDate,
+      endDate,
+    });
+    return { success: true };
+  } catch (e) {
+    console.error('addEventToCalendar error:', e);
+    return { success: false, message: 'Could not add this event to your calendar. Please try again.' };
+  }
+}

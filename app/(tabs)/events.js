@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import NotificationBell from '../../components/NotificationBell';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
+import addEventToCalendar from '../../utils/addEventToCalendar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 function formatDate(date) {
@@ -107,6 +108,7 @@ export default function EventsScreen() {
   const [eventPrice, setEventPrice] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
+  const [addingCalendarId, setAddingCalendarId] = useState(null);
   const scrollRef = useRef(null);
 
   const fetchLocationSuggestions = async (text) => {
@@ -307,6 +309,22 @@ export default function EventsScreen() {
     } catch (e) { console.error(e); }
   };
 
+  // Shared calendar helper defaults to a 1-hour duration since events only
+  // store a start time. Tracks which specific card is mid-add (by id) so
+  // only that card's button shows a spinner, not every card at once.
+  const handleAddToCalendar = async (item) => {
+    const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
+    if (!ed || addingCalendarId) return;
+    setAddingCalendarId(item.id);
+    const result = await addEventToCalendar({ title: item.content, description: item.description, location: item.eventLocation, startDate: ed });
+    setAddingCalendarId(null);
+    if (result.success) {
+      Alert.alert('Added to Calendar', 'This event has been added to your calendar.');
+    } else {
+      Alert.alert('Error', result.message);
+    }
+  };
+
   const handlePickImage = () => {
     if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
     const remaining = 3 - images.length;
@@ -494,6 +512,15 @@ export default function EventsScreen() {
                     <View style={styles.completedBadge}>
                       <Text style={styles.completedText}>Done</Text>
                     </View>
+                  )}
+                  {ed && (
+                    <TouchableOpacity style={styles.calendarBtn} onPress={() => handleAddToCalendar(item)} disabled={addingCalendarId === item.id}>
+                      {addingCalendarId === item.id ? (
+                        <ActivityIndicator color={Colors.brandGreen} size="small" />
+                      ) : (
+                        <Ionicons name="calendar-outline" size={16} color={Colors.brandGreen} />
+                      )}
+                    </TouchableOpacity>
                   )}
                 </View>
 
@@ -766,12 +793,12 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
   },
   cardInner: { padding: 14, overflow: 'hidden', borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
-  cardHeader: { flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: '#EDF7EF', marginHorizontal: -14, marginTop: -14, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
+  cardHeader: { flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: '#EDF7EF', marginHorizontal: -14, marginTop: -14, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6, borderTopLeftRadius: 18, borderTopRightRadius: 18 },
   detailsBody: { marginTop: 6, gap: 6 },
   detailField: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 },
   labelBadgeWrap: { width: 98 },
   labelBadge: { width: 90, alignItems: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 20, backgroundColor: '#C2D9E8' },
-  labelBadgeText: { fontSize: 8, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
+  labelBadgeText: { fontSize: 9, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
   titleBadge: {},
   aboutBadge: {},
   aboutBadgeText: {},
@@ -781,6 +808,7 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
   locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   whereLink: { textDecorationLine: 'underline' },
+  calendarBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   dateBadge: { width: 56, height: 62, borderRadius: 14, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center', gap: 1 },
   dateWeekday: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.75)' },
   dateDay: { fontSize: 19, fontWeight: '900', color: Colors.white, lineHeight: 21 },
