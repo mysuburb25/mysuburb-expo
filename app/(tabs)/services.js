@@ -249,19 +249,19 @@ export default function ServicesScreen() {
                 </View>
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
-                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
+                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
                     <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
-                    <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
+                    <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
                     <Text style={styles.footerText}>{item.commentCount || 0}</Text>
                   </TouchableOpacity>
                   <View style={{ flex: 1 }} />
                   <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={item.savedBy?.includes(user?.uid) ? 'bookmark' : 'bookmark-outline'} size={18} color={item.savedBy?.includes(user?.uid) ? Colors.brandGreen : Colors.charcoal} />
+                    <Ionicons name={item.savedBy?.includes(user?.uid) ? 'bookmark' : 'bookmark-outline'} size={20} color={item.savedBy?.includes(user?.uid) ? Colors.brandGreen : Colors.charcoal} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
+                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 8 }}>
+                    <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>

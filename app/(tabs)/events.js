@@ -518,7 +518,7 @@ export default function EventsScreen() {
                       {addingCalendarId === item.id ? (
                         <ActivityIndicator color={Colors.brandGreen} size="small" />
                       ) : (
-                        <Ionicons name="calendar-outline" size={16} color={Colors.brandGreen} />
+                        <Ionicons name="calendar-outline" size={32} color={Colors.brandGreen} />
                       )}
                     </TouchableOpacity>
                   )}
@@ -577,25 +577,25 @@ export default function EventsScreen() {
 
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
-                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
+                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
                     <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
-                    <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
+                    <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
                     <Text style={styles.footerText}>{item.commentCount || 0}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleToggleAttending(item)}>
-                    <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={18} color={attending ? Colors.brandGreen : Colors.charcoal} />
+                    <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={20} color={attending ? Colors.brandGreen : Colors.charcoal} />
                     <Text style={[styles.footerText, attending && { color: Colors.brandGreen }]}>
                       Interested{item.attendeeCount > 0 ? ` · ${item.attendeeCount}` : ''}
                     </Text>
                   </TouchableOpacity>
                   <View style={{ flex: 1 }} />
                   <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? Colors.brandGreen : Colors.charcoal} />
+                    <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
+                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 8 }}>
+                    <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -808,7 +808,7 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
   locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   whereLink: { textDecorationLine: 'underline' },
-  calendarBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  calendarBtn: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   dateBadge: { width: 56, height: 62, borderRadius: 14, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center', gap: 1 },
   dateWeekday: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.75)' },
   dateDay: { fontSize: 19, fontWeight: '900', color: Colors.white, lineHeight: 21 },

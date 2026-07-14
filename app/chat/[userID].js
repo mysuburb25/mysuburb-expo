@@ -65,7 +65,7 @@ function renderMessageText(text, isMe, styles) {
 
 export default function ChatScreen() {
   const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
-  const { user, profile, updateUserProfile } = useAuth();
+  const { user, profile, blockUser, unblockUser } = useAuth();
   const isOtherUserOnline = useOnlineStatus(userId);
   const [resolvedUserName, setResolvedUserName] = useState(userNameParam || null);
   const [messages, setMessages] = useState([]);
@@ -182,12 +182,12 @@ export default function ChatScreen() {
           text: iBlockedThem ? 'Unblock' : 'Block',
           style: iBlockedThem ? 'default' : 'destructive',
           onPress: async () => {
-            const current = profile?.blockedUsers || [];
-            const updated = iBlockedThem
-              ? current.filter(b => b.uid !== userId)
-              : [...current, { uid: userId, displayName: userName, blockedAt: new Date().toISOString() }];
             try {
-              await updateUserProfile({ blockedUsers: updated });
+              if (iBlockedThem) {
+                await unblockUser(userId);
+              } else {
+                await blockUser(userId, userName);
+              }
             } catch (e) {
               Alert.alert('Error', 'Could not update block status. Please try again.');
             }

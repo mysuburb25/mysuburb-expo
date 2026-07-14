@@ -55,19 +55,19 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
       </View>
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerBtn} onPress={() => onLikeToggle(item)}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
+          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
           <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
-          <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
+          <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
           <Text style={styles.footerText}>{item.commentCount || 0}</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={() => onToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? Colors.brandGreen : Colors.charcoal} />
+          <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => onShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
+        <TouchableOpacity onPress={() => onShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 8 }}>
+          <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
