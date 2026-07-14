@@ -164,6 +164,34 @@ export function AuthProvider({ children }) {
     setProfile(prev => ({ ...prev, ...data }));
   };
 
+  // Keeps two representations of a block in sync in a single write:
+  // `blockedUsers` (array of {uid, displayName, blockedAt} — what the UI
+  // renders, e.g. the Blocked Users list) and `blockedUserIds` (a plain
+  // array of just UIDs). The plain-UID version exists specifically because
+  // Firestore security rules can't check membership in an array of objects
+  // (no "does this array contain an object where uid == X" primitive), but
+  // CAN check membership in a simple array via the `in` operator — that's
+  // what firestore.rules uses to actually enforce blocking server-side for
+  // messages, rather than relying only on client-side filtering.
+  const blockUser = async (uid, displayName) => {
+    if (!user || !uid) return;
+    const currentList = profile?.blockedUsers || [];
+    if (currentList.some(b => b.uid === uid)) return; // already blocked
+    const currentIds = profile?.blockedUserIds || [];
+    const newList = [...currentList, { uid, displayName: displayName || 'Neighbour', blockedAt: new Date().toISOString() }];
+    const newIds = currentIds.includes(uid) ? currentIds : [...currentIds, uid];
+    await updateUserProfile({ blockedUsers: newList, blockedUserIds: newIds });
+  };
+
+  const unblockUser = async (uid) => {
+    if (!user || !uid) return;
+    const currentList = profile?.blockedUsers || [];
+    const currentIds = profile?.blockedUserIds || [];
+    const newList = currentList.filter(b => b.uid !== uid);
+    const newIds = currentIds.filter(id => id !== uid);
+    await updateUserProfile({ blockedUsers: newList, blockedUserIds: newIds });
+  };
+
   const reloadProfile = async () => {
     if (user) await loadProfile(user.uid);
   };
@@ -173,6 +201,7 @@ export function AuthProvider({ children }) {
       user, profile, loading, unreadCount, setUnreadCount, unreadMessageCount,
       login, register, logout,
       createProfile, updateUserProfile, reloadProfile,
+      blockUser, unblockUser,
     }}>
       {!loading && children}
     </AuthContext.Provider>

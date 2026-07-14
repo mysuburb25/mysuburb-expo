@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
 export default function BlockedUsersScreen() {
-  const { profile, updateUserProfile } = useAuth();
+  const { profile, unblockUser } = useAuth();
   const blockedUsers = profile?.blockedUsers || [];
 
   const handleUnblock = (blockedUser) => {
@@ -17,7 +17,7 @@ export default function BlockedUsersScreen() {
         {
           text: 'Unblock', onPress: async () => {
             try {
-              await updateUserProfile({ blockedUsers: blockedUsers.filter(b => b.uid !== blockedUser.uid) });
+              await unblockUser(blockedUser.uid);
             } catch (e) {
               Alert.alert('Error', 'Could not unblock this user. Please try again.');
             }

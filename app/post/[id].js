@@ -95,7 +95,7 @@ function getSoldLabels(post) {
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { user, profile, updateUserProfile } = useAuth();
+  const { user, profile, updateUserProfile, blockUser } = useAuth();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -382,12 +382,8 @@ export default function PostDetailScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Block', style: 'destructive', onPress: async () => {
-            const current = profile?.blockedUsers || [];
-            if (current.some(b => b.uid === post.authorId)) return;
             try {
-              await updateUserProfile({
-                blockedUsers: [...current, { uid: post.authorId, displayName: post.authorName, blockedAt: new Date().toISOString() }]
-              });
+              await blockUser(post.authorId, post.authorName);
               router.back();
             } catch (e) {
               Alert.alert('Error', 'Could not block this user. Please try again.');
@@ -559,7 +555,7 @@ export default function PostDetailScreen() {
                         {addingToCalendar ? (
                           <ActivityIndicator color={Colors.brandGreen} size="small" />
                         ) : (
-                          <Ionicons name="calendar-outline" size={16} color={Colors.brandGreen} />
+                          <Ionicons name="calendar-outline" size={32} color={Colors.brandGreen} />
                         )}
                       </TouchableOpacity>
                     )}
@@ -662,16 +658,16 @@ export default function PostDetailScreen() {
 
                   <View style={styles.footer}>
                     <TouchableOpacity style={styles.footerBtn} onPress={handleLike} disabled={liking}>
-                      <Ionicons name={liked ? 'heart' : 'heart-outline'} size={18} color={liked ? '#E53935' : Colors.charcoal} />
+                      <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
                       <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{post.likeCount || 0}</Text>
                     </TouchableOpacity>
                     <View style={styles.footerBtn}>
-                      <Ionicons name="chatbubble-outline" size={18} color={Colors.charcoal} />
+                      <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
                       <Text style={styles.footerText}>{post.commentCount || 0}</Text>
                     </View>
                     {isEvent && (
                       <TouchableOpacity style={[styles.footerBtn, { flexShrink: 1 }]} onPress={handleToggleAttending}>
-                        <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={18} color={attending ? Colors.brandGreen : Colors.charcoal} />
+                        <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={20} color={attending ? Colors.brandGreen : Colors.charcoal} />
                         <Text style={[styles.footerText, attending && { color: Colors.brandGreen }]} numberOfLines={1}>
                           Interested{post.attendeeCount > 0 ? ` · ${post.attendeeCount}` : ''}
                         </Text>
@@ -679,10 +675,10 @@ export default function PostDetailScreen() {
                     )}
                     <View style={{ flex: 1 }} />
                     <TouchableOpacity onPress={handleToggleSave} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? Colors.brandGreen : Colors.charcoal} />
+                      <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowShareModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="share-outline" size={18} color={Colors.charcoal} />
+                    <TouchableOpacity onPress={() => setShowShareModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 8 }}>
+                      <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1017,7 +1013,7 @@ const styles = StyleSheet.create({
   fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
   locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   eventLocationLink: { textDecorationLine: 'underline' },
-  calendarBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  calendarBtn: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   postCard: {
     backgroundColor: Colors.white, borderRadius: 16, marginBottom: 12,
     borderWidth: 1, borderColor: '#D5D5D5',

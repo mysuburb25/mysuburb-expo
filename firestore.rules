@@ -98,11 +98,6 @@ service cloud.firestore {
                     && request.auth.uid in request.resource.data.participants
                     && request.resource.data.participants.size() == 2;
 
-      // Order-independent check — the same two participants must remain,
-      // but their positions in the array can differ depending on who sends
-      // a message first. A straight array == comparison is order-sensitive
-      // and would incorrectly fail whenever the sender wasn't the person
-      // who originally created the conversation.
       allow update: if isSignedIn()
                     && request.auth.uid in resource.data.participants
                     && request.resource.data.participants.size() == 2
@@ -112,19 +107,36 @@ service cloud.firestore {
       allow delete: if false;
 
       match /messages/{messageId} {
-        // Checks membership directly from the conversationId's structure
-        // (always "sortedUid1_sortedUid2") instead of looking up the parent
-        // conversation document — that document doesn't exist yet for a
-        // brand new conversation before the first message is sent, and
-        // get() on a non-existent doc fails the whole rule evaluation.
         function isParticipant() {
           return isSignedIn() && request.auth.uid in conversationId.split('_');
+        }
+
+        // The other person in this 1:1 conversation — used to look up
+        // whether they've blocked the sender before allowing a message
+        // through. Safe to assume exactly two participants since
+        // conversations are always created with participants.size() == 2.
+        function otherParticipant() {
+          let parts = conversationId.split('_');
+          return parts[0] == request.auth.uid ? parts[1] : parts[0];
+        }
+
+        // Enforces blocking server-side: if the recipient has the sender
+        // in their blockedUserIds, the message write is rejected outright,
+        // rather than relying only on the client hiding the option. Uses
+        // .get(field, default) so this doesn't break for older user docs
+        // that predate this field existing. Costs one extra document read
+        // per message send — an acceptable tradeoff for actually enforcing
+        // the block rather than just hiding it in the UI.
+        function recipientHasBlockedSender() {
+          let recipientDoc = get(/databases/$(database)/documents/users/$(otherParticipant()));
+          return request.auth.uid in recipientDoc.data.get('blockedUserIds', []);
         }
 
         allow read: if isParticipant();
 
         allow create: if isParticipant()
-                      && request.resource.data.senderId == request.auth.uid;
+                      && request.resource.data.senderId == request.auth.uid
+                      && !recipientHasBlockedSender();
 
         allow update: if isParticipant()
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);

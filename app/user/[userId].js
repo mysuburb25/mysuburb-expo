@@ -17,7 +17,7 @@ function formatMemberSince(date) {
 export default function UserProfileScreen() {
   const { userId } = useLocalSearchParams();
   const isOnline = useOnlineStatus(userId);
-  const { user, profile, updateUserProfile } = useAuth();
+  const { user, profile, blockUser, unblockUser } = useAuth();
   const [targetUser, setTargetUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -58,12 +58,12 @@ export default function UserProfileScreen() {
           text: isBlocked ? 'Unblock' : 'Block',
           style: isBlocked ? 'default' : 'destructive',
           onPress: async () => {
-            const current = profile?.blockedUsers || [];
-            const updated = isBlocked
-              ? current.filter(b => b.uid !== userId)
-              : [...current, { uid: userId, displayName: targetUser?.displayName, blockedAt: new Date().toISOString() }];
             try {
-              await updateUserProfile({ blockedUsers: updated });
+              if (isBlocked) {
+                await unblockUser(userId);
+              } else {
+                await blockUser(userId, targetUser?.displayName);
+              }
             } catch (e) {
               Alert.alert('Error', 'Could not update block status. Please try again.');
             }
