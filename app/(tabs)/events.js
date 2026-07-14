@@ -557,6 +557,14 @@ export default function EventsScreen() {
                       </Text>
                     </View>
                   )}
+                  <View style={styles.detailField}>
+                    <View style={styles.labelBadgeWrap}>
+                      <View style={[styles.labelBadge, styles.attendingBadge]}>
+                        <Text style={styles.labelBadgeText}>ATTENDING</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.fieldValue}>{item.attendeeCount || 0} interested</Text>
+                  </View>
                   {item.eventLocation ? (
                     <TouchableOpacity
                       style={styles.detailField}
@@ -576,27 +584,32 @@ export default function EventsScreen() {
                 </View>
 
                 <View style={styles.footer}>
-                  <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
-                    <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
-                    <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
-                    <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
-                    <Text style={styles.footerText}>{item.commentCount || 0}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.footerBtn} onPress={() => handleToggleAttending(item)}>
-                    <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={20} color={attending ? Colors.brandGreen : Colors.charcoal} />
-                    <Text style={[styles.footerText, attending && { color: Colors.brandGreen }]}>
-                      Interested{item.attendeeCount > 0 ? ` · ${item.attendeeCount}` : ''}
+                  <View style={styles.footerSideGroup}>
+                    <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
+                      <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
+                      <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{item.likeCount || 0}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.footerBtn} onPress={() => router.push('/post/' + item.id)}>
+                      <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
+                      <Text style={styles.footerText}>{item.commentCount || 0}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity style={[styles.interestedPill, attending && styles.interestedPillActive]} onPress={() => handleToggleAttending(item)}>
+                    <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={16} color={attending ? Colors.white : '#1B4F72'} />
+                    <Text style={[styles.interestedPillText, attending && styles.interestedPillTextActive]}>
+                      Interested
                     </Text>
                   </TouchableOpacity>
                   <View style={{ flex: 1 }} />
-                  <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 8 }}>
-                    <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
-                  </TouchableOpacity>
+                  <View style={styles.footerSideGroup}>
+                    <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleShare(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 8 }}>
+                      <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
               </TouchableOpacity>
@@ -805,6 +818,7 @@ const styles = StyleSheet.create({
   priceBadge: {},
   dateBadgeLabel: {},
   locationBadge: {},
+  attendingBadge: {},
   fieldValue: { fontSize: 14, color: Colors.charcoal, fontWeight: '600', lineHeight: 19, flex: 1 },
   locationValueRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
   whereLink: { textDecorationLine: 'underline' },
@@ -827,6 +841,11 @@ const styles = StyleSheet.create({
   completedText: { fontSize: 11, color: Colors.midGrey, fontWeight: '700' },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', marginTop: 12, marginHorizontal: -14, marginBottom: -14, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0', borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  footerSideGroup: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  interestedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: '#1B4F72', backgroundColor: Colors.white },
+  interestedPillActive: { backgroundColor: '#1B4F72', borderColor: '#1B4F72' },
+  interestedPillText: { fontSize: 13, fontWeight: '700', color: '#1B4F72' },
+  interestedPillTextActive: { color: Colors.white },
   footerText: { fontSize: 13, color: Colors.charcoal, fontWeight: '700' },
   priceToggleRow: { flexDirection: 'row', gap: 10 },
   priceToggleBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 12, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
