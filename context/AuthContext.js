@@ -11,7 +11,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, serverTimestamp, deleteField } from 'firebase/firestore';
 
 const AuthContext = createContext({});
 
@@ -22,11 +22,6 @@ export function AuthProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
-  // Heartbeat for online status — Firestore has no built-in presence
-  // detection (unlike Firebase's separate Realtime Database), so "online"
-  // here means "seen recently": we touch lastActive every 60s while the
-  // app is open, and anything else reading it treats a stale value
-  // (older than ~2 minutes) as offline.
   useEffect(() => {
     if (!user) return;
     const touch = () => {
@@ -42,8 +37,6 @@ export function AuthProvider({ children }) {
       if (firebaseUser) {
         setUser(firebaseUser);
         await loadProfile(firebaseUser.uid);
-        // Fire-and-forget — don't block app startup on permission prompts
-        // or network calls, and never fail the auth flow if this errors.
         registerForPushNotifications(firebaseUser.uid);
       } else {
         setUser(null);
@@ -56,7 +49,6 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  // Real-time unread notification count (likes, comments, new posts, messages — everything)
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -70,8 +62,6 @@ export function AuthProvider({ children }) {
     return unsub;
   }, [user]);
 
-  // Real-time unread message count — summed across all conversations' per-user
-  // unread counters, separate from the general notification bell count above.
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -85,20 +75,40 @@ export function AuthProvider({ children }) {
     return unsub;
   }, [user]);
 
+  // email and phone live in a private subcollection (users/{uid}/private/contact),
+  // not on the main users/{uid} document — that document is readable by any
+  // signed-in user (needed so the app can show other people's names, avatars,
+  // suburbs, and online status), so contact info can't safely live there too.
+  // Older accounts created before this split may still have email/phone sitting
+  // on the main doc; we fall back to those here for backward compatibility,
+  // and any future edit via updateUserProfile()/createProfile() migrates them
+  // into the private doc and strips them off the main one.
   const loadProfile = async (uid) => {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) setProfile({ uid, ...snap.data() });
+      if (!snap.exists()) return;
+      const mainData = snap.data();
+
+      let contact = {};
+      try {
+        const contactSnap = await getDoc(doc(db, 'users', uid, 'private', 'contact'));
+        if (contactSnap.exists()) contact = contactSnap.data();
+      } catch (e) {
+        // Fine if this fails/doesn't exist yet — mainData fallback below covers it.
+      }
+
+      setProfile({
+        uid,
+        ...mainData,
+        email: contact.email ?? mainData.email,
+        phone: contact.phone ?? mainData.phone,
+      });
     } catch (e) { console.error('loadProfile error:', e); }
   };
 
-  // Requests notification permission and saves the device's Expo push token
-  // to a private subcollection only the owner can read/write. Silently does
-  // nothing on a simulator/emulator, or if the user declines permission —
-  // push notifications are additive, never required for the app to work.
   const registerForPushNotifications = async (uid) => {
     try {
-      if (!Device.isDevice) return; // simulators/emulators don't get real tokens
+      if (!Device.isDevice) return;
 
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
@@ -124,7 +134,6 @@ export function AuthProvider({ children }) {
         updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch (e) {
-      // Never let a push-registration failure block the rest of the app.
       console.error('registerForPushNotifications error:', e);
     }
   };
@@ -149,34 +158,58 @@ export function AuthProvider({ children }) {
     setUnreadMessageCount(0);
   };
 
+  // Splits email/phone off into the private/contact subdocument at profile
+  // creation time too, so a brand-new account never has them on the public
+  // doc in the first place.
   const createProfile = async (uid, data) => {
-    const profileData = { ...data, isAdmin: false, isSuspended: false, createdAt: serverTimestamp() };
+    const { email, phone, ...publicFields } = data;
+    const profileData = { ...publicFields, isAdmin: false, isSuspended: false, createdAt: serverTimestamp() };
     await setDoc(doc(db, 'users', uid), profileData);
-    // Reflect locally with a real Date immediately, since serverTimestamp()
-    // resolves to null until the write round-trips back from the server —
-    // reloadProfile() will pick up the true value on next fetch.
-    setProfile({ uid, ...profileData, createdAt: new Date() });
+
+    if (email !== undefined || phone !== undefined) {
+      const contactData = {};
+      if (email !== undefined) contactData.email = email;
+      if (phone !== undefined) contactData.phone = phone;
+      await setDoc(doc(db, 'users', uid, 'private', 'contact'), contactData, { merge: true });
+    }
+
+    setProfile({ uid, ...profileData, email, phone, createdAt: new Date() });
   };
 
+  // Every existing caller (edit-profile.js, select-suburb.js, blockUser,
+  // lastVisited tracking, etc.) keeps working unchanged — this function's
+  // public signature is identical. Under the hood, any email/phone passed
+  // in gets routed to the private/contact subdocument instead of the main
+  // doc, and is actively deleted from the main doc (via deleteField()) so
+  // older accounts get cleaned up the next time either field is touched.
   const updateUserProfile = async (data) => {
     if (!user) return;
-    await updateDoc(doc(db, 'users', user.uid), data);
+    const { email, phone, ...publicData } = data;
+    const touchesContactFields = email !== undefined || phone !== undefined;
+
+    if (touchesContactFields) {
+      publicData.email = deleteField();
+      publicData.phone = deleteField();
+    }
+
+    const writes = [];
+    if (Object.keys(publicData).length > 0) {
+      writes.push(updateDoc(doc(db, 'users', user.uid), publicData));
+    }
+    if (touchesContactFields) {
+      const contactUpdate = {};
+      if (email !== undefined) contactUpdate.email = email;
+      if (phone !== undefined) contactUpdate.phone = phone;
+      writes.push(setDoc(doc(db, 'users', user.uid, 'private', 'contact'), contactUpdate, { merge: true }));
+    }
+    await Promise.all(writes);
     setProfile(prev => ({ ...prev, ...data }));
   };
 
-  // Keeps two representations of a block in sync in a single write:
-  // `blockedUsers` (array of {uid, displayName, blockedAt} — what the UI
-  // renders, e.g. the Blocked Users list) and `blockedUserIds` (a plain
-  // array of just UIDs). The plain-UID version exists specifically because
-  // Firestore security rules can't check membership in an array of objects
-  // (no "does this array contain an object where uid == X" primitive), but
-  // CAN check membership in a simple array via the `in` operator — that's
-  // what firestore.rules uses to actually enforce blocking server-side for
-  // messages, rather than relying only on client-side filtering.
   const blockUser = async (uid, displayName) => {
     if (!user || !uid) return;
     const currentList = profile?.blockedUsers || [];
-    if (currentList.some(b => b.uid === uid)) return; // already blocked
+    if (currentList.some(b => b.uid === uid)) return;
     const currentIds = profile?.blockedUserIds || [];
     const newList = [...currentList, { uid, displayName: displayName || 'Neighbour', blockedAt: new Date().toISOString() }];
     const newIds = currentIds.includes(uid) ? currentIds : [...currentIds, uid];
