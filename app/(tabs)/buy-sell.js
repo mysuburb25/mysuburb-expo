@@ -23,12 +23,11 @@ const TYPE_CONFIG = {
   seeking:  { label: 'Seeking',   bg: '#6A1B9A' },
 };
 
-// "Sold" only makes sense for For Sale listings — Free items get "taken",
-// and Wanted posts get "found" (the seeker found what they were after).
-function soldBadgeWord(marketplaceType) {
-  if (marketplaceType === 'seeking') return 'FOUND';
-  if (marketplaceType === 'giveaway') return 'TAKEN';
-  return 'SOLD';
+// Uses one generic "Closed" label across all three listing types (rather
+// than SOLD/TAKEN/FOUND) so the wording never collides with Lost & Found's
+// own status terms, which live in a completely different context.
+function soldBadgeWord() {
+  return 'Closed';
 }
 
 function formatDate(date) {
@@ -132,7 +131,7 @@ export default function BuySellScreen() {
         likeCount: increment(newLiked ? 1 : -1),
         likedBy: newLiked ? [...(post.likedBy || []), user.uid] : (post.likedBy || []).filter(u => u !== user.uid),
       });
-      if (newLiked) {
+      if (newLiked && post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
           message: `${profile.displayName} liked your listing`,
@@ -234,23 +233,21 @@ export default function BuySellScreen() {
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
-                      <Text style={styles.typeText}>{typeConf.label}</Text>
+                      <Text style={[styles.typeText, item.isSold && styles.closedText]}>{typeConf.label}</Text>
                     </View>
+                    {item.isSold && (
+                      <View style={styles.soldTag}>
+                        <Text style={styles.soldTagText}>{soldBadgeWord()}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                  {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                    {item.marketplaceType === 'forsale' && item.price > 0 && (
-                      <Text style={styles.price}>${item.price?.toFixed(2)}</Text>
-                    )}
-                    {item.isSold && (
-                      <View style={styles.soldTag}>
-                        <Text style={styles.soldTagText}>{soldBadgeWord(item.marketplaceType)}</Text>
-                      </View>
-                    )}
-                  </View>
+                  {item.description ? <Text style={[styles.cardDesc, item.isSold && styles.closedText]} numberOfLines={2}>{item.description}</Text> : null}
+                  {item.marketplaceType === 'forsale' && item.price > 0 && (
+                    <Text style={styles.price}>${item.price?.toFixed(2)}</Text>
+                  )}
                 </View>
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
@@ -352,13 +349,14 @@ const styles = StyleSheet.create({
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
   cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },
+  closedText: { textDecorationLine: 'line-through' },
   newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
   newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
   typeBadge: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   typeText: { fontSize: 13, fontWeight: '800', color: Colors.white },
   price: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },
-  soldTag: { backgroundColor: '#424242', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  soldTagText: { fontSize: 12, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
+  soldTag: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center', backgroundColor: '#757575' },
+  soldTagText: { fontSize: 13, fontWeight: '800', color: Colors.white },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
   metaText: { fontSize: 11, color: Colors.midGrey },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },

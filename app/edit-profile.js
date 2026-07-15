@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
 export default function EditProfileScreen() {
-  const { profile, updateUserProfile } = useAuth();
+  const { profile, updateUserProfile, user: authUser } = useAuth();
 
   const parseName = (fullName) => {
     const trimmed = (fullName || '').trim();
@@ -19,7 +19,16 @@ export default function EditProfileScreen() {
   };
   const originalName = parseName(profile?.displayName);
 
-  const isPhoneAccount = !!profile?.phone;
+  // isPhoneAccount is decided once, permanently, at signup (see
+  // select-suburb.js's createProfile call) — it must NOT be inferred from
+  // whether profile.phone merely exists, since an email-signup account can
+  // also add a phone number later as a plain contact field, which would
+  // otherwise get misread as "this is a phone-login account" and try to
+  // swap the real login email for a fake generated one. For accounts
+  // created before that permanent flag existed, we fall back to checking
+  // whether the real Firebase Auth login email matches the fake-email
+  // pattern phone signups always get (see signup.js's emailToUse logic).
+  const isPhoneAccount = profile?.isPhoneAccount ?? (authUser?.email || '').endsWith('@mysuburb.app');
 
   const [firstName, setFirstName] = useState(originalName.first);
   const [lastName, setLastName] = useState(originalName.last);

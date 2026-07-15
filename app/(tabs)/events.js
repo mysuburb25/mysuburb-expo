@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import NotificationBell from '../../components/NotificationBell';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -109,7 +110,26 @@ export default function EventsScreen() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
   const [addingCalendarId, setAddingCalendarId] = useState(null);
+  const [addedCalendarIds, setAddedCalendarIds] = useState(new Set());
   const scrollRef = useRef(null);
+
+  // "Added to calendar" is inherently a per-device fact (it lives in the
+  // phone's own calendar app, not our account data), so it's tracked in
+  // AsyncStorage rather than Firestore — checked once whenever the visible
+  // event list changes, so re-renders don't keep re-adding duplicates.
+  useEffect(() => {
+    if (events.length === 0) return;
+    (async () => {
+      try {
+        const keys = events.map(e => `calendarEvent:${e.id}`);
+        const pairs = await AsyncStorage.multiGet(keys);
+        const addedIds = pairs
+          .filter(([, value]) => value === 'true')
+          .map(([key]) => key.replace('calendarEvent:', ''));
+        setAddedCalendarIds(new Set(addedIds));
+      } catch (e) { console.error(e); }
+    })();
+  }, [events]);
 
   const fetchLocationSuggestions = async (text) => {
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
@@ -231,7 +251,7 @@ export default function EventsScreen() {
         likeCount: increment(newLiked ? 1 : -1),
         likedBy: newLiked ? [...(post.likedBy || []), user.uid] : (post.likedBy || []).filter(u => u !== user.uid),
       });
-      if (newLiked) {
+      if (newLiked && post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
           message: `${profile.displayName} liked your event`,
@@ -313,12 +333,18 @@ export default function EventsScreen() {
   // store a start time. Tracks which specific card is mid-add (by id) so
   // only that card's button shows a spinner, not every card at once.
   const handleAddToCalendar = async (item) => {
+    if (addedCalendarIds.has(item.id)) {
+      Alert.alert('Already Added', 'This event is already in your calendar.');
+      return;
+    }
     const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
     if (!ed || addingCalendarId) return;
     setAddingCalendarId(item.id);
     const result = await addEventToCalendar({ title: item.content, description: item.description, location: item.eventLocation, startDate: ed });
     setAddingCalendarId(null);
     if (result.success) {
+      await AsyncStorage.setItem(`calendarEvent:${item.id}`, 'true').catch(() => {});
+      setAddedCalendarIds(prev => new Set(prev).add(item.id));
       Alert.alert('Added to Calendar', 'This event has been added to your calendar.');
     } else {
       Alert.alert('Error', result.message);

@@ -16,6 +16,36 @@ service cloud.firestore {
              (field in resource.data && request.resource.data[field] == resource.data[field]);
     }
 
+    function isValidCountToggle(countField, arrayField) {
+      let beforeArr = resource.data.get(arrayField, []);
+      let afterArr = request.resource.data.get(arrayField, []);
+      let beforeCount = resource.data.get(countField, 0);
+      let afterCount = request.resource.data.get(countField, 0);
+      return
+        (afterCount == beforeCount + 1
+          && !(request.auth.uid in beforeArr)
+          && request.auth.uid in afterArr
+          && afterArr.size() == beforeArr.size() + 1)
+        ||
+        (afterCount == beforeCount - 1
+          && request.auth.uid in beforeArr
+          && !(request.auth.uid in afterArr)
+          && afterArr.size() == beforeArr.size() - 1);
+    }
+
+    function isValidArrayToggle(arrayField) {
+      let beforeArr = resource.data.get(arrayField, []);
+      let afterArr = request.resource.data.get(arrayField, []);
+      return
+        (!(request.auth.uid in beforeArr)
+          && request.auth.uid in afterArr
+          && afterArr.size() == beforeArr.size() + 1)
+        ||
+        (request.auth.uid in beforeArr
+          && !(request.auth.uid in afterArr)
+          && afterArr.size() == beforeArr.size() - 1);
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn();
 
@@ -50,23 +80,31 @@ service cloud.firestore {
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['likeCount', 'likedBy']))
+               .hasOnly(['likeCount', 'likedBy'])
+          && isValidCountToggle('likeCount', 'likedBy'))
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['commentCount']))
+               .hasOnly(['commentCount'])
+          && request.resource.data.commentCount == resource.data.commentCount + 1)
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['attendeeCount', 'attendees']))
+               .hasOnly(['attendeeCount', 'attendees'])
+          && isValidCountToggle('attendeeCount', 'attendees'))
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['savedBy']))
+               .hasOnly(['savedBy'])
+          && isValidArrayToggle('savedBy'))
         ||
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['isSold']));
+               .hasOnly(['isSold']))
+        ||
+        (request.auth.uid == resource.data.authorId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['isResolved']));
 
       allow delete: if false;
     }
@@ -86,7 +124,8 @@ service cloud.firestore {
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['likeCount', 'likedBy']));
+               .hasOnly(['likeCount', 'likedBy'])
+          && isValidCountToggle('likeCount', 'likedBy'));
 
       allow delete: if false;
     }
@@ -111,22 +150,11 @@ service cloud.firestore {
           return isSignedIn() && request.auth.uid in conversationId.split('_');
         }
 
-        // The other person in this 1:1 conversation — used to look up
-        // whether they've blocked the sender before allowing a message
-        // through. Safe to assume exactly two participants since
-        // conversations are always created with participants.size() == 2.
         function otherParticipant() {
           let parts = conversationId.split('_');
           return parts[0] == request.auth.uid ? parts[1] : parts[0];
         }
 
-        // Enforces blocking server-side: if the recipient has the sender
-        // in their blockedUserIds, the message write is rejected outright,
-        // rather than relying only on the client hiding the option. Uses
-        // .get(field, default) so this doesn't break for older user docs
-        // that predate this field existing. Costs one extra document read
-        // per message send — an acceptable tradeoff for actually enforcing
-        // the block rather than just hiding it in the UI.
         function recipientHasBlockedSender() {
           let recipientDoc = get(/databases/$(database)/documents/users/$(otherParticipant()));
           return request.auth.uid in recipientDoc.data.get('blockedUserIds', []);
@@ -148,9 +176,30 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
 
+      function isValidPostNotification() {
+        return request.resource.data.postId is string
+          && get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.authorId == request.resource.data.userId;
+      }
+
+      function isValidCommentNotification() {
+        return request.resource.data.commentId is string
+          && get(/databases/$(database)/documents/comments/$(request.resource.data.commentId)).data.authorId == request.resource.data.userId;
+      }
+
+      function isValidMessageNotification() {
+        return request.resource.data.conversationId is string
+          && request.resource.data.userId in request.resource.data.conversationId.split('_');
+      }
+
       allow create: if isSignedIn()
                     && request.resource.data.fromUserId == request.auth.uid
-                    && request.resource.data.isRead == false;
+                    && request.resource.data.isRead == false
+                    && request.resource.data.userId != request.auth.uid
+                    && (
+                         (request.resource.data.type in ['like', 'comment'] && isValidPostNotification())
+                         || (request.resource.data.type in ['comment_like', 'comment_reply'] && isValidCommentNotification())
+                         || (request.resource.data.type == 'message' && isValidMessageNotification())
+                       );
 
       allow update: if isSignedIn()
                     && request.auth.uid == resource.data.userId

@@ -27,6 +27,12 @@ function formatDate(date) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// One generic "Closed" label, matching Buy & Sell's own generic status
+// wording, rather than a separate Lost/Found-specific term.
+function resolvedBadgeWord() {
+  return 'Closed';
+}
+
 function formatTime(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
@@ -112,7 +118,7 @@ export default function LostFoundScreen() {
         likeCount: increment(newLiked ? 1 : -1),
         likedBy: newLiked ? [...(post.likedBy || []), user.uid] : (post.likedBy || []).filter(u => u !== user.uid),
       });
-      if (newLiked) {
+      if (newLiked && post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
           message: `${profile.displayName} liked your post`,
@@ -214,13 +220,18 @@ export default function LostFoundScreen() {
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
-                      <Text style={styles.typeText}>{isLost ? 'Lost' : 'Found'}</Text>
+                      <Text style={[styles.typeText, item.isResolved && styles.closedText]}>{isLost ? 'Lost' : 'Found'}</Text>
                     </View>
+                    {item.isResolved && (
+                      <View style={styles.soldTag}>
+                        <Text style={styles.soldTagText}>{resolvedBadgeWord()}</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                  {item.description ? <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text> : null}
+                  {item.description ? <Text style={[styles.cardDesc, item.isResolved && styles.closedText]} numberOfLines={2}>{item.description}</Text> : null}
                   {item.lostFoundLocation ? (
                     <TouchableOpacity
                       style={styles.locationRow}
@@ -337,8 +348,11 @@ const styles = StyleSheet.create({
   newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
   newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
   typeBadge: { width: 72, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
+  soldTag: { width: 72, paddingVertical: 5, borderRadius: 20, alignItems: 'center', backgroundColor: '#757575' },
+  soldTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   typeText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },
+  closedText: { textDecorationLine: 'line-through' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationText: { fontSize: 13, color: Colors.midGrey },
   locationLink: { color: Colors.brandGreen, textDecorationLine: 'underline', fontWeight: '600' },

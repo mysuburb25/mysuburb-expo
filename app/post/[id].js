@@ -8,6 +8,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 
 const REPORT_REASONS = [
@@ -71,6 +72,14 @@ const CATEGORY_LABELS = {
   events: 'Event', marketplace: 'Buy & Sell', services: 'Service',
 };
 
+// Post detail shows the SPECIFIC marketplace type (matching the Buy & Sell
+// tab card) rather than the generic "Buy & Sell" category label.
+const MARKETPLACE_TYPE_CONFIG = {
+  forsale:  { label: 'For Sale',  bg: Colors.brandGreen },
+  giveaway: { label: 'Give Away', bg: '#1565C0' },
+  seeking:  { label: 'Seeking',   bg: '#6A1B9A' },
+};
+
 const CATEGORY_ACCENT = {
   updates: Colors.brandGreen, notices: '#0D47A1', safety: '#E65100',
   events: '#6A1B9A', marketplace: Colors.brandGreen, lostfound: '#E65100', services: Colors.brandGreen,
@@ -82,14 +91,18 @@ const SERVICE_LABELS = {
   gardening: 'Gardening', petcare: 'Pet Care', childcare: 'Child & Aged Care', tutoring: 'Tutoring', others: 'Others',
 };
 
-// "Sold" only makes sense for For Sale listings — Free items get "taken",
-// and Wanted posts get "found" (the seeker found what they were after).
-// Same underlying isSold field and toggle action for all three, just
-// worded to match what actually happened.
-function getSoldLabels(post) {
-  if (post.isWanted) return { action: 'Mark as Found', undo: 'Mark as Still Needed', badge: 'FOUND' };
-  if (post.isFree) return { action: 'Mark as Taken', undo: 'Mark as Available', badge: 'TAKEN' };
-  return { action: 'Mark as Sold', undo: 'Mark as Available', badge: 'SOLD' };
+// One generic "Closed" status across Buy & Sell and Lost & Found, rather
+// than type-specific wording (SOLD/TAKEN/FOUND/RETURNED/etc.) — simpler,
+// and avoids any two categories ever landing on the same word for
+// different meanings. Marketplace uses the isSold field underneath;
+// Lost & Found uses a separate isResolved field — see firestore.rules.
+function getStatusLabels() {
+  return { action: 'Mark as Closed', undo: 'Reopen Post', badge: 'Closed' };
+}
+
+// True when a post has been closed, regardless of category/field name.
+function isPostClosed(post) {
+  return post.category === 'lostfound' ? !!post.isResolved : !!post.isSold;
 }
 
 export default function PostDetailScreen() {
@@ -116,10 +129,20 @@ export default function PostDetailScreen() {
   const [deletingPost, setDeletingPost] = useState(false);
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [addedToCalendar, setAddedToCalendar] = useState(false);
   const inputRef = useRef(null);
   const flatListRef = useRef(null);
 
   useEffect(() => { fetchPost(); fetchComments(); }, [id]);
+
+  // "Added to calendar" is a per-device fact (it lives in the phone's own
+  // calendar app, not our account data), so it's tracked in AsyncStorage
+  // rather than Firestore.
+  useEffect(() => {
+    AsyncStorage.getItem(`calendarEvent:${id}`)
+      .then(v => setAddedToCalendar(v === 'true'))
+      .catch(() => {});
+  }, [id]);
 
   const fetchPost = async () => {
     try {
@@ -156,7 +179,7 @@ export default function PostDetailScreen() {
           ? [...(post.likedBy || []), user.uid]
           : (post.likedBy || []).filter(uid => uid !== user.uid),
       });
-      if (newLiked) {
+      if (newLiked && post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
           message: `${profile.displayName} liked your post`,
@@ -246,7 +269,7 @@ export default function PostDetailScreen() {
         await addDoc(collection(db, 'notifications'), {
           userId: item.authorId, type: 'comment_like',
           message: `${profile.displayName} liked your comment`,
-          postId: id, fromUserId: user.uid, fromUserName: profile.displayName,
+          postId: id, commentId: item.id, fromUserId: user.uid, fromUserName: profile.displayName,
           isRead: false, createdAt: serverTimestamp(),
         });
       }
@@ -280,7 +303,7 @@ export default function PostDetailScreen() {
           await addDoc(collection(db, 'notifications'), {
             userId: parentComment.authorId, type: 'comment_reply',
             message: `${profile.displayName} replied to your comment`,
-            postId: id, fromUserId: user.uid, fromUserName: profile.displayName,
+            postId: id, commentId: parentComment.id, fromUserId: user.uid, fromUserName: profile.displayName,
             isRead: false, createdAt: serverTimestamp(),
           });
         }
@@ -304,15 +327,16 @@ export default function PostDetailScreen() {
     finally { setPosting(false); }
   };
 
-  const handleToggleSold = async () => {
+  const handleToggleStatus = async () => {
     setShowPostMenu(false);
-    const newSold = !post.isSold;
-    setPost(prev => ({ ...prev, isSold: newSold }));
+    const fieldName = post.category === 'lostfound' ? 'isResolved' : 'isSold';
+    const newValue = !post[fieldName];
+    setPost(prev => ({ ...prev, [fieldName]: newValue }));
     try {
-      await updateDoc(doc(db, 'posts', id), { isSold: newSold });
+      await updateDoc(doc(db, 'posts', id), { [fieldName]: newValue });
     } catch (e) {
       console.error(e);
-      setPost(prev => ({ ...prev, isSold: !newSold }));
+      setPost(prev => ({ ...prev, [fieldName]: !newValue }));
       setErrorModalMessage('Could not update. Please try again.');
     }
   };
@@ -417,11 +441,17 @@ export default function PostDetailScreen() {
   // Shared calendar helper defaults to a 1-hour duration since events only
   // store a start time, not an end time.
   const handleAddToCalendar = async () => {
+    if (addedToCalendar) {
+      Alert.alert('Already Added', 'This event is already in your calendar.');
+      return;
+    }
     if (!eventDate || addingToCalendar) return;
     setAddingToCalendar(true);
     const result = await addEventToCalendar({ title: post.content, description: post.description, location: post.eventLocation, startDate: eventDate });
     setAddingToCalendar(false);
     if (result.success) {
+      await AsyncStorage.setItem(`calendarEvent:${id}`, 'true').catch(() => {});
+      setAddedToCalendar(true);
       Alert.alert('Added to Calendar', 'This event has been added to your calendar.');
     } else {
       setErrorModalMessage(result.message);
@@ -540,16 +570,33 @@ export default function PostDetailScreen() {
                         <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.brandGreen} />
                       </TouchableOpacity>
                     )}
-                    {isLostFound && post.lostFoundType && (
-                      <View style={[styles.pillTag, { backgroundColor: post.lostFoundType === 'lost' ? '#C62828' : Colors.brandGreen }]}>
-                        <Text style={styles.pillTagText}>{post.lostFoundType === 'lost' ? 'Lost' : 'Found'}</Text>
-                      </View>
-                    )}
-                    {!isLostFound && !isEvent && categoryLabel && (
-                      <View style={styles.pillTag}>
-                        <Text style={styles.pillTagText}>{categoryLabel}</Text>
-                      </View>
-                    )}
+                    <View style={styles.headerBadgeStack}>
+                      {isLostFound && post.lostFoundType && (
+                        <View style={[styles.pillTag, { backgroundColor: post.lostFoundType === 'lost' ? '#C62828' : Colors.brandGreen }]}>
+                          <Text style={[styles.pillTagText, post.isResolved && styles.closedText]}>{post.lostFoundType === 'lost' ? 'Lost' : 'Found'}</Text>
+                        </View>
+                      )}
+                      {isLostFound && post.isResolved && (
+                        <View style={styles.soldTag}>
+                          <Text style={styles.soldTagText}>{getStatusLabels().badge}</Text>
+                        </View>
+                      )}
+                      {post.category === 'marketplace' && post.marketplaceType && (
+                        <View style={[styles.pillTag, { backgroundColor: MARKETPLACE_TYPE_CONFIG[post.marketplaceType]?.bg || Colors.brandGreen }]}>
+                          <Text style={[styles.pillTagText, post.isSold && styles.closedText]}>{MARKETPLACE_TYPE_CONFIG[post.marketplaceType]?.label || categoryLabel}</Text>
+                        </View>
+                      )}
+                      {post.category === 'marketplace' && post.isSold && (
+                        <View style={styles.soldTag}>
+                          <Text style={styles.soldTagText}>{getStatusLabels().badge}</Text>
+                        </View>
+                      )}
+                      {!isLostFound && !isEvent && post.category !== 'marketplace' && categoryLabel && (
+                        <View style={styles.pillTag}>
+                          <Text style={styles.pillTagText}>{categoryLabel}</Text>
+                        </View>
+                      )}
+                    </View>
                     {isEvent && eventDate && (
                       <TouchableOpacity style={styles.calendarBtn} onPress={handleAddToCalendar} disabled={addingToCalendar}>
                         {addingToCalendar ? (
@@ -646,7 +693,7 @@ export default function PostDetailScreen() {
                   )}
 
                   {!isEvent && post.description ? (
-                    <Text style={styles.description}>{post.description}</Text>
+                    <Text style={[styles.description, isPostClosed(post) && styles.closedText]}>{post.description}</Text>
                   ) : null}
                   {isLostFound && post.lostFoundLocation ? (
                     <TouchableOpacity style={styles.locationRow} onPress={handleGetDirections}>
@@ -660,7 +707,6 @@ export default function PostDetailScreen() {
                       {post.price > 0 && <Text style={styles.priceTag}>${post.price?.toFixed(2)}</Text>}
                       {post.isFree && <View style={styles.freeTag}><Text style={styles.freeTagText}>FREE</Text></View>}
                       {post.isWanted && <View style={styles.seekingTag}><Text style={styles.seekingTagText}>SEEKING</Text></View>}
-                      {post.isSold && <View style={styles.soldTag}><Text style={styles.soldTagText}>{getSoldLabels(post).badge}</Text></View>}
                     </View>
                   )}
 
@@ -831,12 +877,12 @@ export default function PostDetailScreen() {
             <View style={styles.menuPad}>
             {isOwner ? (
               <>
-                {post.category === 'marketplace' && (
-                  <TouchableOpacity style={styles.menuItem} onPress={handleToggleSold}>
+                {(post.category === 'marketplace' || post.category === 'lostfound') && (
+                  <TouchableOpacity style={styles.menuItem} onPress={handleToggleStatus}>
                     <View style={styles.menuItemIcon}>
-                      <Ionicons name={post.isSold ? 'refresh-outline' : 'checkmark-circle-outline'} size={20} color={Colors.brandGreen} />
+                      <Ionicons name={(post.category === 'lostfound' ? post.isResolved : post.isSold) ? 'refresh-outline' : 'checkmark-circle-outline'} size={20} color={Colors.brandGreen} />
                     </View>
-                    <Text style={styles.menuItemText}>{post.isSold ? getSoldLabels(post).undo : getSoldLabels(post).action}</Text>
+                    <Text style={styles.menuItemText}>{(post.category === 'lostfound' ? post.isResolved : post.isSold) ? getStatusLabels(post).undo : getStatusLabels(post).action}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.menuItem} onPress={handleDeletePost} disabled={deletingPost}>
@@ -1037,10 +1083,11 @@ const styles = StyleSheet.create({
   },
   postCardInner: { borderRadius: 16, overflow: 'hidden' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, paddingBottom: 8 },
+  headerBadgeStack: { alignItems: 'stretch', gap: 4 },
   authorRowEvent: { backgroundColor: '#EDF7EF', paddingBottom: 8, borderTopLeftRadius: 16, borderTopRightRadius: 16, alignItems: 'center' },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   dateTime: { fontSize: 12, color: Colors.midGrey, marginTop: 2, fontStyle: 'italic' },
-  pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   pillTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   messageBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
   messageBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
@@ -1049,14 +1096,15 @@ const styles = StyleSheet.create({
   serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginHorizontal: 16, marginBottom: 6 },
   serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },
+  closedText: { textDecorationLine: 'line-through' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   locationText: { fontSize: 14, color: Colors.charcoal },
   detailRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   priceTag: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen },
   freeTag: { backgroundColor: Colors.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   freeTagText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
-  soldTag: { backgroundColor: '#424242', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  soldTagText: { fontSize: 13, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
+  soldTag: { backgroundColor: '#757575', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
+  soldTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   seekingTag: { backgroundColor: '#E3F2FD', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   seekingTagText: { fontSize: 13, fontWeight: '700', color: '#0D47A1' },
   footer: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },

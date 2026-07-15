@@ -133,7 +133,7 @@ export default function ServicesScreen() {
         likeCount: increment(newLiked ? 1 : -1),
         likedBy: newLiked ? [...(post.likedBy || []), user.uid] : (post.likedBy || []).filter(u => u !== user.uid),
       });
-      if (newLiked) {
+      if (newLiked && post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
           message: `${profile.displayName} liked your service post`,

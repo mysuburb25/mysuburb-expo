@@ -31,7 +31,7 @@ const emptySlot = () => ({ state: '', suburb: '', active: true });
 const suburbKey = (state, suburb) => `${state}|${suburb}`;
 
 export default function SelectSuburbScreen() {
-  const { uid, email, displayName } = useLocalSearchParams();
+  const { uid, email, displayName, phone } = useLocalSearchParams();
   const { createProfile, updateUserProfile, user, profile } = useAuth();
   const isEditing = !!profile?.suburb;
 
@@ -139,10 +139,18 @@ export default function SelectSuburbScreen() {
         await updateUserProfile(data);
         router.back();
       } else {
+        // isPhoneAccount is recorded permanently, once, right here at
+        // signup — this is the only moment it's safe to infer account
+        // type from whether a phone number was provided. Later on, phone
+        // may also get added to an email account as a plain contact
+        // field (via Edit Profile), so profile.phone alone can never be
+        // used to infer signup method after this point — see edit-profile.js.
         await createProfile(uid || user?.uid, {
           email: email || user?.email,
           displayName: displayName || user?.displayName,
           photoURL: null,
+          isPhoneAccount: !!phone,
+          ...(phone ? { phone } : {}),
           ...data,
         });
         router.replace('/dashboard');
