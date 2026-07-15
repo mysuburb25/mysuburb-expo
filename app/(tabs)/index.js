@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Share, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Share, Alert, Modal, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -145,11 +145,33 @@ export default function HomeScreen() {
     router.push({ pathname: '/share-picker', params: { shareText: buildShareText(shareTarget), sharePostId: shareTarget.id } });
   };
 
-  const handleShareExternal = async () => {
+  // Native share sheet must wait for the custom Share modal to be FULLY
+  // gone before presenting — not just "probably gone after a guessed
+  // delay". iOS's Modal fires onDismiss at exactly that moment, so the
+  // share sheet call is deferred there instead of a fixed setTimeout,
+  // which was causing it to appear on top of the modal's still-fading
+  // overlay (a washed-out look) or fail to appear at all. Android's Modal
+  // doesn't support onDismiss, so it keeps a short fallback delay.
+  const pendingExternalShareRef = useRef(false);
+
+  const handleShareExternal = () => {
+    pendingExternalShareRef.current = true;
     setShowShareModal(false);
-    try {
-      await Share.share({ message: buildShareText(shareTarget) });
-    } catch (e) { console.error(e); }
+    if (Platform.OS !== 'ios') {
+      setTimeout(() => {
+        if (pendingExternalShareRef.current) {
+          pendingExternalShareRef.current = false;
+          Share.share({ message: buildShareText(shareTarget) }).catch(e => console.error(e));
+        }
+      }, 400);
+    }
+  };
+
+  const handleShareModalDismiss = () => {
+    if (Platform.OS === 'ios' && pendingExternalShareRef.current) {
+      pendingExternalShareRef.current = false;
+      Share.share({ message: buildShareText(shareTarget) }).catch(e => console.error(e));
+    }
   };
 
   return (
@@ -214,7 +236,7 @@ export default function HomeScreen() {
         />
       )}
 
-      <Modal visible={showShareModal} transparent animationType="slide">
+      <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>

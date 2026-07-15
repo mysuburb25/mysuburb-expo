@@ -158,11 +158,17 @@ export default function LostFoundScreen() {
     router.push({ pathname: '/share-picker', params: { shareText: buildShareText(shareTarget), sharePostId: shareTarget.id } });
   };
 
-  const handleShareExternal = async () => {
+  const handleShareExternal = () => {
     setShowShareModal(false);
-    try {
-      await Share.share({ message: buildShareText(shareTarget) });
-    } catch (e) { console.error(e); }
+    // iOS needs a beat after the custom modal finishes its close animation
+    // before it can present the native share sheet on top — calling
+    // Share.share() immediately (same tick as the modal closing) causes it
+    // to silently fail to appear at all.
+    setTimeout(async () => {
+      try {
+        await Share.share({ message: buildShareText(shareTarget) });
+      } catch (e) { console.error(e); }
+    }, 400);
   };
 
   return (
