@@ -55,15 +55,6 @@ export default function SettingsScreen() {
         <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', 'Version 1.0.0 - Built for Australian communities.')} />
       </View>
 
-      {profile?.isAdmin && (
-        <>
-          <Text style={styles.sectionLabel}>Admin</Text>
-          <View style={styles.section}>
-            <MenuItem icon="shield-checkmark-outline" label="Moderation" onPress={() => router.push('/moderation')} />
-          </View>
-        </>
-      )}
-
       <Text style={styles.sectionLabel}>Account Actions</Text>
       <View style={styles.section}>
         <MenuItem icon="log-out-outline" label="Sign Out" onPress={handleLogout} danger />

@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -17,11 +17,14 @@ const FILTERS = [
   { key: 'seeking', label: 'Seeking' },
 ];
 
+const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
+
 const SORT_OPTIONS = [
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },
   { key: 'price_low', label: 'Price: Low to High' },
   { key: 'price_high', label: 'Price: High to Low' },
+  { key: 'closed', label: 'Closed' },
 ];
 
 const TYPE_CONFIG = {
@@ -67,23 +70,41 @@ export default function BuySellScreen() {
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
   const [sortBy, setSortBy] = useState('newest');
   const [showSortModal, setShowSortModal] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorsRef = useRef({});
+  const exhaustedRef = useRef({});
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  const fetchListings = useCallback(async () => {
+  const fetchListings = useCallback(async (isLoadMore = false) => {
     const currentProfile = profileRef.current;
-    if (!currentProfile?.suburb) return;
+    if (!currentProfile?.suburb) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
       const activeSuburbs = currentProfile?.suburbs
         ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
         : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
-      if (activeSuburbs.length === 0) return;
+      if (activeSuburbs.length === 0) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
 
-      // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
-      // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
-      const queryPromises = activeSuburbs.map(({ suburb, state }) => {
+      if (!isLoadMore) {
+        cursorsRef.current = {};
+        exhaustedRef.current = {};
+      }
+      const suburbsToQuery = activeSuburbs.filter(({ suburb, state }) => !exhaustedRef.current[`${suburb}|${state}`]);
+      if (isLoadMore && suburbsToQuery.length === 0) {
+        setHasMore(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      // Run one query per active (non-exhausted) suburb, in parallel, always
+      // scoped by BOTH suburb and state (suburb names repeat across
+      // Australian states, so suburb alone isn't a safe filter). Each
+      // continues from its own cursor if one exists.
+      const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
+        const key = `${suburb}|${state}`;
         const filters = [
           where('suburb', '==', suburb),
           where('state', '==', state),
@@ -93,24 +114,46 @@ export default function BuySellScreen() {
           filters.push(where('marketplaceType', '==', activeFilter.key));
         }
         filters.push(where('isRemoved', '==', false));
-        const q = query(collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc'));
-        return getDocs(q);
+        const constraints = [collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc')];
+        const cursor = cursorsRef.current[key];
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(PAGE_SIZE));
+        return getDocs(query(...constraints)).then(snap => ({ key, snap }));
       });
 
-      const snaps = await Promise.all(queryPromises);
-      let allListings = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const results = await Promise.all(queryPromises);
 
-      // Sort merged results by date since each suburb's listings arrive independently
-      allListings.sort((a, b) => {
-        const aTime = a.createdAt?.toDate?.() || new Date(0);
-        const bTime = b.createdAt?.toDate?.() || new Date(0);
-        return bTime - aTime;
-      });
+      let anyMore = false;
+      const newDocs = [];
+      for (const { key, snap } of results) {
+        if (snap.docs.length > 0) cursorsRef.current[key] = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < PAGE_SIZE) exhaustedRef.current[key] = true;
+        else anyMore = true;
+        newDocs.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
       const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
-      setListings(blockedIds.length ? allListings.filter(l => !blockedIds.includes(l.authorId)) : allListings);
+      const filteredNew = blockedIds.length ? newDocs.filter(l => !blockedIds.includes(l.authorId)) : newDocs;
+
+      setListings(prev => {
+        const combined = isLoadMore ? [...prev, ...filteredNew] : filteredNew;
+        combined.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime - aTime;
+        });
+        return combined;
+      });
+      setHasMore(anyMore);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); setRefreshing(false); }
+    finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
   }, [activeFilter]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    fetchListings(true);
+  };
 
   // Refetch when the filter tab changes — previously nothing triggered
   // this at all, since fetchListings was only ever called from the focus
@@ -219,13 +262,23 @@ export default function BuySellScreen() {
   const searchedListings = q
     ? listings.filter(l => l.content?.toLowerCase().includes(q) || l.description?.toLowerCase().includes(q))
     : listings;
-  const sortedListings = [...searchedListings].sort((a, b) => {
-    if (sortBy === 'price_low') return (a.price || 0) - (b.price || 0);
-    if (sortBy === 'price_high') return (b.price || 0) - (a.price || 0);
-    const aTime = a.createdAt?.toDate?.() || new Date(0);
-    const bTime = b.createdAt?.toDate?.() || new Date(0);
-    return sortBy === 'oldest' ? aTime - bTime : bTime - aTime;
-  });
+  // "Closed" behaves differently from the other four — instead of just
+  // reordering the full list, it filters down to only closed listings
+  // (sorted newest-first within that set), since there's no meaningful
+  // "sort order" interpretation of the word otherwise.
+  const sortedListings = sortBy === 'closed'
+    ? searchedListings.filter(l => l.isSold).sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(0);
+        const bTime = b.createdAt?.toDate?.() || new Date(0);
+        return bTime - aTime;
+      })
+    : [...searchedListings].sort((a, b) => {
+        if (sortBy === 'price_low') return (a.price || 0) - (b.price || 0);
+        if (sortBy === 'price_high') return (b.price || 0) - (a.price || 0);
+        const aTime = a.createdAt?.toDate?.() || new Date(0);
+        const bTime = b.createdAt?.toDate?.() || new Date(0);
+        return sortBy === 'oldest' ? aTime - bTime : bTime - aTime;
+      });
 
   return (
     <View style={styles.container}>
@@ -353,6 +406,13 @@ export default function BuySellScreen() {
               <Text style={styles.emptyText}>No listings yet</Text>
             </View>
           }
+          ListFooterComponent={
+            hasMore && sortedListings.length > 0 ? (
+              <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+              </TouchableOpacity>
+            ) : null
+          }
         />
       )}
 
@@ -452,7 +512,7 @@ const styles = StyleSheet.create({
   filterOptionTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: {
-    borderRadius: 14, borderWidth: 1, borderColor: '#D5D5D5', overflow: 'hidden', backgroundColor: Colors.white,
+    borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen, overflow: 'hidden', backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EDF7EF', padding: 14 },
@@ -476,6 +536,8 @@ const styles = StyleSheet.create({
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  loadMoreBtn: { marginTop: 4, marginBottom: 12, alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: Colors.brandGreenPale, borderWidth: 1.5, borderColor: Colors.brandGreen },
+  loadMoreBtnText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   emptyText: { fontSize: 15, color: Colors.midGrey },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },

@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Act
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, limit, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -14,6 +14,8 @@ const FILTERS = [
   { key: 'notices', label: 'Notices', createCategory: 'community', preselect: 'notices' },
   { key: 'safety', label: 'Safety Alerts', createCategory: 'community', preselect: 'safety' },
 ];
+
+const PAGE_SIZE = 15; // used for both the initial load and every subsequent Load More tap
 
 export default function HomeScreen() {
   const { profile, user, unreadCount, updateUserProfile } = useAuth();
@@ -26,6 +28,15 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState(FILTERS[0]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Per-suburb Firestore cursors and exhaustion flags — since this screen
+  // runs one query PER active suburb (in parallel) and merges the results,
+  // each suburb needs its own independent "where did we leave off" cursor.
+  // Kept in refs, not state, since updating them should never itself
+  // trigger a re-render.
+  const cursorsRef = useRef({});
+  const exhaustedRef = useRef({});
 
   // Still used for lastVisited tracking in the focus-effect cleanup below,
   // where we deliberately want the latest value without retriggering effects.
@@ -36,46 +47,97 @@ export default function HomeScreen() {
   // a ref) — this is what makes it automatically re-run the moment `profile`
   // finishes loading after login, and guarantees setLoading(false) always
   // fires even on an early return, so the spinner can never get stuck.
-  const fetchPosts = useCallback(async () => {
-    if (!profile?.suburb) { setLoading(false); setRefreshing(false); return; }
+  // isLoadMore=false (the default) always starts a fresh first page — used
+  // for the initial load, filter changes, and pull-to-refresh. isLoadMore=true
+  // fetches the NEXT batch per suburb using each suburb's own cursor, and
+  // appends rather than replaces — this is what actually keeps costs
+  // proportional to how much a person scrolls, instead of re-reading
+  // already-seen posts every time.
+  const fetchPosts = useCallback(async (isLoadMore = false) => {
+    if (!profile?.suburb) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
       const activeSuburbs = profile?.suburbs
         ? profile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
         : [{ suburb: profile.suburb, state: profile.state }];
-      if (activeSuburbs.length === 0) { setLoading(false); setRefreshing(false); return; }
+      if (activeSuburbs.length === 0) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
 
       const categoryFilter = activeFilter.key === 'all' ? 'updates' : activeFilter.key;
+      const batchSize = PAGE_SIZE;
 
-      // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
-      // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
-      const queryPromises = activeSuburbs.map(({ suburb, state }) => {
-        const q = query(
+      if (!isLoadMore) {
+        cursorsRef.current = {};
+        exhaustedRef.current = {};
+      }
+
+      // Skip suburbs already known to be exhausted, so we don't spend a
+      // read confirming what we already know.
+      const suburbsToQuery = activeSuburbs.filter(({ suburb, state }) => !exhaustedRef.current[`${suburb}|${state}`]);
+      if (isLoadMore && suburbsToQuery.length === 0) {
+        setHasMore(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      // Run one query per active (non-exhausted) suburb, in parallel, always
+      // scoped by BOTH suburb and state (suburb names repeat across
+      // Australian states, so suburb alone isn't a safe filter). Each
+      // continues from its own cursor if one exists.
+      const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
+        const key = `${suburb}|${state}`;
+        const constraints = [
           collection(db, 'posts'),
           where('suburb', '==', suburb),
           where('state', '==', state),
           where('category', '==', categoryFilter),
           where('isRemoved', '==', false),
           orderBy('createdAt', 'desc'),
-          limit(20)
-        );
-        return getDocs(q);
+        ];
+        const cursor = cursorsRef.current[key];
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(batchSize));
+        return getDocs(query(...constraints)).then(snap => ({ key, snap }));
       });
 
-      const snaps = await Promise.all(queryPromises);
-      let allPosts = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const results = await Promise.all(queryPromises);
 
-      // Sort merged results by date since each suburb's posts arrive independently
-      allPosts.sort((a, b) => {
-        const aTime = a.createdAt?.toDate?.() || new Date(0);
-        const bTime = b.createdAt?.toDate?.() || new Date(0);
-        return bTime - aTime;
-      });
+      let anyMore = false;
+      const newDocs = [];
+      for (const { key, snap } of results) {
+        if (snap.docs.length > 0) {
+          cursorsRef.current[key] = snap.docs[snap.docs.length - 1];
+        }
+        if (snap.docs.length < batchSize) {
+          exhaustedRef.current[key] = true;
+        } else {
+          anyMore = true; // returned a full page — this suburb may have more
+        }
+        newDocs.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
       const blockedIds = profile?.blockedUsers?.map(b => b.uid) || [];
-      setPosts(blockedIds.length ? allPosts.filter(p => !blockedIds.includes(p.authorId)) : allPosts);
+      const filteredNew = blockedIds.length ? newDocs.filter(p => !blockedIds.includes(p.authorId)) : newDocs;
+
+      setPosts(prev => {
+        const combined = isLoadMore ? [...prev, ...filteredNew] : filteredNew;
+        // Sort the combined set since each suburb's posts arrive independently
+        combined.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime - aTime;
+        });
+        return combined;
+      });
+      setHasMore(anyMore);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); setRefreshing(false); }
+    finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
   }, [activeFilter, profile?.suburb, profile?.state, profile?.suburbs, profile?.blockedUsers]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    fetchPosts(true);
+  };
 
   // Refetch whenever the filter tab changes OR profile finishes loading —
   // fetchPosts's identity now changes in both cases, so this effect covers
@@ -261,6 +323,13 @@ export default function HomeScreen() {
               <Text style={styles.emptyText}>Be the first to post in {profile?.suburb}!</Text>
             </View>
           }
+          ListFooterComponent={
+            hasMore && posts.length > 0 ? (
+              <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+              </TouchableOpacity>
+            ) : null
+          }
         />
       )}
 
@@ -329,6 +398,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, color: Colors.charcoal },
   list: { padding: 12, gap: 12, paddingBottom: 100 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  loadMoreBtn: { marginTop: 4, marginBottom: 12, alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: Colors.brandGreenPale, borderWidth: 1.5, borderColor: Colors.brandGreen },
+  loadMoreBtnText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.charcoal },
   emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },

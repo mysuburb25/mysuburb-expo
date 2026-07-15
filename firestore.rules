@@ -11,11 +11,30 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Hoisted here (rather than declared only inside /reports/) since the
+    // admin dashboard needs it in /posts/ and /users/ too, to let an admin
+    // remove someone else's post or suspend someone else's account —
+    // actions that are otherwise correctly restricted to the resource's own
+    // owner everywhere else in these rules.
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
     function unchangedField(field) {
       return !(field in request.resource.data) ||
              (field in resource.data && request.resource.data[field] == resource.data[field]);
     }
 
+    // Validates a self-toggle on a count + membership-array pair (e.g.
+    // likeCount/likedBy, attendeeCount/attendees) — confirms the count
+    // moved by exactly 1 in the matching direction, and that only the
+    // caller's own uid was added or removed, never anyone else's and
+    // never by more than one at a time. Uses .get(field, default) since
+    // older/other posts may not have these fields initialized at all
+    // (the client already treats a missing field as an empty array/0 via
+    // `post.likedBy || []` etc. — the rule needs the same fallback or it
+    // errors out entirely on any document missing the field).
     function isValidCountToggle(countField, arrayField) {
       let beforeArr = resource.data.get(arrayField, []);
       let afterArr = request.resource.data.get(arrayField, []);
@@ -33,6 +52,8 @@ service cloud.firestore {
           && afterArr.size() == beforeArr.size() - 1);
     }
 
+    // Same idea for a plain membership array with no separate counter
+    // (savedBy) — self-toggle only, one entry at a time.
     function isValidArrayToggle(arrayField) {
       let beforeArr = resource.data.get(arrayField, []);
       let afterArr = request.resource.data.get(arrayField, []);
@@ -53,9 +74,16 @@ service cloud.firestore {
                     && request.resource.data.isAdmin == false
                     && request.resource.data.isSuspended == false;
 
-      allow update: if isSelf(uid)
-                    && unchangedField('isAdmin')
-                    && unchangedField('isSuspended');
+      allow update: if
+        (isSelf(uid)
+          && unchangedField('isAdmin')
+          && unchangedField('isSuspended'))
+        ||
+        // Admin can suspend/unsuspend ANY user — but ONLY that one field,
+        // never anything else on someone else's account (can't touch their
+        // name, photo, isAdmin, etc. through this path).
+        (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isSuspended']));
 
       allow delete: if isSelf(uid);
 
@@ -104,7 +132,13 @@ service cloud.firestore {
         ||
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['isResolved']));
+               .hasOnly(['isResolved']))
+        ||
+        // Admin can remove ANY post (e.g. from the moderation dashboard,
+        // acting on a report) — but ONLY the isRemoved field, same
+        // single-field restriction pattern used for isSuspended above.
+        (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRemoved']));
 
       allow delete: if false;
     }
@@ -191,6 +225,22 @@ service cloud.firestore {
           && request.resource.data.userId in request.resource.data.conversationId.split('_');
       }
 
+      function isValidNewPostNotification() {
+        let post = get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data;
+        let recipient = get(/databases/$(database)/documents/users/$(request.resource.data.userId)).data;
+        let suburbKey = post.state + '|' + post.suburb;
+        return request.resource.data.postId is string
+          && post.authorId == request.resource.data.fromUserId
+          && suburbKey in recipient.get('activeSuburbKeys', []);
+      }
+
+      // Admin warnings sent from the moderation dashboard — any admin can
+      // warn any user, no post/comment reference needed since this isn't
+      // tied to a specific piece of content the way like/comment are.
+      function isValidWarningNotification() {
+        return isAdmin();
+      }
+
       allow create: if isSignedIn()
                     && request.resource.data.fromUserId == request.auth.uid
                     && request.resource.data.isRead == false
@@ -199,6 +249,8 @@ service cloud.firestore {
                          (request.resource.data.type in ['like', 'comment'] && isValidPostNotification())
                          || (request.resource.data.type in ['comment_like', 'comment_reply'] && isValidCommentNotification())
                          || (request.resource.data.type == 'message' && isValidMessageNotification())
+                         || (request.resource.data.type == 'new_post' && isValidNewPostNotification())
+                         || (request.resource.data.type == 'admin_warning' && isValidWarningNotification())
                        );
 
       allow update: if isSignedIn()
@@ -209,11 +261,6 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      function isAdmin() {
-        return isSignedIn() &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-      }
-
       allow read: if isAdmin();
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isAdmin()

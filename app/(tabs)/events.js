@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -91,6 +91,8 @@ const DATE_FILTERS = [
   { key: 'weekend', label: 'This Weekend' },
 ];
 
+const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
+
 export default function EventsScreen() {
   const { profile, user, updateUserProfile } = useAuth();
   const [newCutoff, setNewCutoff] = useState(null);
@@ -121,6 +123,10 @@ export default function EventsScreen() {
   const [shareTarget, setShareTarget] = useState(null);
   const [addingCalendarId, setAddingCalendarId] = useState(null);
   const [addedCalendarIds, setAddedCalendarIds] = useState(new Set());
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorsRef = useRef({});
+  const exhaustedRef = useRef({});
   const scrollRef = useRef(null);
 
   // "Added to calendar" is inherently a per-device fact (it lives in the
@@ -195,44 +201,83 @@ export default function EventsScreen() {
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (isLoadMore = false) => {
     const currentProfile = profileRef.current;
-    if (!currentProfile?.suburb) return;
+    if (!currentProfile?.suburb) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
     try {
       // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
       const activeSuburbs = currentProfile?.suburbs
         ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
         : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
-      if (activeSuburbs.length === 0) return;
+      if (activeSuburbs.length === 0) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
 
-      // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
-      // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
-      const queryPromises = activeSuburbs.map(({ suburb, state }) => {
-        const q = query(
+      if (!isLoadMore) {
+        cursorsRef.current = {};
+        exhaustedRef.current = {};
+      }
+      const suburbsToQuery = activeSuburbs.filter(({ suburb, state }) => !exhaustedRef.current[`${suburb}|${state}`]);
+      if (isLoadMore && suburbsToQuery.length === 0) {
+        setHasMore(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      // Run one query per active (non-exhausted) suburb, in parallel, always
+      // scoped by BOTH suburb and state (suburb names repeat across
+      // Australian states, so suburb alone isn't a safe filter). Each
+      // continues from its own cursor if one exists. Note: this paginates
+      // by createdAt (post creation order), same as before pagination
+      // existed — the Upcoming/Past/date-filter/search splitting still
+      // happens client-side on whatever's been loaded so far.
+      const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
+        const key = `${suburb}|${state}`;
+        const constraints = [
           collection(db, 'posts'),
           where('suburb', '==', suburb),
           where('state', '==', state),
           where('category', '==', 'events'),
           where('isRemoved', '==', false),
-          orderBy('createdAt', 'desc')
-        );
-        return getDocs(q);
+          orderBy('createdAt', 'desc'),
+        ];
+        const cursor = cursorsRef.current[key];
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(PAGE_SIZE));
+        return getDocs(query(...constraints)).then(snap => ({ key, snap }));
       });
 
-      const snaps = await Promise.all(queryPromises);
-      let allEvents = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const results = await Promise.all(queryPromises);
 
-      // Sort merged results by date since each suburb's events arrive independently
-      allEvents.sort((a, b) => {
-        const aTime = a.createdAt?.toDate?.() || new Date(0);
-        const bTime = b.createdAt?.toDate?.() || new Date(0);
-        return bTime - aTime;
-      });
+      let anyMore = false;
+      const newDocs = [];
+      for (const { key, snap } of results) {
+        if (snap.docs.length > 0) cursorsRef.current[key] = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < PAGE_SIZE) exhaustedRef.current[key] = true;
+        else anyMore = true;
+        newDocs.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
       const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
-      setEvents(blockedIds.length ? allEvents.filter(e => !blockedIds.includes(e.authorId)) : allEvents);
+      const filteredNew = blockedIds.length ? newDocs.filter(e => !blockedIds.includes(e.authorId)) : newDocs;
+
+      setEvents(prev => {
+        const combined = isLoadMore ? [...prev, ...filteredNew] : filteredNew;
+        combined.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime - aTime;
+        });
+        return combined;
+      });
+      setHasMore(anyMore);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); setRefreshing(false); }
+    finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
   }, []);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    fetchEvents(true);
+  };
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
@@ -726,6 +771,13 @@ export default function EventsScreen() {
               <Text style={styles.emptyText}>{tab === 'upcoming' ? 'No upcoming events' : 'No past events'}</Text>
             </View>
           }
+          ListFooterComponent={
+            hasMore && events.length > 0 ? (
+              <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+              </TouchableOpacity>
+            ) : null
+          }
         />
       )}
 
@@ -801,9 +853,15 @@ export default function EventsScreen() {
             </TouchableOpacity>
             <View style={styles.headerCenter}>
               <Text style={styles.mySuburb}>My Suburb</Text>
-              <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+              <Text style={styles.suburbName}>Bringing suburbs together</Text>
             </View>
             <View style={{ width: 60 }} />
+          </View>
+          <View style={styles.pageHeader}>
+            <View style={styles.pageHeaderIconBadge}>
+              <Ionicons name="calendar" size={22} color={Colors.brandGreen} />
+            </View>
+            <Text style={styles.pageTitle}>New Event</Text>
           </View>
           <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Event Title</Text></View>
@@ -940,7 +998,7 @@ const styles = StyleSheet.create({
   list: { padding: 16, gap: 20, paddingBottom: 100 },
   card: {
     backgroundColor: Colors.white, borderRadius: 18,
-    borderWidth: 1, borderColor: '#D5D5D5',
+    borderWidth: 1.5, borderColor: Colors.brandGreen,
     borderLeftWidth: 4, borderLeftColor: '#6A1B9A',
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
   },
@@ -992,6 +1050,8 @@ const styles = StyleSheet.create({
   priceToggleText: { fontSize: 14, fontWeight: '700', color: Colors.midGrey },
   priceToggleTextActive: { color: Colors.white },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  loadMoreBtn: { marginTop: 4, marginBottom: 12, alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: Colors.brandGreenPale, borderWidth: 1.5, borderColor: Colors.brandGreen },
+  loadMoreBtnText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   emptyText: { fontSize: 15, color: Colors.midGrey },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },

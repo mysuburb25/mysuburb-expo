@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { Alert } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
@@ -15,13 +16,28 @@ function TabIcon({ name, focused }) {
 }
 
 export default function TabLayout() {
-  const { user, loading, unreadCount } = useAuth();
+  const { user, profile, loading, unreadCount, logout } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) router.replace('/(auth)/login');
   }, [user, loading]);
 
+  // Suspension takes effect the moment the app next checks the profile —
+  // an admin setting isSuspended: true doesn't forcibly disconnect an
+  // already-open session, but the next screen focus / app reopen catches
+  // it here and signs them out before any tab content renders.
+  useEffect(() => {
+    if (!loading && user && profile?.isSuspended) {
+      Alert.alert(
+        'Account Suspended',
+        'Your account has been suspended. Contact support if you believe this is a mistake.',
+        [{ text: 'OK', onPress: async () => { await logout(); router.replace('/(auth)/login'); } }]
+      );
+    }
+  }, [loading, user, profile?.isSuspended]);
+
   if (loading || !user) return null;
+  if (profile?.isSuspended) return null;
 
   return (
     <Tabs

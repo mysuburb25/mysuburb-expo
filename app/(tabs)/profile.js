@@ -38,7 +38,7 @@ function formatTime(date) {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, logout, updateUserProfile, unreadMessageCount } = useAuth();
+  const { user, profile, logout, updateUserProfile, unreadMessageCount, reloadProfile } = useAuth();
   const [posts, setPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,9 +84,15 @@ export default function ProfileScreen() {
     fetchSavedPosts();
   }, [fetchMyPosts, fetchSavedPosts]));
 
+  // Pulling to refresh now also re-fetches the profile itself (not just
+  // posts) — otherwise a change made elsewhere (e.g. an admin toggling
+  // isAdmin/isSuspended directly in Firestore, or another device updating
+  // your profile) would never show up here without a full sign-out/in,
+  // since AuthContext only loads the profile once at login rather than
+  // keeping a live listener on it.
   const handleRefresh = () => {
     setRefreshing(true);
-    Promise.all([fetchMyPosts(), fetchSavedPosts()]).finally(() => setRefreshing(false));
+    Promise.all([fetchMyPosts(), fetchSavedPosts(), reloadProfile()]).finally(() => setRefreshing(false));
   };
 
   const handlePickPhoto = async () => {
@@ -295,6 +301,19 @@ export default function ProfileScreen() {
         />
       </View>
 
+      {/* Only ever visible to accounts with isAdmin: true on their Firestore
+          user doc — a field no user can set on themselves, by design (see
+          firestore.rules). Regular users never see this row at all. */}
+      {profile?.isAdmin && (
+        <TouchableOpacity style={styles.adminRow} onPress={() => router.push('/admin-dashboard')}>
+          <View style={styles.dashboardRowLeft}>
+            <Ionicons name="shield-checkmark-outline" size={20} color="#1B4F72" />
+            <Text style={styles.adminRowLabel}>Admin Dashboard</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#1B4F72" />
+        </TouchableOpacity>
+      )}
+
       {/* 3-way tab bar — only the selected tab's content shows below */}
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'suburbs' && styles.tabBtnActive]} onPress={() => setActiveTab('suburbs')}>
@@ -443,6 +462,8 @@ const styles = StyleSheet.create({
   dashboardRowLabel: { fontSize: 17, fontWeight: '600', color: Colors.charcoal },
   dashboardViewBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: Colors.brandGreenPale, borderWidth: 1, borderColor: Colors.brandGreen },
   dashboardViewBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
+  adminRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#C2D9E8', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  adminRowLabel: { fontSize: 17, fontWeight: '700', color: '#1B4F72' },
   tabRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },

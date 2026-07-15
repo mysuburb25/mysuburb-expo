@@ -3,17 +3,19 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import NotificationBell from '../../components/NotificationBell';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 
+const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
+
 const TABS = [
   { key: 'all',      label: 'All' },
-  { key: 'offering', label: 'Offering' },
-  { key: 'looking',  label: 'Looking For' },
+  { key: 'offering', label: 'I  Offer' },
+  { key: 'looking',  label: 'I  Need' },
 ];
 
 const SERVICE_LABELS = {
@@ -62,23 +64,41 @@ export default function ServicesScreen() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorsRef = useRef({});
+  const exhaustedRef = useRef({});
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  const fetchPosts = useCallback(async () => {
+  const fetchPosts = useCallback(async (isLoadMore = false) => {
     const currentProfile = profileRef.current;
-    if (!currentProfile?.suburb) { setLoading(false); return; }
+    if (!currentProfile?.suburb) { setLoading(false); setLoadingMore(false); return; }
     // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
     const activeSuburbs = currentProfile?.suburbs
       ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
       : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
-    if (activeSuburbs.length === 0) { setLoading(false); return; }
-    setLoading(true);
+    if (activeSuburbs.length === 0) { setLoading(false); setLoadingMore(false); return; }
+    if (!isLoadMore) setLoading(true);
     try {
-      // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
-      // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
-      const queryPromises = activeSuburbs.map(({ suburb, state }) => {
+      if (!isLoadMore) {
+        cursorsRef.current = {};
+        exhaustedRef.current = {};
+      }
+      const suburbsToQuery = activeSuburbs.filter(({ suburb, state }) => !exhaustedRef.current[`${suburb}|${state}`]);
+      if (isLoadMore && suburbsToQuery.length === 0) {
+        setHasMore(false);
+        setLoadingMore(false);
+        return;
+      }
+
+      // Run one query per active (non-exhausted) suburb, in parallel, always
+      // scoped by BOTH suburb and state (suburb names repeat across
+      // Australian states, so suburb alone isn't a safe filter). Each
+      // continues from its own cursor if one exists.
+      const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
+        const key = `${suburb}|${state}`;
         const filters = [
           where('suburb', '==', suburb),
           where('state', '==', state),
@@ -88,24 +108,46 @@ export default function ServicesScreen() {
           filters.push(where('serviceTab', '==', activeTab));
         }
         filters.push(where('isRemoved', '==', false));
-        const q = query(collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc'));
-        return getDocs(q);
+        const constraints = [collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc')];
+        const cursor = cursorsRef.current[key];
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(PAGE_SIZE));
+        return getDocs(query(...constraints)).then(snap => ({ key, snap }));
       });
 
-      const snaps = await Promise.all(queryPromises);
-      let allPosts = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const results = await Promise.all(queryPromises);
 
-      // Sort merged results by date since each suburb's posts arrive independently
-      allPosts.sort((a, b) => {
-        const aTime = a.createdAt?.toDate?.() || new Date(0);
-        const bTime = b.createdAt?.toDate?.() || new Date(0);
-        return bTime - aTime;
-      });
+      let anyMore = false;
+      const newDocs = [];
+      for (const { key, snap } of results) {
+        if (snap.docs.length > 0) cursorsRef.current[key] = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < PAGE_SIZE) exhaustedRef.current[key] = true;
+        else anyMore = true;
+        newDocs.push(...snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
       const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
-      setPosts(blockedIds.length ? allPosts.filter(p => !blockedIds.includes(p.authorId)) : allPosts);
+      const filteredNew = blockedIds.length ? newDocs.filter(p => !blockedIds.includes(p.authorId)) : newDocs;
+
+      setPosts(prev => {
+        const combined = isLoadMore ? [...prev, ...filteredNew] : filteredNew;
+        combined.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.() || new Date(0);
+          const bTime = b.createdAt?.toDate?.() || new Date(0);
+          return bTime - aTime;
+        });
+        return combined;
+      });
+      setHasMore(anyMore);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); setRefreshing(false); }
+    finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
   }, [activeTab]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    fetchPosts(true);
+  };
 
   // Refetch when the service tab changes — previously nothing triggered
   // this at all, since fetchPosts was only ever called from the focus
@@ -296,15 +338,17 @@ export default function ServicesScreen() {
                         <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
                       </View>
                     )}
-                    <View style={[styles.tabBadge, { backgroundColor: item.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
-                      <Text style={styles.tabBadgeText}>{item.serviceTab === 'offering' ? 'Offering' : 'Looking'}</Text>
+                    <View style={styles.serviceBadgeStack}>
+                      <View style={[styles.tabBadge, { backgroundColor: item.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
+                        <Text style={styles.tabBadgeText}>{item.serviceTab === 'offering' ? 'I  Offer' : 'I  Need'}</Text>
+                      </View>
+                      <View style={styles.serviceLabelBadge}>
+                        <Text style={styles.serviceLabelBadgeText}>{serviceLabel}</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
                 <View style={styles.cardBody}>
-                  <View style={styles.serviceLabelBadge}>
-                    <Text style={styles.serviceLabelBadgeText}>{serviceLabel}</Text>
-                  </View>
                   <Text style={styles.cardContent} numberOfLines={2}>{item.content}</Text>
                 </View>
                 <View style={styles.footer}>
@@ -332,6 +376,13 @@ export default function ServicesScreen() {
               <Ionicons name="briefcase-outline" size={48} color={Colors.lightGrey} />
               <Text style={styles.emptyText}>No service posts yet in {profile?.suburb}</Text>
             </View>
+          }
+          ListFooterComponent={
+            hasMore && posts.length > 0 ? (
+              <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+              </TouchableOpacity>
+            ) : null
           }
         />
       )}
@@ -423,7 +474,7 @@ const styles = StyleSheet.create({
   tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '700' },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '800' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#F5F5F5', borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey },
   searchInput: { flex: 1, fontSize: 14, color: Colors.charcoal },
@@ -439,7 +490,7 @@ const styles = StyleSheet.create({
   filterOptionTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: {
-    borderRadius: 14, borderWidth: 1, borderColor: '#D5D5D5', overflow: 'hidden', backgroundColor: Colors.white,
+    borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen, overflow: 'hidden', backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EDF7EF', padding: 14 },
@@ -448,8 +499,9 @@ const styles = StyleSheet.create({
   cardAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
-  serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
-  serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
+  serviceBadgeStack: { alignItems: 'stretch', gap: 6 },
+  serviceLabelBadge: { backgroundColor: '#C2D9E8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignItems: 'center' },
+  serviceLabelBadgeText: { fontSize: 12, color: '#1B4F72', fontWeight: '800' },
   cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
   metaRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   metaText: { fontSize: 11, color: Colors.midGrey },
@@ -458,9 +510,11 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
   newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
   newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
-  tabBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  tabBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.white },
+  tabBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, alignItems: 'center' },
+  tabBadgeText: { fontSize: 12, fontWeight: '800', color: Colors.white },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  loadMoreBtn: { marginTop: 4, marginBottom: 12, alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, backgroundColor: Colors.brandGreenPale, borderWidth: 1.5, borderColor: Colors.brandGreen },
+  loadMoreBtnText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },

@@ -115,7 +115,8 @@ export default function CreatePostScreen() {
   const isServices = initialCategory === 'services';
   const isCommunity = !isLostFound && !isMarketplace && !isServices;
 
-  const pageTitle = isCommunity ? 'Community Hub' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services';
+  const pageTitle = isCommunity ? 'Home' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services';
+  const pageIcon = isCommunity ? 'home' : isMarketplace ? 'pricetag' : isLostFound ? 'flag' : 'briefcase';
 
   const handlePickImage = () => {
     if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
@@ -333,17 +334,20 @@ export default function CreatePostScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.mySuburb}>My Suburb</Text>
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName}>Bringing suburbs together</Text>
         </View>
         <View style={{ width: 60 }} />
       </View>
 
       <View style={styles.pageHeader}>
+        <View style={styles.pageHeaderIconBadge}>
+          <Ionicons name={pageIcon} size={22} color={Colors.brandGreen} />
+        </View>
         <Text style={styles.pageTitle}>{pageTitle}</Text>
       </View>
       {/* Primary suburb notice */}
       <View style={styles.primarySuburbBanner}>
-        <Ionicons name="location-outline" size={14} color={Colors.brandGreen} />
+        <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
         <Text style={styles.primarySuburbText}>
           Posting to <Text style={{ fontWeight: '700' }}>{profile?.suburb}, {profile?.state}</Text>
         </Text>
@@ -573,12 +577,13 @@ const styles = StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
-  primarySuburbBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  primarySuburbText: { fontSize: 13, color: Colors.brandGreen },
+  primarySuburbBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  primarySuburbText: { fontSize: 14, color: Colors.brandGreen },
   postBtnHeader: { backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
   postBtnHeaderText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
   body: { flex: 1 },
   tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
