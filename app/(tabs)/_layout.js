@@ -44,7 +44,7 @@ export default function TabLayout() {
       <Tabs.Screen name="events" options={{ title: 'Events', tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} /> }} />
       <Tabs.Screen name="buy-sell" options={{ title: 'Buy & Sell', tabBarIcon: ({ focused }) => <TabIcon name="pricetag" focused={focused} /> }} />
       <Tabs.Screen name="services" options={{ title: 'Services', tabBarIcon: ({ focused }) => <TabIcon name="briefcase" focused={focused} /> }} />
-      <Tabs.Screen name="lost-found" options={{ title: 'Lost & Found', tabBarIcon: ({ focused }) => <TabIcon name="search" focused={focused} /> }} />
+      <Tabs.Screen name="lost-found" options={{ title: 'Lost & Found', tabBarIcon: ({ focused }) => <TabIcon name="flag" focused={focused} /> }} />
       <Tabs.Screen
         name="notifications"
         options={{

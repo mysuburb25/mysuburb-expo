@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Linking, Share, Alert, Modal, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Share, Alert, Modal, Platform, ScrollView, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,10 +11,26 @@ import NotificationBell from '../../components/NotificationBell';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 
 const TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'lost', label: 'Lost' },
-  { key: 'found', label: 'Found' },
+  { key: 'all',      label: 'All' },
+  { key: 'offering', label: 'Offering' },
+  { key: 'looking',  label: 'Looking For' },
 ];
+
+const SERVICE_LABELS = {
+  plumbing:   'Plumbing',
+  painting:   'Painting',
+  electrical: 'Electrical',
+  handyman:   'Handyman',
+  massage:    'Massage',
+  physio:     'Physiotherapy',
+  carpentry:  'Carpentry',
+  cleaning:   'Cleaning',
+  gardening:  'Gardening',
+  petcare:    'Pet Care',
+  childcare:  'Child & Aged Care',
+  tutoring:   'Tutoring',
+  others:     'Others',
+};
 
 function formatDate(date) {
   if (!date) return '';
@@ -27,88 +43,91 @@ function formatDate(date) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// One generic "Closed" label, matching Buy & Sell's own generic status
-// wording, rather than a separate Lost/Found-specific term.
-function resolvedBadgeWord() {
-  return 'Closed';
-}
-
 function formatTime(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
   return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function LostFoundScreen() {
+export default function ServicesScreen() {
   const { profile, user, updateUserProfile } = useAuth();
   const [newCutoff, setNewCutoff] = useState(null);
-  const [items, setItems] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all'); // applied client-side, avoids a new Firestore composite index
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  const fetchItems = useCallback(async () => {
+  const fetchPosts = useCallback(async () => {
     const currentProfile = profileRef.current;
-    if (!currentProfile?.suburb) return;
+    if (!currentProfile?.suburb) { setLoading(false); return; }
+    // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
+    const activeSuburbs = currentProfile?.suburbs
+      ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
+      : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
+    if (activeSuburbs.length === 0) { setLoading(false); return; }
+    setLoading(true);
     try {
-      // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
-      const activeSuburbs = currentProfile?.suburbs
-        ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
-        : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
-      if (activeSuburbs.length === 0) return;
-
       // Run one query per active suburb, in parallel, always scoped by BOTH suburb and state
       // (suburb names repeat across Australian states, so suburb alone isn't a safe filter)
       const queryPromises = activeSuburbs.map(({ suburb, state }) => {
-        const q = query(
-          collection(db, 'posts'),
+        const filters = [
           where('suburb', '==', suburb),
           where('state', '==', state),
-          where('category', '==', 'lostfound'),
-          where('isRemoved', '==', false),
-          orderBy('createdAt', 'desc')
-        );
+          where('category', '==', 'services'),
+        ];
+        if (activeTab !== 'all') {
+          filters.push(where('serviceTab', '==', activeTab));
+        }
+        filters.push(where('isRemoved', '==', false));
+        const q = query(collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc'));
         return getDocs(q);
       });
 
       const snaps = await Promise.all(queryPromises);
-      let allItems = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      let allPosts = snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      // Sort merged results by date since each suburb's items arrive independently
-      allItems.sort((a, b) => {
+      // Sort merged results by date since each suburb's posts arrive independently
+      allPosts.sort((a, b) => {
         const aTime = a.createdAt?.toDate?.() || new Date(0);
         const bTime = b.createdAt?.toDate?.() || new Date(0);
         return bTime - aTime;
       });
       const blockedIds = currentProfile?.blockedUsers?.map(b => b.uid) || [];
-      setItems(blockedIds.length ? allItems.filter(i => !blockedIds.includes(i.authorId)) : allItems);
+      setPosts(blockedIds.length ? allPosts.filter(p => !blockedIds.includes(p.authorId)) : allPosts);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [activeTab]);
+
+  // Refetch when the service tab changes — previously nothing triggered
+  // this at all, since fetchPosts was only ever called from the focus
+  // effect below.
+  useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
-    fetchItems();
+    fetchPosts();
 
-    const stored = profileRef.current?.lastVisited?.lostfound;
+    const stored = profileRef.current?.lastVisited?.services;
     setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
 
     return () => {
-      updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), lostfound: new Date() } });
+      updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), services: new Date() } });
     };
-  }, [fetchItems]));
-
-  const filteredItems = activeTab === 'all' ? items : items.filter(p => p.lostFoundType === activeTab);
+  }, [fetchPosts]));
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
     const newLiked = !liked;
-    setItems(prev => prev.map(p => p.id === post.id ? {
+    setPosts(prev => prev.map(p => p.id === post.id ? {
       ...p,
       likeCount: (p.likeCount || 0) + (newLiked ? 1 : -1),
       likedBy: newLiked ? [...(p.likedBy || []), user.uid] : (p.likedBy || []).filter(u => u !== user.uid),
@@ -121,7 +140,7 @@ export default function LostFoundScreen() {
       if (newLiked && post.authorId !== user.uid) {
         await addDoc(collection(db, 'notifications'), {
           userId: post.authorId, type: 'like',
-          message: `${profile.displayName} liked your post`,
+          message: `${profile.displayName} liked your service post`,
           postId: post.id, fromUserId: user.uid, fromUserName: profile.displayName,
           isRead: false, createdAt: serverTimestamp(),
         });
@@ -132,7 +151,7 @@ export default function LostFoundScreen() {
   const handleToggleSave = async (post) => {
     const saved = post.savedBy?.includes(user.uid) || false;
     const newSaved = !saved;
-    setItems(prev => prev.map(p => p.id === post.id ? {
+    setPosts(prev => prev.map(p => p.id === post.id ? {
       ...p,
       savedBy: newSaved ? [...(p.savedBy || []), user.uid] : (p.savedBy || []).filter(u => u !== user.uid),
     } : p));
@@ -203,28 +222,64 @@ export default function LostFoundScreen() {
         </View>
         <NotificationBell />
       </View>
+
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Lost & Found</Text>
+        <View style={styles.pageHeaderIconBadge}>
+          <Ionicons name="briefcase" size={22} color={Colors.brandGreen} />
+        </View>
+        <Text style={styles.pageTitle}>Services</Text>
       </View>
+
       <View style={styles.tabRow}>
         {TABS.map(t => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
+          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => { setLoading(true); setActiveTab(t.key); }}>
             <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
+          <Ionicons name="search-outline" size={20} color={Colors.brandGreen} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowCategoryModal(true)}>
+          <Ionicons name="options-outline" size={20} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
+      {showSearch && (
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={18} color={Colors.midGrey} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search services..."
+            placeholderTextColor={Colors.midGrey}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {loading ? (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
       ) : (
         <FlatList
-          data={filteredItems}
+          data={(() => {
+            const q = searchQuery.trim().toLowerCase();
+            let result = categoryFilter === 'all' ? posts : posts.filter(p => p.serviceType === categoryFilter);
+            if (q) result = result.filter(p => p.content?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+            return result;
+          })()}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchItems(); }} tintColor={Colors.brandGreen} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPosts(); }} tintColor={Colors.brandGreen} />}
           renderItem={({ item }) => {
             const liked = item.likedBy?.includes(user?.uid) || false;
-            const isLost = item.lostFoundType === 'lost';
+            const serviceLabel = SERVICE_LABELS[item.serviceType] || 'Service';
             const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
             const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== user?.uid;
             return (
@@ -232,7 +287,7 @@ export default function LostFoundScreen() {
                 <View style={styles.cardHeader}>
                   <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
+                    <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
@@ -241,28 +296,16 @@ export default function LostFoundScreen() {
                         <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
                       </View>
                     )}
-                    <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
-                      <Text style={[styles.typeText, item.isResolved && styles.closedText]}>{isLost ? 'Lost' : 'Found'}</Text>
+                    <View style={[styles.tabBadge, { backgroundColor: item.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
+                      <Text style={styles.tabBadgeText}>{item.serviceTab === 'offering' ? 'Offering' : 'Looking'}</Text>
                     </View>
-                    {item.isResolved && (
-                      <View style={styles.soldTag}>
-                        <Text style={styles.soldTagText}>{resolvedBadgeWord()}</Text>
-                      </View>
-                    )}
                   </View>
                 </View>
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
-                  {item.description ? <Text style={[styles.cardDesc, item.isResolved && styles.closedText]} numberOfLines={2}>{item.description}</Text> : null}
-                  {item.lostFoundLocation ? (
-                    <TouchableOpacity
-                      style={styles.locationRow}
-                      onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.lostFoundLocation)}`).catch(() => {})}
-                    >
-                      <Ionicons name="location-outline" size={13} color={Colors.brandGreen} />
-                      <Text style={[styles.locationText, styles.locationLink]}>{item.lostFoundLocation}</Text>
-                    </TouchableOpacity>
-                  ) : null}
+                  <View style={styles.serviceLabelBadge}>
+                    <Text style={styles.serviceLabelBadgeText}>{serviceLabel}</Text>
+                  </View>
+                  <Text style={styles.cardContent} numberOfLines={2}>{item.content}</Text>
                 </View>
                 <View style={styles.footer}>
                   <TouchableOpacity style={styles.footerBtn} onPress={() => handleLikeToggle(item)}>
@@ -286,8 +329,8 @@ export default function LostFoundScreen() {
           }}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="search-outline" size={48} color={Colors.lightGrey} />
-              <Text style={styles.emptyText}>No lost & found posts</Text>
+              <Ionicons name="briefcase-outline" size={48} color={Colors.lightGrey} />
+              <Text style={styles.emptyText}>No service posts yet in {profile?.suburb}</Text>
             </View>
           }
         />
@@ -328,14 +371,39 @@ export default function LostFoundScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Floating small pill FAB bottom right */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push({ pathname: '/create-post', params: { category: 'lostfound', preselect: activeTab === 'all' ? 'lost' : activeTab } })}
-      >
+      <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'services', preselect: activeTab === 'all' ? 'offering' : activeTab } })}>
         <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
         <Text style={styles.fabText}>New Post</Text>
       </TouchableOpacity>
+
+      <Modal visible={showCategoryModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowCategoryModal(false)}>
+          <View style={styles.filterSheet}>
+            <View style={styles.filterHeaderBar}>
+              <Text style={styles.filterHeaderText}>Category</Text>
+            </View>
+            <ScrollView style={styles.filterScrollPad} contentContainerStyle={{ paddingBottom: 32 }}>
+              <TouchableOpacity
+                style={[styles.filterOption, categoryFilter === 'all' && styles.filterOptionActive]}
+                onPress={() => { setCategoryFilter('all'); setShowCategoryModal(false); }}
+              >
+                <Ionicons name={categoryFilter === 'all' ? 'radio-button-on' : 'radio-button-off'} size={18} color={categoryFilter === 'all' ? Colors.brandGreen : Colors.midGrey} />
+                <Text style={[styles.filterOptionText, categoryFilter === 'all' && styles.filterOptionTextActive]}>All Categories</Text>
+              </TouchableOpacity>
+              {Object.entries(SERVICE_LABELS).map(([key, label]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.filterOption, categoryFilter === key && styles.filterOptionActive]}
+                  onPress={() => { setCategoryFilter(key); setShowCategoryModal(false); }}
+                >
+                  <Ionicons name={categoryFilter === key ? 'radio-button-on' : 'radio-button-off'} size={18} color={categoryFilter === key ? Colors.brandGreen : Colors.midGrey} />
+                  <Text style={[styles.filterOptionText, categoryFilter === key && styles.filterOptionTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -349,42 +417,51 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  tabRow: { flexDirection: 'row', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
+  tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
-  tabTextActive: { color: Colors.white, fontWeight: '700' },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '700' },
+  tabTextActive: { color: Colors.white, fontWeight: '800' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#F5F5F5', borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.charcoal },
+  filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  filterSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  filterHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, alignItems: 'center' },
+  filterHeaderText: { fontSize: 19, fontWeight: '800', color: Colors.white },
+  filterScrollPad: { paddingHorizontal: 16, paddingTop: 16, maxHeight: 420 },
+  filterOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  filterOptionActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
+  filterOptionText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
+  filterOptionTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: {
     borderRadius: 14, borderWidth: 1, borderColor: '#D5D5D5', overflow: 'hidden', backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EDF7EF', padding: 14 },
-  cardAuthor: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
+  cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
-  cardBody: { backgroundColor: Colors.white, padding: 16, gap: 6 },
-  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
-  cardTitle: { flex: 1, fontSize: 16, color: Colors.charcoal, fontWeight: '700', lineHeight: 22 },
-  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
-  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
-  typeBadge: { width: 72, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
-  soldTag: { width: 72, paddingVertical: 5, borderRadius: 20, alignItems: 'center', backgroundColor: '#757575' },
-  soldTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
-  typeText: { fontSize: 14, fontWeight: '800', color: Colors.white },
-  cardDesc: { fontSize: 13, color: Colors.midGrey, lineHeight: 18 },
-  closedText: { textDecorationLine: 'line-through' },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locationText: { fontSize: 13, color: Colors.midGrey },
-  locationLink: { color: Colors.brandGreen, textDecorationLine: 'underline', fontWeight: '600' },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 6 },
+  serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
+  cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  metaRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   metaText: { fontSize: 11, color: Colors.midGrey },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },
+  newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
+  newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
+  tabBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  tabBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.white },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyText: { fontSize: 15, color: Colors.midGrey },
+  emptyText: { fontSize: 15, color: Colors.midGrey, textAlign: 'center' },
   fab: { position: 'absolute', bottom: 24, right: 16, backgroundColor: '#FFD700', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
   shareOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   shareSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },

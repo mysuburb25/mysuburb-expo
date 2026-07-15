@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Share, Alert, Modal, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Share, Alert, Modal, Platform, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,8 @@ export default function HomeScreen() {
   const { profile, user, unreadCount, updateUserProfile } = useAuth();
   const [newCutoff, setNewCutoff] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -198,7 +200,10 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Community Hub</Text>
+        <View style={styles.pageHeaderIconBadge}>
+          <Ionicons name="home" size={22} color={Colors.brandGreen} />
+        </View>
+        <Text style={styles.pageTitle}>Home</Text>
       </View>
       <View style={styles.tabRow}>
         {FILTERS.map(f => (
@@ -206,13 +211,36 @@ export default function HomeScreen() {
             <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
+          <Ionicons name="search-outline" size={20} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
+      {showSearch && (
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={18} color={Colors.midGrey} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search posts..."
+            placeholderTextColor={Colors.midGrey}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.brandGreen} size="large" />
       ) : (
         <FlatList
-          data={posts}
+          data={searchQuery.trim() ? posts.filter(p => p.content?.toLowerCase().includes(searchQuery.trim().toLowerCase())) : posts}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPosts(); }} tintColor={Colors.brandGreen} />}
@@ -288,13 +316,17 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  tabRow: { flexDirection: 'row', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
+  tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
   tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
+  filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#F5F5F5', borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.charcoal },
   list: { padding: 12, gap: 12, paddingBottom: 100 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.charcoal },

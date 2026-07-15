@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Linking, Share, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Linking, Share, Alert, Modal, Platform, TextInput } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,12 @@ const TABS = [
   { key: 'all', label: 'All' },
   { key: 'lost', label: 'Lost' },
   { key: 'found', label: 'Found' },
+];
+
+const STATUS_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'open', label: 'Open' },
+  { key: 'resolved', label: 'Resolved' },
 ];
 
 function formatDate(date) {
@@ -48,6 +54,10 @@ export default function LostFoundScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('open'); // 'open' | 'resolved'
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
@@ -103,7 +113,14 @@ export default function LostFoundScreen() {
     };
   }, [fetchItems]));
 
-  const filteredItems = activeTab === 'all' ? items : items.filter(p => p.lostFoundType === activeTab);
+  const q = searchQuery.trim().toLowerCase();
+  const filteredItems = items.filter(p => {
+    if (activeTab !== 'all' && p.lostFoundType !== activeTab) return false;
+    if (statusFilter === 'open' && p.isResolved) return false;
+    if (statusFilter === 'resolved' && !p.isResolved) return false;
+    if (q && !(p.content?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))) return false;
+    return true;
+  });
 
   const handleLikeToggle = async (post) => {
     const liked = post.likedBy?.includes(user.uid) || false;
@@ -158,17 +175,33 @@ export default function LostFoundScreen() {
     router.push({ pathname: '/share-picker', params: { shareText: buildShareText(shareTarget), sharePostId: shareTarget.id } });
   };
 
+  // Native share sheet must wait for the custom Share modal to be FULLY
+  // gone before presenting — not just "probably gone after a guessed
+  // delay". iOS's Modal fires onDismiss at exactly that moment, so the
+  // share sheet call is deferred there instead of a fixed setTimeout,
+  // which was causing it to appear on top of the modal's still-fading
+  // overlay (a washed-out look) or fail to appear at all. Android's Modal
+  // doesn't support onDismiss, so it keeps a short fallback delay.
+  const pendingExternalShareRef = useRef(false);
+
   const handleShareExternal = () => {
+    pendingExternalShareRef.current = true;
     setShowShareModal(false);
-    // iOS needs a beat after the custom modal finishes its close animation
-    // before it can present the native share sheet on top — calling
-    // Share.share() immediately (same tick as the modal closing) causes it
-    // to silently fail to appear at all.
-    setTimeout(async () => {
-      try {
-        await Share.share({ message: buildShareText(shareTarget) });
-      } catch (e) { console.error(e); }
-    }, 400);
+    if (Platform.OS !== 'ios') {
+      setTimeout(() => {
+        if (pendingExternalShareRef.current) {
+          pendingExternalShareRef.current = false;
+          Share.share({ message: buildShareText(shareTarget) }).catch(e => console.error(e));
+        }
+      }, 400);
+    }
+  };
+
+  const handleShareModalDismiss = () => {
+    if (Platform.OS === 'ios' && pendingExternalShareRef.current) {
+      pendingExternalShareRef.current = false;
+      Share.share({ message: buildShareText(shareTarget) }).catch(e => console.error(e));
+    }
   };
 
   return (
@@ -188,6 +221,9 @@ export default function LostFoundScreen() {
         <NotificationBell />
       </View>
       <View style={styles.pageHeader}>
+        <View style={styles.pageHeaderIconBadge}>
+          <Ionicons name="flag" size={22} color={Colors.brandGreen} />
+        </View>
         <Text style={styles.pageTitle}>Lost & Found</Text>
       </View>
       <View style={styles.tabRow}>
@@ -196,7 +232,33 @@ export default function LostFoundScreen() {
             <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
+          <Ionicons name="search-outline" size={20} color={Colors.brandGreen} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterBtn} onPress={() => setShowStatusModal(true)}>
+          <Ionicons name="options-outline" size={20} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
+      {showSearch && (
+        <View style={styles.searchRow}>
+          <Ionicons name="search-outline" size={18} color={Colors.midGrey} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search lost & found..."
+            placeholderTextColor={Colors.midGrey}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {loading ? (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
@@ -277,7 +339,7 @@ export default function LostFoundScreen() {
         />
       )}
 
-      <Modal visible={showShareModal} transparent animationType="slide">
+      <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
@@ -320,6 +382,28 @@ export default function LostFoundScreen() {
         <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
         <Text style={styles.fabText}>New Post</Text>
       </TouchableOpacity>
+
+      <Modal visible={showStatusModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowStatusModal(false)}>
+          <View style={styles.filterSheet}>
+            <View style={styles.filterHeaderBar}>
+              <Text style={styles.filterHeaderText}>Status</Text>
+            </View>
+            <View style={styles.filterPad}>
+              {STATUS_FILTERS.map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.filterOption, statusFilter === opt.key && styles.filterOptionActive]}
+                  onPress={() => { setStatusFilter(opt.key); setShowStatusModal(false); }}
+                >
+                  <Ionicons name={statusFilter === opt.key ? 'radio-button-on' : 'radio-button-off'} size={18} color={statusFilter === opt.key ? Colors.brandGreen : Colors.midGrey} />
+                  <Text style={[styles.filterOptionText, statusFilter === opt.key && styles.filterOptionTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -333,13 +417,26 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
-  tabRow: { flexDirection: 'row', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
+  tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
   tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#F5F5F5', borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.charcoal },
+  filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  filterSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  filterHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, alignItems: 'center' },
+  filterHeaderText: { fontSize: 19, fontWeight: '800', color: Colors.white },
+  filterPad: { padding: 16, paddingBottom: 32 },
+  filterOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  filterOptionActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
+  filterOptionText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
+  filterOptionTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   list: { padding: 16, gap: 12, paddingBottom: 100 },
   card: {
     borderRadius: 14, borderWidth: 1, borderColor: '#D5D5D5', overflow: 'hidden', backgroundColor: Colors.white,
