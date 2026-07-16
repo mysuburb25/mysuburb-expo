@@ -6,6 +6,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, g
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import useOnlineStatus from '../../utils/useOnlineStatus';
 
 function formatTime(date) {
@@ -229,10 +230,17 @@ export default function ChatScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={styles.header}>
+      <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+      <View style={styles.header}>
         <View style={styles.headerInfo}>
           <View style={styles.headerAvatar}>
             <Text style={styles.headerAvatarText}>{userName?.[0]?.toUpperCase()}</Text>
@@ -240,8 +248,8 @@ export default function ChatScreen() {
           </View>
           <Text style={styles.headerName}>{userName}</Text>
         </View>
-        <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.backBtn}>
-          <Ionicons name="ellipsis-vertical" size={22} color={Colors.white} />
+        <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuBtn}>
+          <Ionicons name="ellipsis-vertical" size={22} color={Colors.brandGreen} />
         </TouchableOpacity>
       </View>
 
@@ -326,13 +334,18 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
-  header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerCenter: { alignItems: 'center' },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
+  suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
+  header: { backgroundColor: Colors.brandGreenPale, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  menuBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'center' },
   headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4CAF50', borderWidth: 2, borderColor: Colors.brandGreen },
+  onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4CAF50', borderWidth: 2, borderColor: Colors.brandGreenPale },
   headerAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
-  headerName: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  headerName: { fontSize: 18, fontWeight: '800', color: Colors.charcoal },
   list: { padding: 16, gap: 4, paddingBottom: 8 },
   dateLabel: { textAlign: 'center', fontSize: 12, color: Colors.midGrey, marginVertical: 12, fontWeight: '600' },
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 4 },

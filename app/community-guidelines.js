@@ -14,7 +14,7 @@ export default function CommunityGuidelinesScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Community Guidelines</Text>
-        <Text style={styles.updated}>Last updated: 8 July 2026</Text>
+        <Text style={styles.updated}>Last updated: 16 July 2026</Text>
         <Text style={styles.intro}>My Suburb is your local community. These guidelines help keep our community safe, respectful and useful for everyone.</Text>
 
         <Text style={styles.heading}>Be Respectful</Text>
@@ -27,7 +27,7 @@ export default function CommunityGuidelinesScreen() {
 
         <Text style={styles.heading}>Stay Local and On-Topic</Text>
         <Text style={styles.body}>Posts should be relevant to your suburb and its residents. Keep content in the right category:</Text>
-        <Text style={styles.bullet}>- Community Hub: General updates, important notices, safety alerts</Text>
+        <Text style={styles.bullet}>- Home: General updates, important notices, safety alerts</Text>
         <Text style={styles.bullet}>- Events: Local events with date, time and location</Text>
         <Text style={styles.bullet}>- Buy and Sell: Items for sale, give away or seeking</Text>
         <Text style={styles.bullet}>- Lost and Found: Lost or found pets, items and belongings</Text>
@@ -49,18 +49,23 @@ export default function CommunityGuidelinesScreen() {
         <Text style={styles.heading}>Buy and Sell Guidelines</Text>
         <Text style={styles.body}>My Suburb is for private sales between neighbours, not commercial businesses. Be honest about the condition of items.</Text>
         <Text style={styles.body}>Always meet in a safe public place when exchanging items with strangers. My Suburb is not responsible for transactions between users.</Text>
+        <Text style={styles.body}>Once an item is sold, given away, or no longer available, mark the listing as Closed so other neighbours don't waste time asking.</Text>
 
         <Text style={styles.heading}>Lost and Found Guidelines</Text>
         <Text style={styles.body}>When posting about a lost pet or item, include as much detail as possible including description, location last seen, and a contact method.</Text>
         <Text style={styles.body}>If you find something valuable, hand it in to your local police station if the owner cannot be found through the app.</Text>
+        <Text style={styles.body}>Once a lost item or pet has been recovered, or a found item has been returned to its owner, mark the post as Closed.</Text>
 
         <Text style={styles.heading}>Safety Alerts</Text>
         <Text style={styles.body}>Safety alerts should only be used for genuine safety concerns such as suspicious activity, dangerous road conditions, or local emergencies.</Text>
         <Text style={styles.body}>For life-threatening emergencies, always call 000 first before posting to the app. False safety alerts will result in immediate account suspension.</Text>
 
+        <Text style={styles.heading}>Blocking Other Users</Text>
+        <Text style={styles.body}>If another user is bothering you, you can block them at any time from their profile, or from the menu on any of their posts. Blocking someone stops them from messaging you and hides their posts from your feed.</Text>
+        <Text style={styles.body}>Blocking is a personal tool for your own feed and inbox — it doesn't remove the other person's content for everyone else, or notify them that you've blocked them. If their behaviour breaks these guidelines, please also report them so our moderation team can review it.</Text>
+
         <Text style={styles.heading}>Reporting and Enforcement</Text>
         <Text style={styles.body}>You can report a post, comment, or user directly within the app. Our moderation team reviews reports promptly.</Text>
-        <Text style={styles.body}>You can also block another user at any time — this stops them from messaging you and hides their posts from your feed.</Text>
         <Text style={styles.body}>For cyberbullying, image-based abuse, or other seriously harmful content, you can report directly to the eSafety Commissioner at esafety.gov.au in addition to reporting within the app.</Text>
         <Text style={styles.body}>Violations of these guidelines may result in content removal, a warning, temporary suspension or permanent account ban.</Text>
         <Text style={styles.body}>Serious violations including threats of violence, illegal content or repeat offending will result in immediate permanent banning and may be referred to Australian authorities.</Text>

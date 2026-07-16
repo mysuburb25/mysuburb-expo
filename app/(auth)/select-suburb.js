@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, AustralianStates } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import SUBURBS_BY_STATE from '../../constants/suburbs.json';
 
 const STATE_ICONS = {
@@ -165,7 +166,7 @@ export default function SelectSuburbScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.headerBar}>
-        <Text style={styles.headerTitle}>My Suburb</Text>
+        <AppName style={styles.headerTitle} />
         <Text style={styles.headerTagline}>
           {isEditing ? `${profile?.suburb}, ${profile?.state}` : 'Bringing suburbs together'}
         </Text>

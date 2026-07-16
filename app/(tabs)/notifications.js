@@ -7,6 +7,7 @@ import { collection, query, where, orderBy, getDocs, writeBatch, doc } from 'fir
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 
 function timeAgo(date) {
   if (!date) return '';
@@ -60,7 +61,7 @@ export default function NotificationsScreen() {
           <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>

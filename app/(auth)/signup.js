@@ -4,10 +4,11 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 
 const TC_TEXT = `Terms & Conditions
 
-Last updated: July 2026
+Last updated: 16 July 2026
 
 1. ACCEPTANCE
 By using My Suburb, you agree to these terms. If you do not agree, please do not use the app.
@@ -23,10 +24,10 @@ You are responsible for all content you post. You must not post content that is:
 • Spam or advertising without permission
 
 4. PRIVACY
-We collect your name, email/phone, and suburb to provide the service. We do not sell your data to third parties. Posts are visible to other users in your suburb.
+We collect your name, email/phone, and suburb to provide the service. Your email/phone is kept private and is never shown to other users. We do not sell your data to third parties. Posts are visible to other users in your suburb. See our full Privacy Policy for details.
 
 5. MODERATION
-We reserve the right to remove posts or suspend accounts that violate these terms.
+We reserve the right to remove posts, issue warnings, or suspend accounts that violate these terms.
 
 6. LIABILITY
 My Suburb is provided "as is". We are not responsible for content posted by users or any damages arising from use of the app.
@@ -101,7 +102,7 @@ export default function SignupScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.appName}>My Suburb</Text>
+          <AppName style={styles.appName} />
           <Text style={styles.tagline}>Bringing suburbs together</Text>
         </View>
 

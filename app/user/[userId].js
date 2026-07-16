@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import useOnlineStatus from '../../utils/useOnlineStatus';
 
 function formatMemberSince(date) {
@@ -17,7 +18,7 @@ function formatMemberSince(date) {
 export default function UserProfileScreen() {
   const { userId } = useLocalSearchParams();
   const isOnline = useOnlineStatus(userId);
-  const { user, profile, blockUser, unblockUser } = useAuth();
+  const { user, profile, updateUserProfile } = useAuth();
   const [targetUser, setTargetUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -58,12 +59,12 @@ export default function UserProfileScreen() {
           text: isBlocked ? 'Unblock' : 'Block',
           style: isBlocked ? 'default' : 'destructive',
           onPress: async () => {
+            const current = profile?.blockedUsers || [];
+            const updated = isBlocked
+              ? current.filter(b => b.uid !== userId)
+              : [...current, { uid: userId, displayName: targetUser?.displayName, blockedAt: new Date().toISOString() }];
             try {
-              if (isBlocked) {
-                await unblockUser(userId);
-              } else {
-                await blockUser(userId, targetUser?.displayName);
-              }
+              await updateUserProfile({ blockedUsers: updated });
             } catch (e) {
               Alert.alert('Error', 'Could not update block status. Please try again.');
             }
@@ -81,7 +82,7 @@ export default function UserProfileScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 40 }} />

@@ -14,14 +14,14 @@ export default function TermsOfServiceScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Terms of Service</Text>
-        <Text style={styles.updated}>Last updated: 8 July 2026</Text>
+        <Text style={styles.updated}>Last updated: 16 July 2026</Text>
         <Text style={styles.intro}>By using My Suburb, you agree to these Terms of Service. Please read them carefully before using the app.</Text>
 
         <Text style={styles.heading}>1. Acceptance of Terms</Text>
         <Text style={styles.body}>By creating an account or using My Suburb, you agree to be bound by these Terms of Service, our Privacy Policy, and our Community Guidelines. If you do not agree, please do not use the app.</Text>
 
         <Text style={styles.heading}>2. Eligibility</Text>
-        <Text style={styles.body}>You must be at least 16 years of age to use My Suburb. By using the app, you confirm that you are at least 16 years old and that the information you provide is accurate and truthful.</Text>
+        <Text style={styles.body}>You must be at least 18 years of age to use My Suburb. By using the app, you confirm that you are at least 18 years old and that the information you provide is accurate and truthful.</Text>
 
         <Text style={styles.heading}>3. Your Account</Text>
         <Text style={styles.body}>You are responsible for maintaining the security of your account and password. You must not share your account with others or allow unauthorised access.</Text>
@@ -46,7 +46,7 @@ export default function TermsOfServiceScreen() {
         <Text style={styles.bullet}>- Post false safety alerts or misleading community notices</Text>
 
         <Text style={styles.heading}>6. Content Moderation and Reporting</Text>
-        <Text style={styles.body}>My Suburb reserves the right to remove any content that violates these terms or our Community Guidelines, and to suspend or terminate accounts that repeatedly violate our terms, without prior notice where reasonably necessary to protect user safety.</Text>
+        <Text style={styles.body}>My Suburb reserves the right to remove any content that violates these terms or our Community Guidelines, and to warn, suspend, or terminate accounts that violate our terms, without prior notice where reasonably necessary to protect user safety.</Text>
         <Text style={styles.body}>You can report a post, comment, or user directly within the app. For serious harms such as cyberbullying, image-based abuse, or other seriously harmful content, you can also report directly to the eSafety Commissioner at esafety.gov.au</Text>
 
         <Text style={styles.heading}>7. Consumer Guarantees</Text>

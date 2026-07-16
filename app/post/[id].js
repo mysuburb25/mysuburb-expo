@@ -7,6 +7,7 @@ import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, server
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
@@ -349,16 +350,21 @@ export default function PostDetailScreen() {
     finally { setPosting(false); }
   };
 
+  // closedAt records exactly when a post was marked closed, so the tab
+  // lists can keep showing it (with the Closed badge + strikethrough) for
+  // a 24-hour grace period afterward instead of hiding it the instant
+  // it's closed — see the isStaleClosed() check in lost-found.js.
   const handleToggleStatus = async () => {
     setShowPostMenu(false);
     const fieldName = post.category === 'lostfound' ? 'isResolved' : 'isSold';
     const newValue = !post[fieldName];
-    setPost(prev => ({ ...prev, [fieldName]: newValue }));
+    const localClosedAt = newValue ? new Date() : null;
+    setPost(prev => ({ ...prev, [fieldName]: newValue, closedAt: localClosedAt }));
     try {
-      await updateDoc(doc(db, 'posts', id), { [fieldName]: newValue });
+      await updateDoc(doc(db, 'posts', id), { [fieldName]: newValue, closedAt: newValue ? serverTimestamp() : null });
     } catch (e) {
       console.error(e);
-      setPost(prev => ({ ...prev, [fieldName]: !newValue }));
+      setPost(prev => ({ ...prev, [fieldName]: !newValue, closedAt: !newValue ? localClosedAt : null }));
       setErrorModalMessage('Could not update. Please try again.');
     }
   };
@@ -543,7 +549,7 @@ export default function PostDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{post.suburb}, {post.state}</Text>
         </View>
         <View style={{ width: 40 }} />

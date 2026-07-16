@@ -9,6 +9,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 
 const CATEGORY_COLORS = {
   updates:     { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: 'General' },
@@ -240,7 +241,7 @@ export default function ProfileScreen() {
           )}
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/settings')}>

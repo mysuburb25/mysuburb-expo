@@ -7,6 +7,7 @@ import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, 
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
+import AppName from '../components/AppName';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -230,7 +231,7 @@ export default function AdminDashboardScreen() {
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>Bringing suburbs together</Text>
         </View>
         <View style={{ width: 40 }} />
@@ -481,7 +482,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
-  suburbName: { fontSize: 15, color: '#FFD700', marginTop: 4 },
+  suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   pageHeader: { backgroundColor: '#C2D9E8', paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: '#1B4F72', letterSpacing: 0.2 },

@@ -14,7 +14,7 @@ export default function PrivacyPolicyScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Privacy Policy</Text>
-        <Text style={styles.updated}>Last updated: 8 July 2026</Text>
+        <Text style={styles.updated}>Last updated: 16 July 2026</Text>
         <Text style={styles.intro}>My Suburb is committed to protecting your privacy. This policy explains how we collect, use, store, and share your information when you use our app, and how you can contact us with questions, requests, or complaints.</Text>
 
         <Text style={styles.heading}>1. Information We Collect</Text>
@@ -23,6 +23,8 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.body}>We collect posts, comments, replies, likes, listings, and photos you create or upload within the app.</Text>
         <Text style={styles.body}>We collect the content of private messages you send to other users through the app's chat feature.</Text>
         <Text style={styles.body}>We collect a list of any users you choose to block.</Text>
+        <Text style={styles.body}>If you enable notifications, we collect a device push token so we can deliver them to you.</Text>
+        <Text style={styles.body}>If you search for or enter a location (for example when posting an event, or a lost or found item), that search is sent to Google Places to provide address suggestions. See Section 3 for more on this.</Text>
         <Text style={styles.body}>We collect basic device and usage data (such as app version and crash reports) for performance and troubleshooting purposes.</Text>
 
         <Text style={styles.heading}>2. How We Use Your Information</Text>
@@ -31,7 +33,8 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.heading}>3. How We Share Your Information</Text>
         <Text style={styles.body}>We do not sell your personal information to third parties.</Text>
         <Text style={styles.body}>Your posts, display name, and suburb are visible to other users who share an active suburb with you. Direct messages are only visible to you and the recipient.</Text>
-        <Text style={styles.body}>We use Google Firebase (a Google Cloud service) for authentication, data storage, and file storage. Firebase may store and process your data on servers located outside Australia, including in the United States, as part of Google's global infrastructure. We take reasonable steps to only work with providers that maintain appropriate security and confidentiality standards, but we cannot guarantee that overseas recipients will handle your data exactly as Australian law would require, and Australian privacy law may not apply to acts done overseas.</Text>
+        <Text style={styles.body}>Your email address or mobile number is kept private and is never visible to other users. It is stored separately from your public profile information and is only accessible to you and to us.</Text>
+        <Text style={styles.body}>We use Google Firebase (a Google Cloud service) for authentication, data storage, and file storage. Firebase may store and process your data on servers located outside Australia, including in the United States, as part of Google's global infrastructure. If you use location search when creating a post, that search text is sent to Google Places (also a Google service) to return address suggestions. We take reasonable steps to only work with providers that maintain appropriate security and confidentiality standards, but we cannot guarantee that overseas recipients will handle your data exactly as Australian law would require, and Australian privacy law may not apply to acts done overseas.</Text>
         <Text style={styles.body}>We may disclose your information if required by Australian law, in response to a valid legal request, or where necessary to protect the safety of our users.</Text>
 
         <Text style={styles.heading}>4. Data Storage and Security</Text>
@@ -52,7 +55,7 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.body}>We do not currently use automated systems to make decisions that significantly affect your rights or interests. If this changes in future, we will update this policy to explain how and provide details of the automated processes used.</Text>
 
         <Text style={styles.heading}>8. Age Requirements</Text>
-        <Text style={styles.body}>My Suburb is intended for users aged 16 and over. We do not knowingly collect personal information from anyone under 16. If you believe a user under 16 has provided us with personal information, please contact us at privacy@mysuburb.com.au so we can investigate and take appropriate action.</Text>
+        <Text style={styles.body}>My Suburb is intended for users aged 18 and over. We do not knowingly collect personal information from anyone under 18. If you believe a user under 18 has provided us with personal information, please contact us at privacy@mysuburb.com.au so we can investigate and take appropriate action.</Text>
 
         <Text style={styles.heading}>9. Changes to This Policy</Text>
         <Text style={styles.body}>We may update this policy from time to time to reflect changes in our practices or in the law. If we make material changes, we will notify you through the app before they take effect. Your continued use of My Suburb after a change takes effect means you accept the updated policy.</Text>

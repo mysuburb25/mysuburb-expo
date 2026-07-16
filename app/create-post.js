@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
+import AppName from '../components/AppName';
 
 const COMMUNITY_TABS = [
   { key: 'updates', label: 'General' },
@@ -333,7 +334,7 @@ export default function CreatePostScreen() {
           <Ionicons name="close" size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>Bringing suburbs together</Text>
         </View>
         <View style={{ width: 60 }} />

@@ -9,6 +9,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import NotificationBell from '../../components/NotificationBell';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -562,7 +563,7 @@ export default function EventsScreen() {
           )}
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <NotificationBell />
@@ -845,14 +846,14 @@ export default function EventsScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)} style={{ width: 36 }}>
               <Ionicons name="close" size={24} color={Colors.white} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={styles.mySuburb}>My Suburb</Text>
+              <AppName style={styles.mySuburb} />
               <Text style={styles.suburbName}>Bringing suburbs together</Text>
             </View>
             <View style={{ width: 60 }} />

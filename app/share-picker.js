@@ -6,6 +6,7 @@ import { collection, query, where, orderBy, limit, getDocs } from 'firebase/fire
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
+import AppName from '../components/AppName';
 
 export default function SharePickerScreen() {
   const { user, profile } = useAuth();
@@ -72,7 +73,7 @@ export default function SharePickerScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 40 }} />

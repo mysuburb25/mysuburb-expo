@@ -7,6 +7,7 @@ import { collection, query, where, orderBy, limit, startAfter, getDocs, updateDo
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import PostCard from '../../components/PostCard';
 
 const FILTERS = [
@@ -249,7 +250,7 @@ export default function HomeScreen() {
           )}
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>

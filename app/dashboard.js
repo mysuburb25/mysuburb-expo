@@ -6,9 +6,10 @@ import { collection, query, where, orderBy, limit, getDocs } from 'firebase/fire
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
+import AppName from '../components/AppName';
 
 const SECTIONS = [
-  { key: 'community', label: 'Community Hub', icon: 'home', color: Colors.brandGreen },
+  { key: 'community', label: 'Home', icon: 'home', color: Colors.brandGreen },
   { key: 'events', label: 'Events', icon: 'calendar', color: '#6A1B9A' },
   { key: 'marketplace', label: 'Buy & Sell', icon: 'pricetag', color: Colors.brandGreen },
   { key: 'services', label: 'Services', icon: 'briefcase', color: Colors.brandGreen },
@@ -111,7 +112,7 @@ export default function DashboardScreen() {
           )}
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
+          <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 42 }} />
@@ -136,20 +137,22 @@ export default function DashboardScreen() {
             const items = grouped[section.key];
             if (!items || items.length === 0) return null;
             return (
-              <View key={section.key} style={[styles.panel, { borderColor: section.color + '40' }]}>
-                <View style={[styles.panelHeader, { backgroundColor: section.color + '18' }]}>
-                  <View style={[styles.sectionIconBadge, { backgroundColor: section.color + '30' }]}>
-                    <Ionicons name={section.icon} size={17} color={section.color} />
+              <View key={section.key} style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <View style={[styles.sectionIconBadge, { backgroundColor: section.color + '20' }]}>
+                      <Ionicons name={section.icon} size={17} color={section.color} />
+                    </View>
+                    <Text style={styles.sectionTitle}>{section.label}</Text>
                   </View>
-                  <Text style={styles.sectionTitle}>{section.label}</Text>
                   <View style={[styles.sectionCountPill, { backgroundColor: section.color }]}>
                     <Text style={styles.sectionCountText}>{items.length}</Text>
                   </View>
                 </View>
-                {items.map((item, index) => (
+                {items.map(item => (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.row, index < items.length - 1 && styles.rowDivider]}
+                    style={[styles.card, { borderLeftColor: section.color, borderLeftWidth: 4 }]}
                     onPress={() => router.push('/post/' + item.id)}
                     activeOpacity={0.85}
                   >
@@ -200,28 +203,18 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 20 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyText: { fontSize: 15, color: Colors.midGrey },
-
-  // Each section is now a single bordered "panel": a tinted header strip
-  // (icon + title + count, centered) sitting on top of its posts, all
-  // inside one rounded, shadowed card — rather than a floating heading
-  // above a stack of separately-carded posts.
-  panel: {
-    backgroundColor: Colors.white,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-    marginBottom: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
-  },
-  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 16 },
+  section: { marginBottom: 20 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 },
+  sectionHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   sectionIconBadge: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  sectionTitle: { fontSize: 20, fontWeight: '800', color: Colors.charcoal },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.charcoal },
   sectionCountPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, minWidth: 26, alignItems: 'center' },
   sectionCountText: { fontSize: 12, fontWeight: '800', color: Colors.white },
-
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.white },
-  rowDivider: { borderBottomWidth: 1, borderBottomColor: '#EFEFEF' },
-
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 16, padding: 13, marginBottom: 9,
+    borderWidth: 1, borderColor: '#D5D5D5',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2,
+  },
   cardAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.white, borderWidth: 2, borderColor: Colors.brandGreen, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   cardAvatarImage: { width: 32, height: 32, borderRadius: 16 },
   cardAvatarText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },

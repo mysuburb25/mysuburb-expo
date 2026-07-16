@@ -7,6 +7,7 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 import useOnlineStatus from '../../utils/useOnlineStatus';
 
 function timeAgo(date) {
@@ -92,8 +93,8 @@ export default function MessagesScreen() {
           <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.mySuburb}>My Suburb</Text>
-          <Text style={styles.suburbName}>Messages</Text>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 42 }} />
       </View>

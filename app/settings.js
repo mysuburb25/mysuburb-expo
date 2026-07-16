@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
+import AppName from '../components/AppName';
 
 export default function SettingsScreen() {
   const { logout, profile } = useAuth();
@@ -28,8 +29,18 @@ export default function SettingsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+        </View>
         <View style={{ width: 40 }} />
+      </View>
+
+      <View style={styles.pageHeader}>
+        <View style={styles.pageHeaderIconBadge}>
+          <Ionicons name="settings" size={22} color={Colors.brandGreen} />
+        </View>
+        <Text style={styles.pageTitle}>Settings</Text>
       </View>
 
       <Text style={styles.sectionLabel}>Account</Text>
@@ -70,8 +81,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  title: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  sectionLabel: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen, paddingHorizontal: 16, paddingVertical: 9, backgroundColor: Colors.brandGreenPale, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: '#c8e6c9', marginTop: 8 },
+  headerCenter: { alignItems: 'center' },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
+  suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
+  sectionLabel: { fontSize: 14, fontWeight: '900', color: Colors.brandGreen, paddingHorizontal: 16, paddingVertical: 9, backgroundColor: Colors.brandGreenPale, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: '#c8e6c9', marginTop: 8 },
   section: { backgroundColor: Colors.white, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: Colors.lightGrey },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   menuLabel: { flex: 1, fontSize: 15, color: Colors.charcoal },

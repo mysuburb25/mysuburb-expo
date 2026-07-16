@@ -7,6 +7,7 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
+import AppName from '../../components/AppName';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -97,7 +98,7 @@ export default function LoginScreen() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.appName}>My Suburb</Text>
+          <AppName style={styles.appName} />
           <Text style={styles.tagline}>Bringing suburbs together</Text>
         </View>
 
