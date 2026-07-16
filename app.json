@@ -1,19 +1,31 @@
 {
   "expo": {
-    "name": "My Suburb",
+    "name": "MySuburb",
     "slug": "mysuburb",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FBFBFB"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mysuburb.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "MySuburb uses your camera so you can take photos to attach to posts and update your profile picture.",
+        "NSPhotoLibraryUsageDescription": "MySuburb accesses your photo library so you can attach existing photos to posts and set your profile picture."
       }
     },
     "android": {
-      "package": "com.mysuburb.app"
+      "package": "com.mysuburb.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#FFD700"
+      }
     },
     "plugins": [
       "expo-router",
@@ -26,18 +38,10 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "My Suburb needs access to your photos so you can attach images to your posts.",
-          "cameraPermission": "My Suburb needs access to your camera so you can take photos for your posts."
+          "photosPermission": "MySuburb accesses your photo library so you can attach existing photos to posts and set your profile picture.",
+          "cameraPermission": "MySuburb uses your camera so you can take photos to attach to posts and update your profile picture."
         }
-      ],
-      [
-        "expo-calendar",
-        {
-          "calendarPermission": "My Suburb needs access to your calendar so you can add events to it."
-        }
-      ],
-      "@react-native-community/datetimepicker",
-      "expo-font"
+      ]
     ],
     "scheme": "mysuburb",
     "extra": {
