@@ -3,7 +3,8 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator }
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { Alert } from 'react-native';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -27,10 +28,45 @@ function ConversationRow({ item, user, shareText }) {
   const unread = item.unreadCount?.[user.uid] || 0;
   const isLastFromMe = item.lastMessageSenderId === user.uid;
   const isOnline = useOnlineStatus(otherUserId);
+  const isPinned = (item.pinnedBy || []).includes(user.uid);
+
+  const handleLongPress = () => {
+    Alert.alert(
+      otherUserName,
+      undefined,
+      [
+        {
+          text: isPinned ? 'Unpin' : 'Pin',
+          onPress: () => updateDoc(doc(db, 'conversations', item.id), {
+            pinnedBy: isPinned ? arrayRemove(user.uid) : arrayUnion(user.uid),
+          }).catch(e => console.error(e)),
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => Alert.alert(
+            'Delete Conversation',
+            `This removes the conversation with ${otherUserName} from your list. It comes back if either of you sends a new message.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete', style: 'destructive',
+                onPress: () => updateDoc(doc(db, 'conversations', item.id), {
+                  deletedBy: arrayUnion(user.uid),
+                }).catch(e => console.error(e)),
+              },
+            ]
+          ),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
 
   return (
     <TouchableOpacity
       style={styles.row}
+      onLongPress={handleLongPress}
       onPress={() => router.push({
         pathname: '/chat/' + otherUserId,
         params: shareText ? { userId: otherUserId, userName: otherUserName, prefillText: shareText } : { userId: otherUserId, userName: otherUserName },
@@ -42,7 +78,10 @@ function ConversationRow({ item, user, shareText }) {
       </View>
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
-          <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>{otherUserName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
+            {isPinned && <Ionicons name="bookmark" size={13} color={Colors.brandGreen} />}
+            <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>{otherUserName}</Text>
+          </View>
           <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
         </View>
         <View style={styles.rowBottom}>
@@ -76,7 +115,18 @@ export default function MessagesScreen() {
         orderBy('updatedAt', 'desc')
       );
       const unsub = onSnapshot(q, (snap) => {
-        setConversations(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Hide anything the current user has deleted from their own list
+        // (deleting is per-user — the other participant still sees it
+        // normally). Pinned conversations float to the top; within each
+        // group, the existing updatedAt-desc order from the query holds.
+        const visible = all.filter(c => !(c.deletedBy || []).includes(user.uid));
+        visible.sort((a, b) => {
+          const aPinned = (a.pinnedBy || []).includes(user.uid) ? 1 : 0;
+          const bPinned = (b.pinnedBy || []).includes(user.uid) ? 1 : 0;
+          return bPinned - aPinned;
+        });
+        setConversations(visible);
         setLoading(false);
       }, (e) => {
         console.error(e);

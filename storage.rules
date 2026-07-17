@@ -28,6 +28,21 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Chat images — keyed by conversationId, so ownership is checked the
+    // same way as post images: look up the conversation doc and confirm
+    // the uploader is one of its two participants. Both read and write
+    // are scoped this way, since chat images should only ever be visible
+    // to the two people actually in that conversation, unlike post images
+    // which are public to any signed-in user.
+    match /chatImages/{conversationId}/{fileName} {
+      allow read: if request.auth != null
+                  && request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participants;
+      allow write: if request.auth != null
+                   && request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participants
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
     // Deny everything else by default — no other paths are used by the
     // app, so there's no reason to leave them open.
     match /{allPaths=**} {

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, writeBatch, increment } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import * as ImagePicker from 'expo-image-picker';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, writeBatch, increment, arrayRemove } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
@@ -75,6 +77,9 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [theyBlockedMe, setTheyBlockedMe] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName }
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [viewerImageUrl, setViewerImageUrl] = useState(null);
   const flatListRef = useRef(null);
 
   const userName = resolvedUserName || 'Neighbour';
@@ -126,47 +131,113 @@ export default function ChatScreen() {
     return unsub;
   }, [conversationId, user.uid]);
 
+  // Shared by both text and image sends — handles the conversation
+  // metadata update, the message document itself, and the notification.
+  // previewText is what shows in the conversation list (e.g. "You: hey"
+  // vs "You: 📷 Photo").
+  const sendMessage = async ({ text, imageUrl, previewText }) => {
+    await setDoc(doc(db, 'conversations', conversationId), {
+      participants: [user.uid, userId],
+      participantNames: { [user.uid]: profile.displayName, [userId]: userName },
+      lastMessage: previewText,
+      lastMessageSenderId: user.uid,
+      lastMessageAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      unreadCount: { [userId]: increment(1) },
+      // A new message means the conversation is active again for both
+      // people — clears it from "deleted" for either side, so nobody's
+      // left with a hidden conversation that actually has new activity.
+      deletedBy: arrayRemove(user.uid, userId),
+    }, { merge: true });
+
+    const messageData = {
+      senderId: user.uid,
+      senderName: profile.displayName,
+      createdAt: serverTimestamp(),
+      read: false,
+    };
+    if (text) messageData.text = text;
+    if (imageUrl) messageData.imageUrl = imageUrl;
+    if (replyingTo) {
+      messageData.replyTo = {
+        messageId: replyingTo.messageId,
+        text: replyingTo.text,
+        senderName: replyingTo.senderName,
+      };
+    }
+
+    await addDoc(collection(db, 'conversations', conversationId, 'messages'), messageData);
+    setReplyingTo(null);
+
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: userId,
+        type: 'message',
+        message: `${profile.displayName} sent you a message`,
+        fromUserId: user.uid,
+        fromUserName: profile.displayName,
+        conversationId,
+        isRead: false,
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) { console.error('notification error:', e); }
+  };
+
   const handleSend = async () => {
     if (!message.trim() || sending || isBlocked) return;
     const text = message.trim();
     setMessage('');
     setSending(true);
     try {
-      await setDoc(doc(db, 'conversations', conversationId), {
-        participants: [user.uid, userId],
-        participantNames: { [user.uid]: profile.displayName, [userId]: userName },
-        lastMessage: text,
-        lastMessageSenderId: user.uid,
-        lastMessageAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        unreadCount: { [userId]: increment(1) },
-      }, { merge: true });
-
-      await addDoc(collection(db, 'conversations', conversationId, 'messages'), {
-        text,
-        senderId: user.uid,
-        senderName: profile.displayName,
-        createdAt: serverTimestamp(),
-        read: false,
-      });
-
-      try {
-        await addDoc(collection(db, 'notifications'), {
-          userId: userId,
-          type: 'message',
-          message: `${profile.displayName} sent you a message`,
-          fromUserId: user.uid,
-          fromUserName: profile.displayName,
-          conversationId,
-          isRead: false,
-          createdAt: serverTimestamp(),
-        });
-      } catch (e) { console.error('notification error:', e); }
+      await sendMessage({ text, previewText: text });
     } catch (e) {
       console.error(e);
       setMessage(text);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handlePickImage = () => {
+    if (uploadingImage || isBlocked) return;
+    Alert.alert('Send Photo', 'Choose an option', [
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
+          const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
+          if (!result.canceled) uploadAndSendImage(result.assets[0].uri);
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
+          if (!result.canceled) uploadAndSendImage(result.assets[0].uri);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const uploadAndSendImage = async (uri) => {
+    setUploadingImage(true);
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const fileName = `${Date.now()}.jpg`;
+      const storageRef = ref(storage, `chatImages/${conversationId}/${fileName}`);
+      await uploadBytes(storageRef, blob);
+      const imageUrl = await getDownloadURL(storageRef);
+      await sendMessage({ imageUrl, previewText: '\ud83d\udcf7 Photo' });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not send photo. Please try again.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -198,6 +269,14 @@ export default function ChatScreen() {
     );
   };
 
+  const handleLongPressMessage = (item) => {
+    setReplyingTo({
+      messageId: item.id,
+      text: item.text || (item.imageUrl ? 'Photo' : ''),
+      senderName: item.senderId === user.uid ? 'You' : userName,
+    });
+  };
+
   const renderItem = ({ item, index }) => {
     const isMe = item.senderId === user.uid;
     const prevMsg = index > 0 ? messages[index - 1] : null;
@@ -217,12 +296,27 @@ export default function ChatScreen() {
               <Text style={styles.avatarSmallText}>{userName?.[0]?.toUpperCase()}</Text>
             </View>
           )}
-          <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-            {renderMessageText(item.text, isMe, styles)}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onLongPress={() => handleLongPressMessage(item)}
+            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
+          >
+            {item.replyTo && (
+              <View style={[styles.replyQuote, isMe && styles.replyQuoteMe]}>
+                <Text style={[styles.replyQuoteSender, isMe && styles.replyQuoteSenderMe]} numberOfLines={1}>{item.replyTo.senderName}</Text>
+                <Text style={[styles.replyQuoteText, isMe && styles.replyQuoteTextMe]} numberOfLines={1}>{item.replyTo.text}</Text>
+              </View>
+            )}
+            {item.imageUrl && (
+              <TouchableOpacity onPress={() => setViewerImageUrl(item.imageUrl)}>
+                <Image source={{ uri: item.imageUrl }} style={styles.msgImage} />
+              </TouchableOpacity>
+            )}
+            {item.text ? renderMessageText(item.text, isMe, styles) : null}
             <Text style={[styles.bubbleTime, isMe && styles.bubbleTimeMe]}>
               {item.createdAt ? formatTime(item.createdAt) : ''}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </>
     );
@@ -287,30 +381,58 @@ export default function ChatScreen() {
           )}
         </View>
       ) : (
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder={`Message ${userName}...`}
-            placeholderTextColor={Colors.midGrey}
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            maxLength={500}
-            autoCorrect={true}
-            autoCapitalize="sentences"
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, (!message.trim() || sending) && styles.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={!message.trim() || sending}
-          >
-            {sending
-              ? <ActivityIndicator color={Colors.white} size="small" />
-              : <Ionicons name="send" size={20} color={Colors.brandGreen} />
-            }
-          </TouchableOpacity>
-        </View>
+        <>
+          {replyingTo && (
+            <View style={styles.replyBar}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.replyBarSender}>Replying to {replyingTo.senderName}</Text>
+                <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.text}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={18} color={Colors.midGrey} />
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={styles.inputRow}>
+            <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={uploadingImage}>
+              {uploadingImage
+                ? <ActivityIndicator color={Colors.brandGreen} size="small" />
+                : <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
+              }
+            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              placeholder={`Message ${userName}...`}
+              placeholderTextColor={Colors.midGrey}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              maxLength={500}
+              autoCorrect={true}
+              autoCapitalize="sentences"
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, (!message.trim() || sending) && styles.sendBtnDisabled]}
+              onPress={handleSend}
+              disabled={!message.trim() || sending}
+            >
+              {sending
+                ? <ActivityIndicator color={Colors.white} size="small" />
+                : <Ionicons name="send" size={20} color={Colors.brandGreen} />
+              }
+            </TouchableOpacity>
+          </View>
+        </>
       )}
+
+      <Modal visible={!!viewerImageUrl} transparent animationType="fade">
+        <TouchableOpacity style={styles.imageViewerOverlay} activeOpacity={1} onPress={() => setViewerImageUrl(null)}>
+          <Image source={{ uri: viewerImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
+          <TouchableOpacity style={styles.imageViewerCloseBtn} onPress={() => setViewerImageUrl(null)}>
+            <Ionicons name="close" size={28} color={Colors.white} />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <Modal visible={showMenu} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
@@ -365,9 +487,26 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptySubText: { fontSize: 14, color: Colors.midGrey },
   inputRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.brandGreen, alignItems: 'flex-end' },
+  imageBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#FFD700', opacity: 0.5 },
+  // Reply quote shown inside a bubble, above the actual message content
+  replyQuote: { backgroundColor: '#FAFAFA', borderLeftWidth: 3, borderLeftColor: Colors.brandGreen, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 6 },
+  replyQuoteMe: { backgroundColor: 'rgba(255,255,255,0.15)', borderLeftColor: '#FFD700' },
+  replyQuoteSender: { fontSize: 11, fontWeight: '700', color: Colors.brandGreen },
+  replyQuoteSenderMe: { color: '#FFD700' },
+  replyQuoteText: { fontSize: 12, color: Colors.midGrey },
+  replyQuoteTextMe: { color: 'rgba(255,255,255,0.85)' },
+  // Reply preview bar shown above the composer while replying
+  replyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  replyBarSender: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
+  replyBarText: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
+  // Image message + full-screen viewer
+  msgImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
+  imageViewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  imageViewerImage: { width: '100%', height: '80%' },
+  imageViewerCloseBtn: { position: 'absolute', top: 56, right: 20, padding: 8 },
   blockedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   blockedBannerText: { flex: 1, fontSize: 13, color: Colors.midGrey },
   unblockLink: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
