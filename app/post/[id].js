@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
+import ImageViewerModal from '../../components/ImageViewerModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 
@@ -128,12 +129,7 @@ export default function PostDetailScreen() {
   const [showReportSuccess, setShowReportSuccess] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editContent, setEditContent] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editPrice, setEditPrice] = useState('');
-  const [editLocation, setEditLocation] = useState('');
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [viewerImageUrl, setViewerImageUrl] = useState(null);
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [addedToCalendar, setAddedToCalendar] = useState(false);
@@ -375,35 +371,15 @@ export default function PostDetailScreen() {
     }
   };
 
-  const openEditModal = () => {
+  const openEditPost = () => {
     setShowPostMenu(false);
-    setEditContent(post.content || '');
-    setEditDescription(post.description || '');
-    setEditPrice(post.price != null ? String(post.price) : '');
-    setEditLocation(post.eventLocation || post.lostFoundLocation || '');
-    setShowEditModal(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editContent.trim()) { Alert.alert('Error', 'This field can\'t be empty.'); return; }
-    setSavingEdit(true);
-    const updates = { content: editContent.trim() };
-    if (post.description !== undefined || editDescription.trim()) updates.description = editDescription.trim();
-    if (post.category === 'marketplace' && post.marketplaceType === 'forsale') {
-      updates.price = editPrice ? parseFloat(editPrice) || 0 : 0;
-    }
-    if (post.category === 'events') updates.eventLocation = editLocation.trim();
-    if (post.category === 'lostfound') updates.lostFoundLocation = editLocation.trim();
-
-    try {
-      await updateDoc(doc(db, 'posts', id), updates);
-      setPost(prev => ({ ...prev, ...updates }));
-      setShowEditModal(false);
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Could not save changes. Please try again.');
-    } finally {
-      setSavingEdit(false);
+    // Events aren't handled by create-post.js at all — "New Event" lives
+    // entirely inside events.js as its own modal — so editing an event
+    // routes there instead, where it auto-opens pre-filled.
+    if (post.category === 'events') {
+      router.push({ pathname: '/(tabs)/events', params: { editEventId: post.id } });
+    } else {
+      router.push({ pathname: '/create-post', params: { editPostId: post.id } });
     }
   };
 
@@ -753,7 +729,9 @@ export default function PostDetailScreen() {
                   {post.images && post.images.length > 0 && (
                     <View style={styles.imagesWrap}>
                       {post.images.map((url, i) => (
-                        <Image key={i} source={{ uri: url }} style={styles.postImage} resizeMode="cover" />
+                        <TouchableOpacity key={i} onPress={() => setViewerImageUrl(url)}>
+                          <Image source={{ uri: url }} style={styles.postImage} resizeMode="cover" />
+                        </TouchableOpacity>
                       ))}
                     </View>
                   )}
@@ -951,7 +929,7 @@ export default function PostDetailScreen() {
                     <Text style={styles.menuItemText}>{(post.category === 'lostfound' ? post.isResolved : post.isSold) ? getStatusLabels(post).undo : getStatusLabels(post).action}</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={styles.menuItem} onPress={openEditModal}>
+                <TouchableOpacity style={styles.menuItem} onPress={openEditPost}>
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="create-outline" size={20} color={Colors.brandGreen} />
                   </View>
@@ -988,81 +966,7 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Edit Post modal — covers text, description, price, and location.
-          Photos and event date/time aren't editable yet; those need more
-          substantial work (image re-upload handling, date pickers) than
-          fits here, so they're a clear follow-up rather than half-built
-          into this first version. */}
-      <Modal visible={showEditModal} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView style={styles.editModal} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={styles.editModalHeader}>
-            <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <Text style={styles.editModalCancel}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.editModalTitle}>Edit Post</Text>
-            <TouchableOpacity onPress={handleSaveEdit} disabled={savingEdit}>
-              {savingEdit
-                ? <ActivityIndicator color={Colors.brandGreen} size="small" />
-                : <Text style={styles.editModalSave}>Save</Text>
-              }
-            </TouchableOpacity>
-          </View>
-          <View style={styles.editModalBody}>
-            <Text style={styles.editFieldLabel}>
-              {post?.category === 'marketplace' ? 'Title' : post?.category === 'lostfound' ? 'Item' : post?.category === 'events' ? 'Event Title' : 'Content'}
-            </Text>
-            <TextInput
-              style={styles.editInput}
-              value={editContent}
-              onChangeText={setEditContent}
-              multiline
-              placeholder="What's this post about?"
-              placeholderTextColor={Colors.midGrey}
-            />
-
-            {(post?.category === 'marketplace' || post?.category === 'lostfound' || post?.category === 'events' || post?.category === 'services') && (
-              <>
-                <Text style={styles.editFieldLabel}>Description</Text>
-                <TextInput
-                  style={[styles.editInput, { minHeight: 90 }]}
-                  value={editDescription}
-                  onChangeText={setEditDescription}
-                  multiline
-                  placeholder="Add more detail..."
-                  placeholderTextColor={Colors.midGrey}
-                />
-              </>
-            )}
-
-            {post?.category === 'marketplace' && post?.marketplaceType === 'forsale' && (
-              <>
-                <Text style={styles.editFieldLabel}>Price</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editPrice}
-                  onChangeText={setEditPrice}
-                  keyboardType="numeric"
-                  placeholder="0.00"
-                  placeholderTextColor={Colors.midGrey}
-                />
-              </>
-            )}
-
-            {(post?.category === 'events' || post?.category === 'lostfound') && (
-              <>
-                <Text style={styles.editFieldLabel}>Location</Text>
-                <TextInput
-                  style={styles.editInput}
-                  value={editLocation}
-                  onChangeText={setEditLocation}
-                  placeholder="Location"
-                  placeholderTextColor={Colors.midGrey}
-                />
-              </>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <ImageViewerModal imageUrl={viewerImageUrl} onClose={() => setViewerImageUrl(null)} />
 
       {/* Share modal */}
       <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>
@@ -1323,14 +1227,6 @@ const styles = StyleSheet.create({
   menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
   menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8, borderWidth: 0 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
-  editModal: { flex: 1, backgroundColor: Colors.white },
-  editModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  editModalCancel: { fontSize: 16, color: Colors.midGrey },
-  editModalTitle: { fontSize: 17, fontWeight: '800', color: Colors.charcoal },
-  editModalSave: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen },
-  editModalBody: { padding: 16, gap: 6 },
-  editFieldLabel: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen, marginTop: 14, marginBottom: 6 },
-  editInput: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal, minHeight: 48 },
   reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   reportHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
   reportTitle: { fontSize: 19, fontWeight: '800', color: Colors.white, textAlign: 'center', marginBottom: 4 },

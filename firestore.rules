@@ -90,7 +90,7 @@ service cloud.firestore {
         // and share the same authorization check.
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['isRemoved', 'content', 'images', 'description', 'price', 'eventLocation', 'lostFoundLocation']))
+               .hasOnly(['isRemoved', 'content', 'images', 'description', 'price', 'eventLocation', 'lostFoundLocation', 'marketplaceType', 'isFree', 'isWanted', 'lostFoundType', 'serviceType', 'serviceTab', 'eventDate', 'eventPrice']))
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()

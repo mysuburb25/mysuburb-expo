@@ -11,7 +11,8 @@ import AppName from '../../components/AppName';
 import PostCard from '../../components/PostCard';
 
 const FILTERS = [
-  { key: 'all', label: 'General', createCategory: 'community', preselect: 'updates' },
+  { key: 'all', label: 'All', createCategory: 'community', preselect: 'updates' },
+  { key: 'updates', label: 'General', createCategory: 'community', preselect: 'updates' },
   { key: 'notices', label: 'Notices', createCategory: 'community', preselect: 'notices' },
   { key: 'safety', label: 'Safety Alerts', createCategory: 'community', preselect: 'safety' },
 ];
@@ -19,7 +20,7 @@ const FILTERS = [
 const PAGE_SIZE = 15; // used for both the initial load and every subsequent Load More tap
 
 export default function HomeScreen() {
-  const { profile, user, unreadCount, updateUserProfile } = useAuth();
+  const { profile, user, unreadCount, unreadMessageCount, updateUserProfile } = useAuth();
   const [newCutoff, setNewCutoff] = useState(null);
   const [posts, setPosts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,7 +64,6 @@ export default function HomeScreen() {
         : [{ suburb: profile.suburb, state: profile.state }];
       if (activeSuburbs.length === 0) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
 
-      const categoryFilter = activeFilter.key === 'all' ? 'updates' : activeFilter.key;
       const batchSize = PAGE_SIZE;
 
       if (!isLoadMore) {
@@ -90,7 +90,12 @@ export default function HomeScreen() {
           collection(db, 'posts'),
           where('suburb', '==', suburb),
           where('state', '==', state),
-          where('category', '==', categoryFilter),
+          // "All" combines General/Notices/Safety Alerts in one query
+          // rather than a separate query per category, since Firestore's
+          // 'in' operator handles that cleanly without extra reads.
+          activeFilter.key === 'all'
+            ? where('category', 'in', ['updates', 'notices', 'safety'])
+            : where('category', '==', activeFilter.key),
           where('isRemoved', '==', false),
           orderBy('createdAt', 'desc'),
         ];
@@ -253,14 +258,24 @@ export default function HomeScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
-          <Ionicons name="notifications-outline" size={26} color="#fff" />
-          {unreadCount > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+            <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+            {unreadMessageCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
+            <Ionicons name="notifications-outline" size={26} color="#fff" />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.pageHeader}>
         <View style={styles.pageHeaderIconBadge}>
@@ -271,7 +286,7 @@ export default function HomeScreen() {
       <View style={styles.tabRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => setActiveFilter(f)}>
-            <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}>{f.label}</Text>
+            <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]} numberOfLines={1}>{f.label}</Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
@@ -389,10 +404,10 @@ const styles = StyleSheet.create({
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
-  tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  tabRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8, gap: 6, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabBtn: { flex: 1, paddingVertical: 10, paddingHorizontal: 2, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
+  tabText: { fontSize: 11, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#F5F5F5', borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey },

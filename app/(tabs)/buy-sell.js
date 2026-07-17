@@ -59,7 +59,7 @@ function formatTime(date) {
 }
 
 export default function BuySellScreen() {
-  const { profile, user, updateUserProfile } = useAuth();
+  const { profile, user, unreadMessageCount, updateUserProfile } = useAuth();
   const [newCutoff, setNewCutoff] = useState(null);
   const [listings, setListings] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -295,7 +295,17 @@ export default function BuySellScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <NotificationBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+            <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+            {unreadMessageCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <NotificationBell />
+        </View>
       </View>
       <View style={styles.pageHeader}>
         <View style={styles.pageHeaderIconBadge}>
@@ -491,6 +501,8 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },

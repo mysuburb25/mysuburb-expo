@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import useOnlineStatus from '../../utils/useOnlineStatus';
+import ImageViewerModal from '../../components/ImageViewerModal';
 
 function formatMemberSince(date) {
   if (!date) return '';
@@ -21,6 +22,7 @@ export default function UserProfileScreen() {
   const { user, profile, updateUserProfile } = useAuth();
   const [targetUser, setTargetUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [viewerImageUrl, setViewerImageUrl] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +108,9 @@ export default function UserProfileScreen() {
           <View style={styles.coverCard}>
             <View style={styles.avatarWrap}>
               {targetUser.photoURL ? (
-                <Image source={{ uri: targetUser.photoURL }} style={styles.avatarImage} />
+                <TouchableOpacity onPress={() => setViewerImageUrl(targetUser.photoURL)}>
+                  <Image source={{ uri: targetUser.photoURL }} style={styles.avatarImage} />
+                </TouchableOpacity>
               ) : (
                 <View style={styles.avatarLarge}>
                   <Text style={styles.avatarText}>{targetUser.displayName?.[0]?.toUpperCase() || '?'}</Text>
@@ -160,6 +164,7 @@ export default function UserProfileScreen() {
           )}
         </View>
       )}
+      <ImageViewerModal imageUrl={viewerImageUrl} onClose={() => setViewerImageUrl(null)} />
     </View>
   );
 }

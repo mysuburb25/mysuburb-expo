@@ -36,7 +36,13 @@ export default function TabLayout() {
     }
   }, [loading, user, profile?.isSuspended]);
 
-  if (loading || !user) return null;
+  // Also gate on !profile, not just loading/user — belt-and-suspenders
+  // against the profile-loading race condition: even if something upstream
+  // still lets loading flip to false before the profile is actually set,
+  // the tabs simply never render with a broken/empty profile underneath
+  // them. Renders a blank screen for that brief moment instead, rather
+  // than a visibly broken one.
+  if (loading || !user || !profile) return null;
   if (profile?.isSuspended) return null;
 
   return (

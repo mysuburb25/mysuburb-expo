@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -82,18 +82,29 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
 }
 
 export default function CreatePostScreen() {
-  const { category: initialCategory, preselect } = useLocalSearchParams();
+  const { category: paramCategory, preselect, editPostId } = useLocalSearchParams();
   const { user, profile } = useAuth();
+  const isEditMode = !!editPostId;
+
+  const [editPost, setEditPost] = useState(null);
+  const [loadingEditPost, setLoadingEditPost] = useState(isEditMode);
+
+  // In edit mode, which category branch to show isn't known from route
+  // params (we only got an editPostId) — it's only known once the post
+  // itself has loaded. effectiveCategory covers both: route params in
+  // create mode (available immediately), or the fetched post's own
+  // category once it's loaded in edit mode.
+  const effectiveCategory = isEditMode ? editPost?.category : paramCategory;
 
   const getDefaultCat = () => {
-    if (initialCategory === 'community') return preselect || 'updates';
-    if (initialCategory === 'marketplace') return preselect || 'forsale';
-    if (initialCategory === 'lostfound') return preselect || 'lost';
-    if (initialCategory === 'services') return preselect || 'offering';
+    if (paramCategory === 'community') return preselect || 'updates';
+    if (paramCategory === 'marketplace') return preselect || 'forsale';
+    if (paramCategory === 'lostfound') return preselect || 'lost';
+    if (paramCategory === 'services') return preselect || 'offering';
     return preselect || 'updates';
   };
 
-  const [selectedCategory, setSelectedCategory] = useState(getDefaultCat());
+  const [selectedCategory, setSelectedCategory] = useState(isEditMode ? '' : getDefaultCat());
   const [content, setContent] = useState('');
   const [lfItem, setLfItem] = useState('');
   const [lfDescription, setLfDescription] = useState('');
@@ -107,17 +118,66 @@ export default function CreatePostScreen() {
   const [mpPrice, setMpPrice] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
-  const [images, setImages] = useState([]); // array of { uri }
+  const [images, setImages] = useState([]); // array of { uri, existing? } — existing:true means an already-uploaded URL, not a fresh local pick
   const [posting, setPosting] = useState(false);
   const scrollRef = useRef(null);
 
-  const isLostFound = initialCategory === 'lostfound';
-  const isMarketplace = initialCategory === 'marketplace';
-  const isServices = initialCategory === 'services';
+  // Fetch the post being edited and populate every field from it — this
+  // is what makes "Edit Post" actually reopen the same form pre-filled,
+  // rather than a stripped-down separate edit screen.
+  useEffect(() => {
+    if (!editPostId) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'posts', editPostId));
+        if (!snap.exists()) {
+          Alert.alert('Error', 'This post could not be found.');
+          router.back();
+          return;
+        }
+        const data = { id: snap.id, ...snap.data() };
+        setEditPost(data);
+
+        if (data.category === 'lostfound') {
+          setSelectedCategory(data.lostFoundType || 'lost');
+          setLfItem(data.content || '');
+          setLfDescription(data.description || '');
+          setLfLocation(data.lostFoundLocation || '');
+        } else if (data.category === 'marketplace') {
+          setSelectedCategory(data.marketplaceType || 'forsale');
+          setMpTitle(data.content || '');
+          setMpDescription(data.description || '');
+          setMpPrice(data.price != null ? String(data.price) : '');
+        } else if (data.category === 'services') {
+          setSelectedCategory(data.serviceTab || 'offering');
+          setContent(data.content || '');
+          const svc = SERVICE_CATEGORIES.find(s => s.key === data.serviceType);
+          if (svc) setSelectedService(svc);
+        } else {
+          setSelectedCategory(data.category || 'updates');
+          setContent(data.content || '');
+        }
+
+        if (data.images && data.images.length > 0) {
+          setImages(data.images.map(url => ({ uri: url, existing: true })));
+        }
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'Could not load this post for editing.');
+        router.back();
+      } finally {
+        setLoadingEditPost(false);
+      }
+    })();
+  }, [editPostId]);
+
+  const isLostFound = effectiveCategory === 'lostfound';
+  const isMarketplace = effectiveCategory === 'marketplace';
+  const isServices = effectiveCategory === 'services';
   const isCommunity = !isLostFound && !isMarketplace && !isServices;
 
-  const pageTitle = isCommunity ? 'Home' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services';
-  const pageIcon = isCommunity ? 'home' : isMarketplace ? 'pricetag' : isLostFound ? 'flag' : 'briefcase';
+  const pageTitle = isEditMode ? 'Edit Post' : (isCommunity ? 'Home' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services');
+  const pageIcon = isEditMode ? 'create' : (isCommunity ? 'home' : isMarketplace ? 'pricetag' : isLostFound ? 'flag' : 'briefcase');
 
   const handlePickImage = () => {
     if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
@@ -208,12 +268,19 @@ export default function CreatePostScreen() {
     setShowLfLocationSuggestions(false);
   };
 
+  // Existing (already-uploaded) images just keep their URL as-is — only
+  // freshly-picked local images actually need uploading. Order is
+  // preserved from the `images` array either way.
   const uploadImages = async (postId) => {
     const urls = [];
     for (let i = 0; i < images.length; i++) {
+      if (images[i].existing) {
+        urls.push(images[i].uri);
+        continue;
+      }
       const response = await fetch(images[i].uri);
       const blob = await response.blob();
-      const storageRef = ref(storage, `posts/${postId}/image_${i}.jpg`);
+      const storageRef = ref(storage, `posts/${postId}/image_${i}_${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
       const url = await getDownloadURL(storageRef);
       urls.push(url);
@@ -257,6 +324,19 @@ export default function CreatePostScreen() {
         extraFields = { serviceType: selectedService.key, serviceTab: selectedCategory };
       }
 
+      // --- Edit mode: update the existing post instead of creating one ---
+      if (isEditMode) {
+        const imageUrls = await uploadImages(editPostId);
+        await updateDoc(doc(db, 'posts', editPostId), {
+          content: postContent,
+          images: imageUrls,
+          ...extraFields,
+        });
+        router.replace('/post/' + editPostId);
+        return;
+      }
+
+      // --- Create mode: original new-post flow ---
       const postRef = await addDoc(collection(db, 'posts'), {
         content: postContent,
         category: categoryValue,
@@ -276,7 +356,6 @@ export default function CreatePostScreen() {
       // Upload images if any
       if (images.length > 0) {
         const imageUrls = await uploadImages(postRef.id);
-        const { updateDoc, doc } = await import('firebase/firestore');
         await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
       }
 
@@ -284,7 +363,8 @@ export default function CreatePostScreen() {
       // Primary, Second, or Third suburb — except the poster themselves,
       // and only if they haven't turned off notifications for this category.
       // General community posts (updates/notices) have no dedicated toggle,
-      // so those always notify.
+      // so those always notify. Edit mode never reaches this — updating a
+      // post shouldn't re-broadcast a "new post" notification to everyone.
       try {
         const key = `${profile.state}|${profile.suburb}`;
         const usersSnap = await getDocs(query(collection(db, 'users'), where('activeSuburbKeys', 'array-contains', key)));
@@ -326,6 +406,14 @@ export default function CreatePostScreen() {
   };
 
   const tabs = isCommunity ? COMMUNITY_TABS : isMarketplace ? MARKETPLACE_TABS : isServices ? SERVICE_TABS : null;
+
+  if (loadingEditPost) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator color={Colors.brandGreen} size="large" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
@@ -417,7 +505,7 @@ export default function CreatePostScreen() {
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
             <Modal visible={showServiceModal} transparent animationType="slide">
@@ -478,7 +566,7 @@ export default function CreatePostScreen() {
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
           </>
@@ -508,7 +596,7 @@ export default function CreatePostScreen() {
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
           </>
@@ -561,7 +649,7 @@ export default function CreatePostScreen() {
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
           </>
@@ -573,6 +661,7 @@ export default function CreatePostScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
+  loadingContainer: { flex: 1, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   header: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },
   closeBtn: { width: 36, justifyContent: 'center' },
   headerCenter: { alignItems: 'center' },

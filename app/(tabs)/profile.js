@@ -39,7 +39,7 @@ function formatTime(date) {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, logout, updateUserProfile, unreadMessageCount, reloadProfile } = useAuth();
+  const { user, profile, logout, updateUserProfile, unreadMessageCount, unreadCount, reloadProfile } = useAuth();
   const [posts, setPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -232,21 +232,31 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       {/* Fixed top header */}
       <View style={styles.topHeader}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
-          <Ionicons name="chatbubbles-outline" size={28} color="#fff" />
-          {unreadMessageCount > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
-            </View>
-          )}
+        <TouchableOpacity onPress={() => router.push('/settings')}>
+          <Ionicons name="settings-outline" size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/settings')}>
-          <Ionicons name="settings-outline" size={28} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+            <Ionicons name="chatbubbles-outline" size={26} color="#fff" />
+            {unreadMessageCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
+            <Ionicons name="notifications-outline" size={26} color="#fff" />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Fixed page header */}

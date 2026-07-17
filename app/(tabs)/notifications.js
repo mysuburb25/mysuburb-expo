@@ -86,8 +86,14 @@ export default function NotificationsScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.item, !item.isRead && styles.itemUnread]}
-              onPress={() => item.postId ? router.push('/post/' + item.postId) : null}
-              activeOpacity={item.postId ? 0.7 : 1}
+              onPress={() => {
+                // postId covers like/comment/new_post notifications; message
+                // notifications carry fromUserId instead (there's no post to
+                // go to — the destination is a chat with whoever sent it).
+                if (item.type === 'message' && item.fromUserId) return router.push('/chat/' + item.fromUserId);
+                if (item.postId) return router.push('/post/' + item.postId);
+              }}
+              activeOpacity={(item.postId || (item.type === 'message' && item.fromUserId)) ? 0.7 : 1}
             >
               <View style={[styles.iconBox, { backgroundColor: item.type === 'like' ? '#FFF0F0' : item.type === 'new_post' ? '#FFF9E6' : Colors.brandGreenPale }]}>
                 <Ionicons

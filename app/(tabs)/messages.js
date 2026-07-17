@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,7 +73,11 @@ function ConversationRow({ item, user, shareText }) {
       })}
     >
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{otherUserName[0]?.toUpperCase()}</Text>
+        {item.participantPhotos?.[otherUserId] ? (
+          <Image source={{ uri: item.participantPhotos[otherUserId] }} style={styles.avatarImage} />
+        ) : (
+          <Text style={styles.avatarText}>{otherUserName[0]?.toUpperCase()}</Text>
+        )}
         {isOnline && <View style={styles.onlineDot} />}
       </View>
       <View style={styles.rowBody}>
@@ -100,7 +104,7 @@ function ConversationRow({ item, user, shareText }) {
 }
 
 export default function MessagesScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, unreadCount } = useAuth();
   const { shareText } = useLocalSearchParams();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -140,13 +144,24 @@ export default function MessagesScreen() {
     <View style={styles.container}>
       <View style={styles.topHeader}>
         <TouchableOpacity style={styles.profileAvatar} onPress={() => router.push('/(tabs)/profile')}>
-          <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
+          {profile?.photoURL ? (
+            <Image source={{ uri: profile.photoURL }} style={styles.profileAvatarImage} />
+          ) : (
+            <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
+          )}
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <View style={{ width: 42 }} />
+        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative', width: 42, alignItems: 'flex-end' }}>
+          <Ionicons name="notifications-outline" size={26} color="#fff" />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Messages</Text>
@@ -189,6 +204,9 @@ const styles = StyleSheet.create({
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
+  profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   profileAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
@@ -197,6 +215,7 @@ const styles = StyleSheet.create({
   list: { padding: 12, gap: 4, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  avatarImage: { width: 48, height: 48, borderRadius: 24 },
   onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#4CAF50', borderWidth: 2, borderColor: Colors.white },
   avatarText: { fontSize: 18, fontWeight: '700', color: Colors.brandGreen },
   rowBody: { flex: 1, gap: 3 },

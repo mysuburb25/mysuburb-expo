@@ -68,7 +68,7 @@ function renderMessageText(text, isMe, styles) {
 
 export default function ChatScreen() {
   const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
-  const { user, profile, blockUser, unblockUser } = useAuth();
+  const { user, profile, blockUser, unblockUser, unreadCount } = useAuth();
   const isOtherUserOnline = useOnlineStatus(userId);
   const [resolvedUserName, setResolvedUserName] = useState(userNameParam || null);
   const [messages, setMessages] = useState([]);
@@ -77,8 +77,9 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [theyBlockedMe, setTheyBlockedMe] = useState(false);
+  const [otherUserPhotoURL, setOtherUserPhotoURL] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName }
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingImage, setPendingImage] = useState(null); // local uri, staged but not yet sent
   const [viewerImageUrl, setViewerImageUrl] = useState(null);
   const flatListRef = useRef(null);
 
@@ -102,6 +103,7 @@ export default function ChatScreen() {
         if (!userNameParam) setResolvedUserName(snap.data().displayName || 'Neighbour');
         const theirBlocked = snap.data().blockedUsers || [];
         setTheyBlockedMe(theirBlocked.some(b => b.uid === user.uid));
+        setOtherUserPhotoURL(snap.data().photoURL || null);
       } catch (e) {
         console.error(e);
       }
@@ -139,6 +141,7 @@ export default function ChatScreen() {
     await setDoc(doc(db, 'conversations', conversationId), {
       participants: [user.uid, userId],
       participantNames: { [user.uid]: profile.displayName, [userId]: userName },
+      participantPhotos: { [user.uid]: profile.photoURL || null, [userId]: otherUserPhotoURL || null },
       lastMessage: previewText,
       lastMessageSenderId: user.uid,
       lastMessageAt: serverTimestamp(),
@@ -183,31 +186,52 @@ export default function ChatScreen() {
     } catch (e) { console.error('notification error:', e); }
   };
 
+  // Picking a photo only stages it (pendingImage) — it does NOT send
+  // immediately. It shows as a preview above the composer, same as a
+  // typed reply-in-progress, and only actually uploads + sends once the
+  // person taps Send, same as text.
   const handleSend = async () => {
-    if (!message.trim() || sending || isBlocked) return;
+    if ((!message.trim() && !pendingImage) || sending || isBlocked) return;
     const text = message.trim();
+    const imageToSend = pendingImage;
     setMessage('');
+    setPendingImage(null);
     setSending(true);
     try {
-      await sendMessage({ text, previewText: text });
+      let imageUrl = null;
+      if (imageToSend) {
+        const response = await fetch(imageToSend);
+        const blob = await response.blob();
+        const fileName = `${Date.now()}.jpg`;
+        const storageRef = ref(storage, `chatImages/${conversationId}/${fileName}`);
+        await uploadBytes(storageRef, blob);
+        imageUrl = await getDownloadURL(storageRef);
+      }
+      const previewText = imageUrl ? (text ? text : '\ud83d\udcf7 Photo') : text;
+      await sendMessage({
+        text: text || undefined,
+        imageUrl: imageUrl || undefined,
+        previewText,
+      });
     } catch (e) {
       console.error(e);
       setMessage(text);
+      setPendingImage(imageToSend);
     } finally {
       setSending(false);
     }
   };
 
   const handlePickImage = () => {
-    if (uploadingImage || isBlocked) return;
-    Alert.alert('Send Photo', 'Choose an option', [
+    if (pendingImage || isBlocked) return;
+    Alert.alert('Add Photo', 'Choose an option', [
       {
         text: 'Take Photo',
         onPress: async () => {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
           const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
-          if (!result.canceled) uploadAndSendImage(result.assets[0].uri);
+          if (!result.canceled) setPendingImage(result.assets[0].uri);
         },
       },
       {
@@ -216,29 +240,11 @@ export default function ChatScreen() {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-          if (!result.canceled) uploadAndSendImage(result.assets[0].uri);
+          if (!result.canceled) setPendingImage(result.assets[0].uri);
         },
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  };
-
-  const uploadAndSendImage = async (uri) => {
-    setUploadingImage(true);
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const fileName = `${Date.now()}.jpg`;
-      const storageRef = ref(storage, `chatImages/${conversationId}/${fileName}`);
-      await uploadBytes(storageRef, blob);
-      const imageUrl = await getDownloadURL(storageRef);
-      await sendMessage({ imageUrl, previewText: '\ud83d\udcf7 Photo' });
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Could not send photo. Please try again.');
-    } finally {
-      setUploadingImage(false);
-    }
   };
 
   const handleToggleBlock = () => {
@@ -293,13 +299,20 @@ export default function ChatScreen() {
         <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
           {!isMe && (
             <View style={styles.avatarSmall}>
-              <Text style={styles.avatarSmallText}>{userName?.[0]?.toUpperCase()}</Text>
+              {otherUserPhotoURL ? (
+                <Image source={{ uri: otherUserPhotoURL }} style={styles.avatarSmallImage} />
+              ) : (
+                <Text style={styles.avatarSmallText}>{userName?.[0]?.toUpperCase()}</Text>
+              )}
             </View>
           )}
           <TouchableOpacity
             activeOpacity={0.85}
             onLongPress={() => handleLongPressMessage(item)}
-            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
+            style={[
+              (item.imageUrl && !item.text) ? styles.bubbleImageOnly : styles.bubble,
+              !(item.imageUrl && !item.text) && (isMe ? styles.bubbleMe : styles.bubbleThem),
+            ]}
           >
             {item.replyTo && (
               <View style={[styles.replyQuote, isMe && styles.replyQuoteMe]}>
@@ -313,7 +326,10 @@ export default function ChatScreen() {
               </TouchableOpacity>
             )}
             {item.text ? renderMessageText(item.text, isMe, styles) : null}
-            <Text style={[styles.bubbleTime, isMe && styles.bubbleTimeMe]}>
+            <Text style={[
+              styles.bubbleTime,
+              (item.imageUrl && !item.text) ? styles.bubbleTimeImageOnly : (isMe && styles.bubbleTimeMe),
+            ]}>
               {item.createdAt ? formatTime(item.createdAt) : ''}
             </Text>
           </TouchableOpacity>
@@ -332,12 +348,23 @@ export default function ChatScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative', width: 40, alignItems: 'flex-end' }}>
+          <Ionicons name="notifications-outline" size={26} color={Colors.white} />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
       <View style={styles.header}>
         <View style={styles.headerInfo}>
           <View style={styles.headerAvatar}>
-            <Text style={styles.headerAvatarText}>{userName?.[0]?.toUpperCase()}</Text>
+            {otherUserPhotoURL ? (
+              <Image source={{ uri: otherUserPhotoURL }} style={styles.headerAvatarImage} />
+            ) : (
+              <Text style={styles.headerAvatarText}>{userName?.[0]?.toUpperCase()}</Text>
+            )}
             {isOtherUserOnline && <View style={styles.onlineDot} />}
           </View>
           <Text style={styles.headerName}>{userName}</Text>
@@ -393,16 +420,22 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           )}
+          {pendingImage && (
+            <View style={styles.pendingImageBar}>
+              <Image source={{ uri: pendingImage }} style={styles.pendingImageThumb} />
+              <Text style={styles.pendingImageText}>Photo ready — add a caption or tap send</Text>
+              <TouchableOpacity onPress={() => setPendingImage(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={22} color={Colors.midGrey} />
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={styles.inputRow}>
-            <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={uploadingImage}>
-              {uploadingImage
-                ? <ActivityIndicator color={Colors.brandGreen} size="small" />
-                : <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
-              }
+            <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={!!pendingImage}>
+              <Ionicons name="camera-outline" size={24} color={pendingImage ? Colors.lightGrey : Colors.brandGreen} />
             </TouchableOpacity>
             <TextInput
               style={styles.input}
-              placeholder={`Message ${userName}...`}
+              placeholder={pendingImage ? 'Add a caption (optional)...' : `Message ${userName}...`}
               placeholderTextColor={Colors.midGrey}
               value={message}
               onChangeText={setMessage}
@@ -412,9 +445,9 @@ export default function ChatScreen() {
               autoCapitalize="sentences"
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!message.trim() || sending) && styles.sendBtnDisabled]}
+              style={[styles.sendBtn, (!message.trim() && !pendingImage || sending) && styles.sendBtnDisabled]}
               onPress={handleSend}
-              disabled={!message.trim() || sending}
+              disabled={(!message.trim() && !pendingImage) || sending}
             >
               {sending
                 ? <ActivityIndicator color={Colors.white} size="small" />
@@ -463,8 +496,11 @@ const styles = StyleSheet.create({
   header: { backgroundColor: Colors.brandGreenPale, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   menuBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, justifyContent: 'center' },
   headerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  headerAvatarImage: { width: 36, height: 36, borderRadius: 18 },
   onlineDot: { position: 'absolute', bottom: -1, right: -1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4CAF50', borderWidth: 2, borderColor: Colors.brandGreenPale },
   headerAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
   headerName: { fontSize: 18, fontWeight: '800', color: Colors.charcoal },
@@ -473,8 +509,13 @@ const styles = StyleSheet.create({
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 4 },
   msgRowMe: { justifyContent: 'flex-end' },
   avatarSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  avatarSmallImage: { width: 28, height: 28, borderRadius: 14 },
   avatarSmallText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2, flexShrink: 1 },
+  // Image-only messages skip the colored bubble background/padding
+  // entirely — the photo shows edge-to-edge with just rounded corners,
+  // rather than sitting inside a green/white frame like text messages.
+  bubbleImageOnly: { maxWidth: '75%', borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', gap: 2, flexShrink: 1 },
   bubbleMe: { backgroundColor: Colors.brandGreen, borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: Colors.white, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: Colors.lightGrey },
   bubbleText: { fontSize: 15, color: Colors.charcoal, lineHeight: 20, flexShrink: 1 },
@@ -482,6 +523,9 @@ const styles = StyleSheet.create({
   bubbleLinkMe: { color: '#FFD700' },
   bubbleTextMe: { color: Colors.white },
   bubbleTime: { fontSize: 10, color: Colors.midGrey, alignSelf: 'flex-end' },
+  // Neutral grey regardless of sender, since there's no colored backdrop
+  // behind an image-only message the way bubbleTimeMe's white assumes.
+  bubbleTimeImageOnly: { color: Colors.midGrey, marginTop: 2 },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.7)' },
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
@@ -500,6 +544,9 @@ const styles = StyleSheet.create({
   replyQuoteTextMe: { color: 'rgba(255,255,255,0.85)' },
   // Reply preview bar shown above the composer while replying
   replyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  pendingImageBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  pendingImageThumb: { width: 40, height: 40, borderRadius: 8 },
+  pendingImageText: { flex: 1, fontSize: 12, color: Colors.brandGreen, fontWeight: '600' },
   replyBarSender: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   replyBarText: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
   // Image message + full-screen viewer

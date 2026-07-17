@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking, Share } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, limit, startAfter, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -90,12 +90,13 @@ const DATE_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'today', label: 'Today' },
   { key: 'weekend', label: 'This Weekend' },
+  { key: 'later', label: 'Later' },
 ];
 
 const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
 
 export default function EventsScreen() {
-  const { profile, user, updateUserProfile } = useAuth();
+  const { profile, user, unreadMessageCount, updateUserProfile } = useAuth();
   const [newCutoff, setNewCutoff] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +106,9 @@ export default function EventsScreen() {
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const { editEventId } = useLocalSearchParams();
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [loadingEditEvent, setLoadingEditEvent] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -129,6 +133,42 @@ export default function EventsScreen() {
   const cursorsRef = useRef({});
   const exhaustedRef = useRef({});
   const scrollRef = useRef(null);
+
+  // Reached from post/[id].js's "Edit Post" menu option on an event —
+  // fetches the event and pre-fills the same New Event form, then opens
+  // it automatically, same idea as create-post.js's edit mode but for
+  // events specifically, since New Event lives here as its own modal
+  // rather than being routable on its own.
+  useEffect(() => {
+    if (!editEventId) return;
+    setLoadingEditEvent(true);
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'posts', editEventId));
+        if (!snap.exists()) {
+          Alert.alert('Error', 'This event could not be found.');
+          return;
+        }
+        const data = snap.data();
+        setEditingEventId(editEventId);
+        setTitle(data.content || '');
+        setDescription(data.description || '');
+        setLocation(data.eventLocation || '');
+        setEventDate(data.eventDate?.toDate ? data.eventDate.toDate() : (data.eventDate ? new Date(data.eventDate) : new Date()));
+        setPriceType(data.isFree === false ? 'paid' : 'free');
+        setEventPrice(data.eventPrice != null ? String(data.eventPrice) : '');
+        if (data.images && data.images.length > 0) {
+          setImages(data.images.map(url => ({ uri: url, existing: true })));
+        }
+        setShowModal(true);
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'Could not load this event for editing.');
+      } finally {
+        setLoadingEditEvent(false);
+      }
+    })();
+  }, [editEventId]);
 
   // "Added to calendar" is inherently a per-device fact (it lives in the
   // phone's own calendar app, not our account data), so it's tracked in
@@ -472,12 +512,19 @@ export default function EventsScreen() {
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Existing (already-uploaded) images keep their URL as-is — only
+  // freshly-picked local images need uploading. Mirrors create-post.js's
+  // same edit-mode handling.
   const uploadImages = async (postId) => {
     const urls = [];
     for (let i = 0; i < images.length; i++) {
+      if (images[i].existing) {
+        urls.push(images[i].uri);
+        continue;
+      }
       const response = await fetch(images[i].uri);
       const blob = await response.blob();
-      const storageRef = ref(storage, `posts/${postId}/image_${i}.jpg`);
+      const storageRef = ref(storage, `posts/${postId}/image_${i}_${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
       const url = await getDownloadURL(storageRef);
       urls.push(url);
@@ -485,11 +532,36 @@ export default function EventsScreen() {
     return urls;
   };
 
+  const resetForm = () => {
+    setShowModal(false);
+    setEditingEventId(null);
+    setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
+    setLocationSuggestions([]); setShowLocationSuggestions(false);
+    setImages([]);
+    setPriceType('free'); setEventPrice('');
+  };
+
   const handlePost = async () => {
     if (!title.trim()) { Alert.alert('Error', 'Please enter an event title.'); return; }
     if (priceType === 'paid' && !eventPrice.trim()) { Alert.alert('Error', 'Please enter a price, or switch to Free.'); return; }
     setPosting(true);
     try {
+      // --- Editing an existing event ---
+      if (editingEventId) {
+        const imageUrls = await uploadImages(editingEventId);
+        await updateDoc(doc(db, 'posts', editingEventId), {
+          content: title.trim(), description: description.trim(),
+          eventLocation: location.trim(), eventDate: eventDate,
+          images: imageUrls,
+          isFree: priceType === 'free',
+          eventPrice: priceType === 'paid' ? parseFloat(eventPrice) || 0 : 0,
+        });
+        resetForm();
+        router.replace('/post/' + editingEventId);
+        return;
+      }
+
+      // --- Creating a new event ---
       const postRef = await addDoc(collection(db, 'posts'), {
         content: title.trim(), description: description.trim(),
         eventLocation: location.trim(), eventDate: eventDate,
@@ -507,11 +579,7 @@ export default function EventsScreen() {
         await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
       }
 
-      setShowModal(false);
-      setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
-      setLocationSuggestions([]); setShowLocationSuggestions(false);
-      setImages([]);
-      setPriceType('free'); setEventPrice('');
+      resetForm();
       fetchEvents();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setPosting(false); }
@@ -542,6 +610,8 @@ export default function EventsScreen() {
     if (dateFilter === 'weekend') {
       return edDateOnly.getTime() === upcomingSaturday.getTime() || edDateOnly.getTime() === upcomingSunday.getTime();
     }
+    // Everything from the Monday after this coming weekend onward.
+    if (dateFilter === 'later') return edDateOnly.getTime() > upcomingSunday.getTime();
     return true;
   });
 
@@ -566,7 +636,17 @@ export default function EventsScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <NotificationBell />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+            <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+            {unreadMessageCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <NotificationBell />
+        </View>
       </View>
       <View style={styles.pageHeader}>
         <View style={styles.pageHeaderIconBadge}>
@@ -849,7 +929,7 @@ export default function EventsScreen() {
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowModal(false)} style={{ width: 36 }}>
+            <TouchableOpacity onPress={resetForm} style={{ width: 36 }}>
               <Ionicons name="close" size={24} color={Colors.white} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
@@ -860,9 +940,9 @@ export default function EventsScreen() {
           </View>
           <View style={styles.pageHeader}>
             <View style={styles.pageHeaderIconBadge}>
-              <Ionicons name="calendar" size={22} color={Colors.brandGreen} />
+              <Ionicons name={editingEventId ? 'create' : 'calendar'} size={22} color={Colors.brandGreen} />
             </View>
-            <Text style={styles.pageTitle}>New Event</Text>
+            <Text style={styles.pageTitle}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
           </View>
           <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Event Title</Text></View>
@@ -958,7 +1038,7 @@ export default function EventsScreen() {
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>Post Event</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{editingEventId ? 'Save Changes' : 'Post Event'}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -977,6 +1057,8 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },

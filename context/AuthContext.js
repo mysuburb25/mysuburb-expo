@@ -36,6 +36,12 @@ export function AuthProvider({ children }) {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
+        // On a cold app launch, onAuthStateChanged can fire before the
+        // Firestore connection is fully warmed up, so this first read is
+        // the one most likely to hit a transient failure — loadProfile
+        // now retries a couple of times before giving up, rather than
+        // silently leaving profile null while loading flips to false and
+        // the tabs render with an empty/broken profile underneath them.
         await loadProfile(firebaseUser.uid);
         registerForPushNotifications(firebaseUser.uid);
       } else {
@@ -75,18 +81,24 @@ export function AuthProvider({ children }) {
     return unsub;
   }, [user]);
 
-  // email and phone live in a private subcollection (users/{uid}/private/contact),
-  // not on the main users/{uid} document — that document is readable by any
-  // signed-in user (needed so the app can show other people's names, avatars,
-  // suburbs, and online status), so contact info can't safely live there too.
-  // Older accounts created before this split may still have email/phone sitting
-  // on the main doc; we fall back to those here for backward compatibility,
-  // and any future edit via updateUserProfile()/createProfile() migrates them
-  // into the private doc and strips them off the main one.
-  const loadProfile = async (uid) => {
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Retries the profile read up to 3 total attempts (with a short delay
+  // between each) before giving up — covers the cold-start case where the
+  // very first Firestore read fires before the connection is fully ready.
+  // Returns true/false so callers can tell whether it actually succeeded,
+  // rather than assuming success just because it didn't throw.
+  const loadProfile = async (uid, attempt = 1) => {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+        if (attempt < 3) {
+          await sleep(attempt * 500);
+          return loadProfile(uid, attempt + 1);
+        }
+        console.error('loadProfile: no profile document found after retries for uid', uid);
+        return false;
+      }
       const mainData = snap.data();
 
       let contact = {};
@@ -103,7 +115,15 @@ export function AuthProvider({ children }) {
         email: contact.email ?? mainData.email,
         phone: contact.phone ?? mainData.phone,
       });
-    } catch (e) { console.error('loadProfile error:', e); }
+      return true;
+    } catch (e) {
+      if (attempt < 3) {
+        await sleep(attempt * 500);
+        return loadProfile(uid, attempt + 1);
+      }
+      console.error('loadProfile error after retries:', e);
+      return false;
+    }
   };
 
   const registerForPushNotifications = async (uid) => {
@@ -158,9 +178,6 @@ export function AuthProvider({ children }) {
     setUnreadMessageCount(0);
   };
 
-  // Splits email/phone off into the private/contact subdocument at profile
-  // creation time too, so a brand-new account never has them on the public
-  // doc in the first place.
   const createProfile = async (uid, data) => {
     const { email, phone, ...publicFields } = data;
     const profileData = { ...publicFields, isAdmin: false, isSuspended: false, createdAt: serverTimestamp() };
@@ -176,12 +193,6 @@ export function AuthProvider({ children }) {
     setProfile({ uid, ...profileData, email, phone, createdAt: new Date() });
   };
 
-  // Every existing caller (edit-profile.js, select-suburb.js, blockUser,
-  // lastVisited tracking, etc.) keeps working unchanged — this function's
-  // public signature is identical. Under the hood, any email/phone passed
-  // in gets routed to the private/contact subdocument instead of the main
-  // doc, and is actively deleted from the main doc (via deleteField()) so
-  // older accounts get cleaned up the next time either field is touched.
   const updateUserProfile = async (data) => {
     if (!user) return;
     const { email, phone, ...publicData } = data;
