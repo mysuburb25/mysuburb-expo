@@ -83,9 +83,14 @@ service cloud.firestore {
                     && request.resource.data.commentCount == 0;
 
       allow update: if
+        // Owner editing their own post — covers both the original
+        // remove/restore + content/images path, and the newer Edit Post
+        // feature (description, price, and location fields). Kept in one
+        // clause since they're all "the owner editing their own content"
+        // and share the same authorization check.
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['isRemoved', 'content', 'images']))
+               .hasOnly(['isRemoved', 'content', 'images', 'description', 'price', 'eventLocation', 'lostFoundLocation']))
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -107,6 +112,9 @@ service cloud.firestore {
                .hasOnly(['savedBy'])
           && isValidArrayToggle('savedBy'))
         ||
+        // closedAt travels alongside isSold/isResolved so the client can
+        // record exactly when a post was closed (used for the 24-hour
+        // grace period logic, and just generally useful data to have).
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['isSold', 'closedAt']))
