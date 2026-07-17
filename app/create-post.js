@@ -13,7 +13,7 @@ import AppName from '../components/AppName';
 const COMMUNITY_TABS = [
   { key: 'updates', label: 'General' },
   { key: 'notices', label: 'Notice' },
-  { key: 'safety', label: 'Safety Alert' },
+  { key: 'safety', label: 'Alert' },
 ];
 
 const MARKETPLACE_TABS = [
@@ -57,7 +57,7 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos ({images.length}/3)</Text>
+        <Text style={styles.sectionBarText}>Photos ({images.length}/5)</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
@@ -69,7 +69,7 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
               </TouchableOpacity>
             </View>
           ))}
-          {images.length < 3 && (
+          {images.length < 5 && (
             <TouchableOpacity style={styles.addImageBtn} onPress={onAddPhoto}>
               <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
               <Text style={styles.addImageText}>Add Photo</Text>
@@ -176,12 +176,12 @@ export default function CreatePostScreen() {
   const isServices = effectiveCategory === 'services';
   const isCommunity = !isLostFound && !isMarketplace && !isServices;
 
-  const pageTitle = isEditMode ? 'Edit Post' : (isCommunity ? 'Home' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services');
+  const pageTitle = isEditMode ? 'Edit Post' : (isCommunity ? 'Community Hub' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services');
   const pageIcon = isEditMode ? 'create' : (isCommunity ? 'home' : isMarketplace ? 'pricetag' : isLostFound ? 'flag' : 'briefcase');
 
   const handlePickImage = () => {
-    if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
-    const remaining = 3 - images.length;
+    if (images.length >= 5) { Alert.alert('Limit reached', 'You can only add up to 5 images.'); return; }
+    const remaining = 5 - images.length;
     Alert.alert('Add Photos', 'Choose an option', [
       {
         text: 'Take Photo',

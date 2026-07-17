@@ -277,10 +277,15 @@ export default function LostFoundScreen() {
         </View>
       </View>
       <View style={styles.pageHeader}>
-        <View style={styles.pageHeaderIconBadge}>
-          <Ionicons name="flag" size={22} color={Colors.brandGreen} />
+        <View style={styles.pageHeaderCenterGroup}>
+          <View style={styles.pageHeaderIconBadge}>
+            <Ionicons name="flag" size={22} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.pageTitle}>Lost & Found</Text>
         </View>
-        <Text style={styles.pageTitle}>Lost & Found</Text>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
+          <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
       <View style={styles.tabRow}>
         {TABS.map(t => (
@@ -375,6 +380,10 @@ export default function LostFoundScreen() {
                     <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
                     <Text style={styles.footerText}>{item.commentCount || 0}</Text>
                   </TouchableOpacity>
+                  <View style={styles.footerBtn}>
+                    <Ionicons name="eye-outline" size={19} color={Colors.midGrey} />
+                    <Text style={[styles.footerText, { color: Colors.midGrey }]}>{item.viewCount || 0}</Text>
+                  </View>
                   <View style={{ flex: 1 }} />
                   <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name={item.savedBy?.includes(user?.uid) ? 'bookmark' : 'bookmark-outline'} size={20} color={item.savedBy?.includes(user?.uid) ? Colors.brandGreen : Colors.charcoal} />
@@ -482,7 +491,9 @@ const styles = StyleSheet.create({
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderCenterGroup: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  dashboardShortcut: { padding: 4 },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
   tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },

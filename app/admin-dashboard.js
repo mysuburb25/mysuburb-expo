@@ -22,7 +22,7 @@ function formatDate(date) {
 }
 
 export default function AdminDashboardScreen() {
-  const { user, profile } = useAuth();
+  const { user, profile, unreadCount, unreadMessageCount } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
   // --- Overview / stats ---
@@ -234,7 +234,24 @@ export default function AdminDashboardScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>Bringing suburbs together</Text>
         </View>
-        <View style={{ width: 40 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+            <Ionicons name="chatbubbles-outline" size={22} color="#fff" />
+            {unreadMessageCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
+            <Ionicons name="notifications-outline" size={24} color="#fff" />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.pageHeader}>
@@ -288,7 +305,7 @@ export default function AdminDashboardScreen() {
               </View>
               <View style={[styles.statCard, styles.statCardWide, { backgroundColor: '#F5F5F5' }]}>
                 <Ionicons name="home-outline" size={18} color={Colors.brandGreen} />
-                <Text style={styles.statRowLabel}>Home</Text>
+                <Text style={styles.statRowLabel}>Community Hub</Text>
                 <Text style={styles.statRowNumber}>{stats?.home ?? 0}</Text>
               </View>
               <View style={[styles.statCard, styles.statCardWide, { backgroundColor: '#F5F5F5' }]}>
@@ -480,6 +497,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F2F2' },
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   headerCenter: { alignItems: 'center' },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },

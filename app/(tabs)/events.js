@@ -62,7 +62,7 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos ({images.length}/3)</Text>
+        <Text style={styles.sectionBarText}>Photos ({images.length}/5)</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
@@ -74,7 +74,7 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
               </TouchableOpacity>
             </View>
           ))}
-          {images.length < 3 && (
+          {images.length < 5 && (
             <TouchableOpacity style={styles.addImageBtn} onPress={onAddPhoto}>
               <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
               <Text style={styles.addImageText}>Add Photo</Text>
@@ -470,8 +470,8 @@ export default function EventsScreen() {
   };
 
   const handlePickImage = () => {
-    if (images.length >= 3) { Alert.alert('Limit reached', 'You can only add up to 3 images.'); return; }
-    const remaining = 3 - images.length;
+    if (images.length >= 5) { Alert.alert('Limit reached', 'You can only add up to 5 images.'); return; }
+    const remaining = 5 - images.length;
     Alert.alert('Add Photos', 'Choose an option', [
       {
         text: 'Take Photo',
@@ -649,10 +649,15 @@ export default function EventsScreen() {
         </View>
       </View>
       <View style={styles.pageHeader}>
-        <View style={styles.pageHeaderIconBadge}>
-          <Ionicons name="calendar" size={22} color={Colors.brandGreen} />
+        <View style={styles.pageHeaderCenterGroup}>
+          <View style={styles.pageHeaderIconBadge}>
+            <Ionicons name="calendar" size={22} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.pageTitle}>Events</Text>
         </View>
-        <Text style={styles.pageTitle}>Events</Text>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
+          <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, tab === 'upcoming' && styles.tabBtnActive]} onPress={() => setTab('upcoming')}>
@@ -824,6 +829,10 @@ export default function EventsScreen() {
                       <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
                       <Text style={styles.footerText}>{item.commentCount || 0}</Text>
                     </TouchableOpacity>
+                    <View style={styles.footerBtn}>
+                      <Ionicons name="eye-outline" size={19} color={Colors.midGrey} />
+                      <Text style={[styles.footerText, { color: Colors.midGrey }]}>{item.viewCount || 0}</Text>
+                    </View>
                   </View>
                   <View style={{ flex: 1 }} />
                   <TouchableOpacity style={[styles.interestedPill, attending && styles.interestedPillActive]} onPress={() => handleToggleAttending(item)}>
@@ -939,10 +948,12 @@ export default function EventsScreen() {
             <View style={{ width: 60 }} />
           </View>
           <View style={styles.pageHeader}>
-            <View style={styles.pageHeaderIconBadge}>
-              <Ionicons name={editingEventId ? 'create' : 'calendar'} size={22} color={Colors.brandGreen} />
+            <View style={styles.pageHeaderCenterGroup}>
+              <View style={styles.pageHeaderIconBadge}>
+                <Ionicons name={editingEventId ? 'create' : 'calendar'} size={22} color={Colors.brandGreen} />
+              </View>
+              <Text style={styles.pageTitle}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
             </View>
-            <Text style={styles.pageTitle}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
           </View>
           <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Event Title</Text></View>
@@ -1059,7 +1070,9 @@ const styles = StyleSheet.create({
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderCenterGroup: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  dashboardShortcut: { padding: 4 },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
   tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },

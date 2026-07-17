@@ -51,6 +51,22 @@ service cloud.firestore {
           && afterArr.size() == beforeArr.size() - 1);
     }
 
+    // One-way only, unlike the toggles above — a view can be added once
+    // per person but never removed. Blocks the same uid from being added
+    // to viewedBy twice, which also means it blocks incrementing
+    // viewCount more than once per person, keeping the two fields
+    // consistent with each other.
+    function isValidViewIncrement() {
+      let beforeArr = resource.data.get('viewedBy', []);
+      let afterArr = request.resource.data.get('viewedBy', []);
+      let beforeCount = resource.data.get('viewCount', 0);
+      let afterCount = request.resource.data.get('viewCount', 0);
+      return !(request.auth.uid in beforeArr)
+        && request.auth.uid in afterArr
+        && afterArr.size() == beforeArr.size() + 1
+        && afterCount == beforeCount + 1;
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn();
 
@@ -111,6 +127,14 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['savedBy'])
           && isValidArrayToggle('savedBy'))
+        ||
+        // Anyone except the post's own author can register a view — once
+        // per person, never reversible, and never touching any other field.
+        (isSignedIn()
+          && request.auth.uid != resource.data.authorId
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['viewCount', 'viewedBy'])
+          && isValidViewIncrement())
         ||
         // closedAt travels alongside isSold/isResolved so the client can
         // record exactly when a post was closed (used for the 24-hour

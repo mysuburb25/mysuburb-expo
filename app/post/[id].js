@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityInd
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, arrayUnion } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -70,7 +70,7 @@ const PAGE_TITLES = {
 };
 
 const CATEGORY_LABELS = {
-  updates: 'General', notices: 'Notice', safety: 'Safety Alert',
+  updates: 'General', notices: 'Notice', safety: 'Alert',
   events: 'Event', marketplace: 'Buy & Sell', services: 'Service',
 };
 
@@ -129,7 +129,7 @@ export default function PostDetailScreen() {
   const [showReportSuccess, setShowReportSuccess] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
-  const [viewerImageUrl, setViewerImageUrl] = useState(null);
+  const [viewerIndex, setViewerIndex] = useState(null); // index into post.images, or null when closed
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [addedToCalendar, setAddedToCalendar] = useState(false);
@@ -137,6 +137,29 @@ export default function PostDetailScreen() {
   const flatListRef = useRef(null);
 
   useEffect(() => { fetchPost(); fetchComments(); }, [id]);
+
+  // Registers a view once per person, skipping the post's own author (a
+  // view count that includes the author checking their own post repeatedly
+  // isn't a meaningful signal). Runs once post + user are both available,
+  // and only if this user isn't already in viewedBy — both to avoid a
+  // wasted write and because the rules would reject a second attempt
+  // anyway.
+  useEffect(() => {
+    if (!post || !user) return;
+    if (post.authorId === user.uid) return;
+    if ((post.viewedBy || []).includes(user.uid)) return;
+    updateDoc(doc(db, 'posts', id), {
+      viewCount: increment(1),
+      viewedBy: arrayUnion(user.uid),
+    }).then(() => {
+      setPost(prev => ({
+        ...prev,
+        viewCount: (prev.viewCount || 0) + 1,
+        viewedBy: [...(prev.viewedBy || []), user.uid],
+      }));
+    }).catch(e => console.error('view count error:', e));
+  }, [post?.id, user?.uid]);
+
 
   // "Added to calendar" is a per-device fact (it lives in the phone's own
   // calendar app, not our account data), so it's tracked in AsyncStorage
@@ -729,7 +752,7 @@ export default function PostDetailScreen() {
                   {post.images && post.images.length > 0 && (
                     <View style={styles.imagesWrap}>
                       {post.images.map((url, i) => (
-                        <TouchableOpacity key={i} onPress={() => setViewerImageUrl(url)}>
+                        <TouchableOpacity key={i} onPress={() => setViewerIndex(i)}>
                           <Image source={{ uri: url }} style={styles.postImage} resizeMode="cover" />
                         </TouchableOpacity>
                       ))}
@@ -763,6 +786,10 @@ export default function PostDetailScreen() {
                       <View style={styles.footerBtn}>
                         <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
                         <Text style={styles.footerText}>{post.commentCount || 0}</Text>
+                      </View>
+                      <View style={styles.footerBtn}>
+                        <Ionicons name="eye-outline" size={19} color={Colors.midGrey} />
+                        <Text style={[styles.footerText, { color: Colors.midGrey }]}>{post.viewCount || 0}</Text>
                       </View>
                     </View>
                     <View style={{ flex: 1 }} />
@@ -966,7 +993,7 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <ImageViewerModal imageUrl={viewerImageUrl} onClose={() => setViewerImageUrl(null)} />
+      <ImageViewerModal images={viewerIndex !== null ? post?.images : null} initialIndex={viewerIndex ?? 0} onClose={() => setViewerIndex(null)} />
 
       {/* Share modal */}
       <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>

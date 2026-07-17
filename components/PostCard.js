@@ -7,7 +7,7 @@ import { Colors } from '../constants/theme';
 const CATEGORY_CONFIG = {
   updates:     { label: 'General', bg: Colors.brandGreen },
   notices:     { label: 'Notice',           bg: '#1565C0' },
-  safety:      { label: 'Safety Alert',     bg: '#E65100' },
+  safety:      { label: 'Alert',            bg: '#E65100' },
   events:      { label: 'Event',            bg: '#6A1B9A' },
   marketplace: { label: 'Buy & Sell',       bg: Colors.brandGreen },
   lostfound:   { label: 'Lost & Found',     bg: '#C62828' },
@@ -62,6 +62,10 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
           <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
           <Text style={styles.footerText}>{item.commentCount || 0}</Text>
         </TouchableOpacity>
+        <View style={styles.footerBtn}>
+          <Ionicons name="eye-outline" size={19} color={Colors.midGrey} />
+          <Text style={[styles.footerText, { color: Colors.midGrey }]}>{item.viewCount || 0}</Text>
+        </View>
         <View style={{ flex: 1 }} />
         <TouchableOpacity onPress={() => onToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />

@@ -14,7 +14,7 @@ import AppName from '../../components/AppName';
 const CATEGORY_COLORS = {
   updates:     { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: 'General' },
   notices:     { bg: '#E3F2FD', text: '#0D47A1', label: 'Notice' },
-  safety:      { bg: '#FFF3E0', text: '#E65100', label: 'Safety Alert' },
+  safety:      { bg: '#FFF3E0', text: '#E65100', label: 'Alert' },
   events:      { bg: '#F3E5F5', text: '#6A1B9A', label: 'Event' },
   marketplace: { bg: Colors.brandGreenPale, text: Colors.brandGreen, label: 'Buy & Sell' },
   lostfound:   { bg: '#FFF3E0', text: '#E65100', label: 'Lost & Found' },

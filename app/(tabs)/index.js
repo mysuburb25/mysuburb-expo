@@ -14,7 +14,7 @@ const FILTERS = [
   { key: 'all', label: 'All', createCategory: 'community', preselect: 'updates' },
   { key: 'updates', label: 'General', createCategory: 'community', preselect: 'updates' },
   { key: 'notices', label: 'Notices', createCategory: 'community', preselect: 'notices' },
-  { key: 'safety', label: 'Safety Alerts', createCategory: 'community', preselect: 'safety' },
+  { key: 'safety', label: 'Alerts', createCategory: 'community', preselect: 'safety' },
 ];
 
 const PAGE_SIZE = 15; // used for both the initial load and every subsequent Load More tap
@@ -278,10 +278,15 @@ export default function HomeScreen() {
         </View>
       </View>
       <View style={styles.pageHeader}>
-        <View style={styles.pageHeaderIconBadge}>
-          <Ionicons name="home" size={22} color={Colors.brandGreen} />
+        <View style={styles.pageHeaderCenterGroup}>
+          <View style={styles.pageHeaderIconBadge}>
+            <Ionicons name="home" size={22} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.pageTitle}>Community Hub</Text>
         </View>
-        <Text style={styles.pageTitle}>Home</Text>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
+          <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
       <View style={styles.tabRow}>
         {FILTERS.map(f => (
@@ -401,13 +406,15 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderCenterGroup: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  dashboardShortcut: { padding: 4 },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
   tabRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8, gap: 6, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flex: 1, paddingVertical: 10, paddingHorizontal: 2, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   tabBtnActive: { backgroundColor: Colors.brandGreen, borderColor: Colors.brandGreen },
-  tabText: { fontSize: 11, color: Colors.midGrey, fontWeight: '800' },
+  tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '800' },
   tabTextActive: { color: Colors.white, fontWeight: '700' },
   filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 12, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: '#F5F5F5', borderRadius: 14, borderWidth: 1, borderColor: Colors.lightGrey },

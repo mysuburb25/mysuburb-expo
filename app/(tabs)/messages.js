@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { Alert } from 'react-native';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -23,55 +22,49 @@ function timeAgo(date) {
 }
 
 function ConversationRow({ item, user, shareText }) {
+  const { profile, blockUser, unblockUser } = useAuth();
   const otherUserId = item.participants?.find(p => p !== user.uid);
   const otherUserName = item.participantNames?.[otherUserId] || 'Neighbour';
   const unread = item.unreadCount?.[user.uid] || 0;
   const isLastFromMe = item.lastMessageSenderId === user.uid;
   const isOnline = useOnlineStatus(otherUserId);
   const isPinned = (item.pinnedBy || []).includes(user.uid);
+  const isBlocked = (profile?.blockedUserIds || []).includes(otherUserId);
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleLongPress = () => {
-    Alert.alert(
-      otherUserName,
-      undefined,
-      [
-        {
-          text: isPinned ? 'Unpin' : 'Pin',
-          onPress: () => updateDoc(doc(db, 'conversations', item.id), {
-            pinnedBy: isPinned ? arrayRemove(user.uid) : arrayUnion(user.uid),
-          }).catch(e => console.error(e)),
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => Alert.alert(
-            'Delete Conversation',
-            `This removes the conversation with ${otherUserName} from your list. It comes back if either of you sends a new message.`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete', style: 'destructive',
-                onPress: () => updateDoc(doc(db, 'conversations', item.id), {
-                  deletedBy: arrayUnion(user.uid),
-                }).catch(e => console.error(e)),
-              },
-            ]
-          ),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+  const handleTogglePin = () => {
+    setShowActionSheet(false);
+    updateDoc(doc(db, 'conversations', item.id), {
+      pinnedBy: isPinned ? arrayRemove(user.uid) : arrayUnion(user.uid),
+    }).catch(e => console.error(e));
+  };
+
+  const handleToggleBlock = async () => {
+    setShowActionSheet(false);
+    try {
+      if (isBlocked) await unblockUser(otherUserId);
+      else await blockUser(otherUserId, otherUserName);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDelete = () => {
+    setShowDeleteConfirm(false);
+    updateDoc(doc(db, 'conversations', item.id), {
+      deletedBy: arrayUnion(user.uid),
+    }).catch(e => console.error(e));
   };
 
   return (
-    <TouchableOpacity
-      style={styles.row}
-      onLongPress={handleLongPress}
-      onPress={() => router.push({
-        pathname: '/chat/' + otherUserId,
-        params: shareText ? { userId: otherUserId, userName: otherUserName, prefillText: shareText } : { userId: otherUserId, userName: otherUserName },
-      })}
-    >
+    <>
+      <TouchableOpacity
+        style={styles.row}
+        onLongPress={() => setShowActionSheet(true)}
+        onPress={() => router.push({
+          pathname: '/chat/' + otherUserId,
+          params: shareText ? { userId: otherUserId, userName: otherUserName, prefillText: shareText } : { userId: otherUserId, userName: otherUserName },
+        })}
+      >
       <View style={styles.avatar}>
         {item.participantPhotos?.[otherUserId] ? (
           <Image source={{ uri: item.participantPhotos[otherUserId] }} style={styles.avatarImage} />
@@ -99,7 +92,61 @@ function ConversationRow({ item, user, shareText }) {
           )}
         </View>
       </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      <Modal visible={showActionSheet} transparent animationType="fade">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowActionSheet(false)}>
+          <View style={styles.menuSheet}>
+            <View style={styles.menuHeaderBar}>
+              <Text style={styles.menuHeaderText}>Select</Text>
+            </View>
+            <View style={styles.menuPad}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleTogglePin}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name={isPinned ? 'bookmark' : 'bookmark-outline'} size={20} color={Colors.brandGreen} />
+                </View>
+                <Text style={styles.menuItemText}>{isPinned ? 'Unpin' : 'Pin'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleToggleBlock}>
+                <View style={styles.menuItemIconDanger}>
+                  <Ionicons name="ban-outline" size={20} color="#E53935" />
+                </View>
+                <Text style={styles.menuItemTextDanger}>{isBlocked ? 'Unblock' : 'Block'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setShowActionSheet(false); setShowDeleteConfirm(true); }}>
+                <View style={styles.menuItemIconDanger}>
+                  <Ionicons name="trash-outline" size={20} color="#E53935" />
+                </View>
+                <Text style={styles.menuItemTextDanger}>Delete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowActionSheet(false)}>
+                <Text style={styles.menuCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={showDeleteConfirm} transparent animationType="fade">
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconCircle}>
+              <Ionicons name="trash-outline" size={26} color="#E53935" />
+            </View>
+            <Text style={styles.confirmTitle}>Delete Conversation</Text>
+            <Text style={styles.confirmMessage}>This removes the conversation with {otherUserName} from your list. It comes back if either of you sends a new message.</Text>
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setShowDeleteConfirm(false)}>
+                <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmDeleteBtn} onPress={handleDelete}>
+                <Text style={styles.confirmDeleteBtnText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -198,6 +245,32 @@ export default function MessagesScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Matches the same "green header + Select" menu pattern used on the
+  // post detail screen's 3-dot menu, and the individual chat screen's
+  // own menu — kept visually identical across all three so this kind of
+  // action sheet always looks the same no matter where it's opened from.
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  menuHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
+  menuHeaderText: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  menuPad: { padding: 16, paddingBottom: 32 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  menuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  menuItemIconDanger: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
+  menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
+  menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
+  menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8, borderWidth: 0 },
+  menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  confirmCard: { backgroundColor: Colors.white, borderRadius: 20, padding: 26, alignItems: 'center', width: '100%', maxWidth: 340 },
+  confirmIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FCE8E7', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  confirmTitle: { fontSize: 19, fontWeight: '800', color: Colors.charcoal, marginBottom: 6 },
+  confirmMessage: { fontSize: 14, color: Colors.midGrey, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  confirmBtnRow: { flexDirection: 'row', gap: 10, width: '100%' },
+  confirmCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center', backgroundColor: '#F0F0F0' },
+  confirmCancelBtnText: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
+  confirmDeleteBtn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center', backgroundColor: '#E53935' },
+  confirmDeleteBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
   container: { flex: 1, backgroundColor: Colors.white },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerCenter: { alignItems: 'center' },

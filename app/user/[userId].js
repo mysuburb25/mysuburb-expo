@@ -164,7 +164,7 @@ export default function UserProfileScreen() {
           )}
         </View>
       )}
-      <ImageViewerModal imageUrl={viewerImageUrl} onClose={() => setViewerImageUrl(null)} />
+      <ImageViewerModal images={viewerImageUrl ? [viewerImageUrl] : null} initialIndex={0} onClose={() => setViewerImageUrl(null)} />
     </View>
   );
 }

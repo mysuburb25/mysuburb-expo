@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, writeBatch, increment, arrayRemove } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import useOnlineStatus from '../../utils/useOnlineStatus';
+import ImageViewerModal from '../../components/ImageViewerModal';
 
 function formatTime(date) {
   if (!date) return '';
@@ -79,8 +80,8 @@ export default function ChatScreen() {
   const [theyBlockedMe, setTheyBlockedMe] = useState(false);
   const [otherUserPhotoURL, setOtherUserPhotoURL] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName }
-  const [pendingImage, setPendingImage] = useState(null); // local uri, staged but not yet sent
-  const [viewerImageUrl, setViewerImageUrl] = useState(null);
+  const [pendingImages, setPendingImages] = useState([]); // local uris, staged but not yet sent
+  const [viewerIndex, setViewerIndex] = useState(null); // index into chatImageUrls, or null when closed
   const flatListRef = useRef(null);
 
   const userName = resolvedUserName || 'Neighbour';
@@ -89,6 +90,18 @@ export default function ChatScreen() {
 
   // Conversation ID — always sorted so same convo regardless of who starts
   const conversationId = [user.uid, userId].sort().join('_');
+  const [isConvoPinned, setIsConvoPinned] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'conversations', conversationId));
+        if (snap.exists()) {
+          setIsConvoPinned((snap.data().pinnedBy || []).includes(user.uid));
+        }
+      } catch (e) { console.error(e); }
+    })();
+  }, [conversationId, user.uid]);
 
   // If the screen was opened without a userName param (e.g. a deep link),
   // look the recipient's name up directly so we never write `undefined`
@@ -186,44 +199,52 @@ export default function ChatScreen() {
     } catch (e) { console.error('notification error:', e); }
   };
 
-  // Picking a photo only stages it (pendingImage) — it does NOT send
-  // immediately. It shows as a preview above the composer, same as a
-  // typed reply-in-progress, and only actually uploads + sends once the
-  // person taps Send, same as text.
+  // Picking photos only stages them (pendingImages) — nothing sends
+  // immediately. Each staged photo becomes its own message on Send (same
+  // as how most chat apps handle a multi-photo batch), with any typed
+  // caption attached to the last one rather than sent as a separate
+  // bubble on its own.
+  const MAX_PENDING_IMAGES = 5;
+
   const handleSend = async () => {
-    if ((!message.trim() && !pendingImage) || sending || isBlocked) return;
+    if ((!message.trim() && pendingImages.length === 0) || sending || isBlocked) return;
     const text = message.trim();
-    const imageToSend = pendingImage;
+    const imagesToSend = pendingImages;
     setMessage('');
-    setPendingImage(null);
+    setPendingImages([]);
     setSending(true);
     try {
-      let imageUrl = null;
-      if (imageToSend) {
-        const response = await fetch(imageToSend);
-        const blob = await response.blob();
-        const fileName = `${Date.now()}.jpg`;
-        const storageRef = ref(storage, `chatImages/${conversationId}/${fileName}`);
-        await uploadBytes(storageRef, blob);
-        imageUrl = await getDownloadURL(storageRef);
+      if (imagesToSend.length === 0) {
+        await sendMessage({ text, previewText: text });
+      } else {
+        for (let i = 0; i < imagesToSend.length; i++) {
+          const response = await fetch(imagesToSend[i]);
+          const blob = await response.blob();
+          const fileName = `${Date.now()}_${i}.jpg`;
+          const storageRef = ref(storage, `chatImages/${conversationId}/${fileName}`);
+          await uploadBytes(storageRef, blob);
+          const imageUrl = await getDownloadURL(storageRef);
+          const isLast = i === imagesToSend.length - 1;
+          const captionForThis = isLast ? text : '';
+          await sendMessage({
+            text: captionForThis || undefined,
+            imageUrl,
+            previewText: captionForThis || '\ud83d\udcf7 Photo',
+          });
+        }
       }
-      const previewText = imageUrl ? (text ? text : '\ud83d\udcf7 Photo') : text;
-      await sendMessage({
-        text: text || undefined,
-        imageUrl: imageUrl || undefined,
-        previewText,
-      });
     } catch (e) {
       console.error(e);
       setMessage(text);
-      setPendingImage(imageToSend);
+      setPendingImages(imagesToSend);
     } finally {
       setSending(false);
     }
   };
 
   const handlePickImage = () => {
-    if (pendingImage || isBlocked) return;
+    if (pendingImages.length >= MAX_PENDING_IMAGES || isBlocked) return;
+    const remaining = MAX_PENDING_IMAGES - pendingImages.length;
     Alert.alert('Add Photo', 'Choose an option', [
       {
         text: 'Take Photo',
@@ -231,7 +252,7 @@ export default function ChatScreen() {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
           const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
-          if (!result.canceled) setPendingImage(result.assets[0].uri);
+          if (!result.canceled) setPendingImages(prev => [...prev, result.assets[0].uri]);
         },
       },
       {
@@ -239,12 +260,51 @@ export default function ChatScreen() {
         onPress: async () => {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-          if (!result.canceled) setPendingImage(result.assets[0].uri);
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+            allowsMultipleSelection: true,
+            selectionLimit: remaining,
+          });
+          if (!result.canceled) {
+            const newUris = result.assets.slice(0, remaining).map(a => a.uri);
+            setPendingImages(prev => [...prev, ...newUris]);
+          }
         },
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
+  };
+
+  const removePendingImage = (index) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleTogglePin = () => {
+    setShowMenu(false);
+    updateDoc(doc(db, 'conversations', conversationId), {
+      pinnedBy: isConvoPinned ? arrayRemove(user.uid) : arrayUnion(user.uid),
+    }).then(() => setIsConvoPinned(!isConvoPinned)).catch(e => console.error(e));
+  };
+
+  const handleDeleteConversation = () => {
+    setShowMenu(false);
+    Alert.alert(
+      'Delete Conversation',
+      `This removes the conversation with ${userName} from your list. It comes back if either of you sends a new message.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'conversations', conversationId), { deletedBy: arrayUnion(user.uid) });
+              router.back();
+            } catch (e) { console.error(e); }
+          },
+        },
+      ]
+    );
   };
 
   const handleToggleBlock = () => {
@@ -279,9 +339,16 @@ export default function ChatScreen() {
     setReplyingTo({
       messageId: item.id,
       text: item.text || (item.imageUrl ? 'Photo' : ''),
+      imageUrl: item.imageUrl || null,
       senderName: item.senderId === user.uid ? 'You' : userName,
     });
   };
+
+  // Every photo shared in this conversation, in the same order they
+  // appear in the message list — lets the viewer swipe through all of
+  // them starting from whichever one was tapped, rather than only
+  // showing that single image with no way to browse the rest.
+  const chatImageUrls = messages.filter(m => m.imageUrl).map(m => m.imageUrl);
 
   const renderItem = ({ item, index }) => {
     const isMe = item.senderId === user.uid;
@@ -321,7 +388,7 @@ export default function ChatScreen() {
               </View>
             )}
             {item.imageUrl && (
-              <TouchableOpacity onPress={() => setViewerImageUrl(item.imageUrl)}>
+              <TouchableOpacity onPress={() => setViewerIndex(chatImageUrls.indexOf(item.imageUrl))}>
                 <Image source={{ uri: item.imageUrl }} style={styles.msgImage} />
               </TouchableOpacity>
             )}
@@ -411,31 +478,44 @@ export default function ChatScreen() {
         <>
           {replyingTo && (
             <View style={styles.replyBar}>
+              <View style={styles.replyBarAccent} />
+              {replyingTo.imageUrl && (
+                <Image source={{ uri: replyingTo.imageUrl }} style={styles.replyBarThumb} />
+              )}
               <View style={{ flex: 1 }}>
-                <Text style={styles.replyBarSender}>Replying to {replyingTo.senderName}</Text>
+                <View style={styles.replyBarHeader}>
+                  <Ionicons name="arrow-undo" size={13} color={Colors.brandGreen} />
+                  <Text style={styles.replyBarSender}>{replyingTo.senderName}</Text>
+                </View>
                 <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.text}</Text>
               </View>
-              <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={18} color={Colors.midGrey} />
+              <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyBarCloseBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={15} color={Colors.white} />
               </TouchableOpacity>
             </View>
           )}
-          {pendingImage && (
+          {pendingImages.length > 0 && (
             <View style={styles.pendingImageBar}>
-              <Image source={{ uri: pendingImage }} style={styles.pendingImageThumb} />
-              <Text style={styles.pendingImageText}>Photo ready — add a caption or tap send</Text>
-              <TouchableOpacity onPress={() => setPendingImage(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={22} color={Colors.midGrey} />
-              </TouchableOpacity>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {pendingImages.map((uri, i) => (
+                  <View key={i} style={styles.pendingImageThumbWrap}>
+                    <Image source={{ uri }} style={styles.pendingImageThumb} />
+                    <TouchableOpacity style={styles.pendingImageRemoveBtn} onPress={() => removePendingImage(i)}>
+                      <Ionicons name="close-circle" size={18} color="#E53935" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+              <Text style={styles.pendingImageCount}>{pendingImages.length}</Text>
             </View>
           )}
           <View style={styles.inputRow}>
-            <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={!!pendingImage}>
-              <Ionicons name="camera-outline" size={24} color={pendingImage ? Colors.lightGrey : Colors.brandGreen} />
+            <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={pendingImages.length >= MAX_PENDING_IMAGES}>
+              <Ionicons name="camera-outline" size={24} color={pendingImages.length >= MAX_PENDING_IMAGES ? Colors.lightGrey : Colors.brandGreen} />
             </TouchableOpacity>
             <TextInput
               style={styles.input}
-              placeholder={pendingImage ? 'Add a caption (optional)...' : `Message ${userName}...`}
+              placeholder={pendingImages.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
               placeholderTextColor={Colors.midGrey}
               value={message}
               onChangeText={setMessage}
@@ -445,9 +525,9 @@ export default function ChatScreen() {
               autoCapitalize="sentences"
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!message.trim() && !pendingImage || sending) && styles.sendBtnDisabled]}
+              style={[styles.sendBtn, (!message.trim() && pendingImages.length === 0 || sending) && styles.sendBtnDisabled]}
               onPress={handleSend}
-              disabled={(!message.trim() && !pendingImage) || sending}
+              disabled={(!message.trim() && pendingImages.length === 0) || sending}
             >
               {sending
                 ? <ActivityIndicator color={Colors.white} size="small" />
@@ -458,28 +538,41 @@ export default function ChatScreen() {
         </>
       )}
 
-      <Modal visible={!!viewerImageUrl} transparent animationType="fade">
-        <TouchableOpacity style={styles.imageViewerOverlay} activeOpacity={1} onPress={() => setViewerImageUrl(null)}>
-          <Image source={{ uri: viewerImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
-          <TouchableOpacity style={styles.imageViewerCloseBtn} onPress={() => setViewerImageUrl(null)}>
-            <Ionicons name="close" size={28} color={Colors.white} />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      <ImageViewerModal
+        images={viewerIndex !== null ? chatImageUrls : null}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
 
       <Modal visible={showMenu} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={styles.menuSheet}>
-            <View style={styles.menuHandle} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleToggleBlock}>
-              <View style={styles.menuItemIcon}>
-                <Ionicons name="ban-outline" size={20} color="#E53935" />
-              </View>
-              <Text style={styles.menuItemTextDanger}>{iBlockedThem ? `Unblock ${userName}` : `Block ${userName}`}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowMenu(false)}>
-              <Text style={styles.menuCancelText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={styles.menuHeaderBar}>
+              <Text style={styles.menuHeaderText}>Select</Text>
+            </View>
+            <View style={styles.menuPad}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleTogglePin}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name={isConvoPinned ? 'bookmark' : 'bookmark-outline'} size={20} color={Colors.brandGreen} />
+                </View>
+                <Text style={styles.menuItemText}>{isConvoPinned ? 'Unpin' : 'Pin'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleToggleBlock}>
+                <View style={styles.menuItemIconDanger}>
+                  <Ionicons name="ban-outline" size={20} color="#E53935" />
+                </View>
+                <Text style={styles.menuItemTextDanger}>{iBlockedThem ? 'Unblock' : 'Block'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleDeleteConversation}>
+                <View style={styles.menuItemIconDanger}>
+                  <Ionicons name="trash-outline" size={20} color="#E53935" />
+                </View>
+                <Text style={styles.menuItemTextDanger}>Delete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowMenu(false)}>
+                <Text style={styles.menuCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -543,26 +636,36 @@ const styles = StyleSheet.create({
   replyQuoteText: { fontSize: 12, color: Colors.midGrey },
   replyQuoteTextMe: { color: 'rgba(255,255,255,0.85)' },
   // Reply preview bar shown above the composer while replying
-  replyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
-  pendingImageBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
-  pendingImageThumb: { width: 40, height: 40, borderRadius: 8 },
-  pendingImageText: { flex: 1, fontSize: 12, color: Colors.brandGreen, fontWeight: '600' },
+  replyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 3 },
+  replyBarAccent: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: Colors.brandGreen },
+  replyBarThumb: { width: 38, height: 38, borderRadius: 8 },
+  replyBarHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
+  replyBarCloseBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.midGrey, justifyContent: 'center', alignItems: 'center' },
+  pendingImageBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
+  pendingImageThumbWrap: { position: 'relative' },
+  pendingImageThumb: { width: 52, height: 52, borderRadius: 10 },
+  pendingImageRemoveBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 9 },
+  pendingImageCount: { fontSize: 13, fontWeight: '800', color: Colors.brandGreen, minWidth: 20, textAlign: 'center' },
   replyBarSender: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   replyBarText: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
   // Image message + full-screen viewer
   msgImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
-  imageViewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-  imageViewerImage: { width: '100%', height: '80%' },
-  imageViewerCloseBtn: { position: 'absolute', top: 56, right: 20, padding: 8 },
+
   blockedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   blockedBannerText: { flex: 1, fontSize: 13, color: Colors.midGrey },
   unblockLink: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
+  // Matches the same "green header + Select" menu pattern used on the
+  // post detail screen and the Messages list's long-press action sheet.
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 },
-  menuHandle: { width: 40, height: 4, backgroundColor: Colors.lightGrey, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12 },
-  menuItemIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
+  menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  menuHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
+  menuHeaderText: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  menuPad: { padding: 16, paddingBottom: 32 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  menuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
+  menuItemIconDanger: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
+  menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
   menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
-  menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8 },
+  menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8, borderWidth: 0 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
 });

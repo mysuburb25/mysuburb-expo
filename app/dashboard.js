@@ -9,7 +9,7 @@ import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
 
 const SECTIONS = [
-  { key: 'community', label: 'Home', icon: 'home', color: Colors.brandGreen },
+  { key: 'community', label: 'Community Hub', icon: 'home', color: Colors.brandGreen },
   { key: 'events', label: 'Events', icon: 'calendar', color: '#6A1B9A' },
   { key: 'marketplace', label: 'Buy & Sell', icon: 'pricetag', color: Colors.brandGreen },
   { key: 'services', label: 'Services', icon: 'briefcase', color: Colors.brandGreen },
@@ -28,7 +28,7 @@ function formatDate(date) {
 }
 
 export default function DashboardScreen() {
-  const { profile, updateUserProfile } = useAuth();
+  const { profile, updateUserProfile, unreadCount, unreadMessageCount } = useAuth();
   const [grouped, setGrouped] = useState({});
   const [loading, setLoading] = useState(true);
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -115,7 +115,24 @@ export default function DashboardScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <View style={{ width: 42 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+            <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+            {unreadMessageCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
+            <Ionicons name="notifications-outline" size={26} color="#fff" />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.pageHeader}>
@@ -194,6 +211,8 @@ const styles = StyleSheet.create({
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 20, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerCenter: { alignItems: 'center' },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   profileAvatarImage: { width: 42, height: 42, borderRadius: 21 },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white, marginTop: 2 },

@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { Alert } from 'react-native';
 import { Colors } from '../../constants/theme';
@@ -17,6 +18,7 @@ function TabIcon({ name, focused }) {
 
 export default function TabLayout() {
   const { user, profile, loading, unreadCount, logout } = useAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!loading && !user) router.replace('/(auth)/login');
@@ -54,15 +56,24 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: Colors.brandGreen,
           borderTopWidth: 0,
-          height: 60,
-          paddingBottom: 8,
+          // iOS reports its home-indicator inset reliably through
+          // useSafeAreaInsets, so a flat baseline plus that inset works
+          // everywhere. Android's system nav bar varies a lot by device
+          // (3-button vs gesture nav, manufacturer skins), and insets.bottom
+          // isn't always populated the same way React Navigation's own
+          // defaults expect — Math.max with a sane floor keeps the bar
+          // from ever rendering too short and getting obscured, while
+          // insets.bottom stretches it further on devices that report a
+          // real inset.
+          height: 60 + Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 0),
+          paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 8),
           paddingHorizontal: 25,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
         tabBarItemStyle: { marginHorizontal: -8 },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} /> }} />
+      <Tabs.Screen name="index" options={{ title: 'Hub', tabBarLabelStyle: { fontSize: 12, fontWeight: '700' }, tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} /> }} />
       <Tabs.Screen name="events" options={{ title: 'Events', tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} /> }} />
       <Tabs.Screen name="buy-sell" options={{ title: 'Buy & Sell', tabBarIcon: ({ focused }) => <TabIcon name="pricetag" focused={focused} /> }} />
       <Tabs.Screen name="services" options={{ title: 'Services', tabBarIcon: ({ focused }) => <TabIcon name="briefcase" focused={focused} /> }} />
