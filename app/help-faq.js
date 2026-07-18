@@ -6,9 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 const FAQS = [
   { q: 'How does My Suburb work?', a: 'My Suburb connects you with neighbours in your exact suburb. All posts are only visible to people who live in the same suburb as you.' },
   { q: 'How do I change my suburb?', a: 'Go to Profile, tap Settings, then tap Change Suburb. You can search for any suburb in Australia.' },
-  { q: 'Can I follow more than one suburb?', a: 'Yes, you can select up to 3 suburbs — a Primary, Second, and Third. Posts from all your active suburbs appear together in your feed.' },
+  { q: 'Can I follow more than one suburb?', a: 'Yes, you can select up to 5 suburbs — a Primary plus four others. Posts from all your active suburbs appear together in your feed.' },
   { q: 'What is a Primary suburb?', a: 'Your Primary suburb is the first one you select and is where all your posts are published. It cannot be turned off, but you can replace it any time from Change Suburb.' },
-  { q: 'How do I turn a suburb on or off in my feed?', a: 'Go to Profile and open the Suburbs tab. Each Second and Third suburb has a switch you can toggle on or off to control whether its posts show in your feed. Your Primary suburb is always on.' },
+  { q: 'How do I turn a suburb on or off in my feed?', a: 'Go to Profile and open the Suburbs tab. Each of your other suburbs has a switch you can toggle on or off to control whether its posts show in your feed. Your Primary suburb is always on.' },
   { q: 'Who can see my posts?', a: 'Only verified residents of your suburb can see your posts. Posts are never visible to people outside your suburb.' },
   { q: 'Can other users see my email or mobile number?', a: 'No. Your email or mobile number is kept private and is never shown to other users, even on your profile.' },
   { q: 'How do I report a post?', a: 'Tap the three-dot menu on any post and choose Report. Our moderation team reviews all reports promptly.' },

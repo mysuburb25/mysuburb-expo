@@ -56,17 +56,15 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: Colors.brandGreen,
           borderTopWidth: 0,
-          // iOS reports its home-indicator inset reliably through
-          // useSafeAreaInsets, so a flat baseline plus that inset works
-          // everywhere. Android's system nav bar varies a lot by device
-          // (3-button vs gesture nav, manufacturer skins), and insets.bottom
-          // isn't always populated the same way React Navigation's own
-          // defaults expect — Math.max with a sane floor keeps the bar
-          // from ever rendering too short and getting obscured, while
-          // insets.bottom stretches it further on devices that report a
-          // real inset.
-          height: 60 + Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 0),
-          paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 8),
+          // iOS was already correct with flat values — its home indicator
+          // inset (~34px) is already accounted for by React Navigation's
+          // own default tab bar behavior, so adding insets.bottom on top
+          // of that here was double-counting it and made the bar taller
+          // than intended. Only Android actually needed the dynamic
+          // treatment, since its system nav bar varies by device in a way
+          // these flat values never covered.
+          height: Platform.OS === 'android' ? 60 + Math.max(insets.bottom, 16) : 60,
+          paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 16) : 8,
           paddingHorizontal: 25,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },

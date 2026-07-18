@@ -360,7 +360,7 @@ export default function CreatePostScreen() {
       }
 
       // Notify all users who have this suburb active — whether it's their
-      // Primary, Second, or Third suburb — except the poster themselves,
+      // Primary or any of their other active suburbs — except the poster themselves,
       // and only if they haven't turned off notifications for this category.
       // General community posts (updates/notices) have no dedicated toggle,
       // so those always notify. Edit mode never reaches this — updating a

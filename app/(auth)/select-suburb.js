@@ -22,13 +22,15 @@ const SUBURB_SLOTS = [
   { key: 'primary',   label: 'Primary Suburb',  required: true  },
   { key: 'second',    label: 'Second Suburb',    required: false },
   { key: 'third',     label: 'Third Suburb',     required: false },
+  { key: 'fourth',    label: 'Fourth Suburb',    required: false },
+  { key: 'fifth',     label: 'Fifth Suburb',     required: false },
 ];
 
 const emptySlot = () => ({ state: '', suburb: '', active: true });
 
 // Builds the "STATE|suburb" key used by activeSuburbKeys so Firestore can
 // array-contains query for any user who has this suburb active, regardless
-// of whether it's their Primary, Second, or Third suburb.
+// of whether it's their Primary or any of their other active suburbs.
 const suburbKey = (state, suburb) => `${state}|${suburb}`;
 
 export default function SelectSuburbScreen() {
@@ -36,22 +38,19 @@ export default function SelectSuburbScreen() {
   const { createProfile, updateUserProfile, user, profile } = useAuth();
   const isEditing = !!profile?.suburb;
 
+  // Driven by SUBURB_SLOTS.length rather than a hardcoded count, so
+  // changing the number of available slots only ever needs to happen in
+  // one place (the SUBURB_SLOTS array above).
   const initSlots = () => {
     if (profile?.suburbs && profile.suburbs.length > 0) {
-      return [
-        profile.suburbs[0] || emptySlot(),
-        profile.suburbs[1] || emptySlot(),
-        profile.suburbs[2] || emptySlot(),
-      ];
+      return SUBURB_SLOTS.map((_, i) => profile.suburbs[i] || emptySlot());
     }
     if (profile?.suburb) {
-      return [
-        { state: profile.state || '', suburb: profile.suburb, active: true },
-        emptySlot(),
-        emptySlot(),
-      ];
+      return SUBURB_SLOTS.map((_, i) =>
+        i === 0 ? { state: profile.state || '', suburb: profile.suburb, active: true } : emptySlot()
+      );
     }
-    return [emptySlot(), emptySlot(), emptySlot()];
+    return SUBURB_SLOTS.map(() => emptySlot());
   };
 
   const [slots, setSlots] = useState(initSlots());
@@ -175,7 +174,7 @@ export default function SelectSuburbScreen() {
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} automaticallyAdjustKeyboardInsets={true}>
         <View style={styles.topSection}>
           <Text style={styles.title}>{isEditing ? 'My Suburbs' : 'Select Your Suburbs'}</Text>
-          <Text style={styles.subtitle}>Select up to 3 suburbs. Your Primary suburb is where your posts will appear.</Text>
+          <Text style={styles.subtitle}>Select up to 5 suburbs. Your Primary suburb is where your posts will appear.</Text>
 
           {SUBURB_SLOTS.map((slot, index) => (
             <View key={slot.key} style={styles.slotSection}>

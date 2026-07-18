@@ -154,7 +154,7 @@ export default function ProfileScreen() {
     if (index === 0) {
       Alert.alert(
         'Primary suburb is locked',
-        'Your Primary suburb can\'t be turned off. Use "Change Suburb" to replace it, or manage your Second/Third suburbs instead.'
+        'Your Primary suburb can\'t be turned off. Use "Change Suburb" to replace it, or manage your other suburbs instead.'
       );
       return;
     }
