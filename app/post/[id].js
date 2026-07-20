@@ -12,6 +12,7 @@ import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 import ImageViewerModal from '../../components/ImageViewerModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 const REPORT_REASONS = [
   'Spam or scam',
@@ -105,6 +106,26 @@ function getStatusLabels() {
 // True when a post has been closed, regardless of category/field name.
 function isPostClosed(post) {
   return post.category === 'lostfound' ? !!post.isResolved : !!post.isSold;
+}
+
+// One player instance per video — useVideoPlayer is a hook, so it can't
+// be called inside a .map() loop directly, hence this being its own
+// component. Doesn't autoplay: starts paused, person taps the native
+// controls to play, same as tapping "play" on any other video app —
+// nobody's mobile data gets used for a video they didn't ask to watch.
+function PostVideoPlayer({ url }) {
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = false;
+  });
+  return (
+    <VideoView
+      style={styles.postVideo}
+      player={player}
+      nativeControls
+      allowsFullscreen
+      contentFit="cover"
+    />
+  );
 }
 
 export default function PostDetailScreen() {
@@ -784,6 +805,15 @@ export default function PostDetailScreen() {
                     </View>
                   )}
 
+                  {/* Videos */}
+                  {post.videos && post.videos.length > 0 && (
+                    <View style={styles.imagesWrap}>
+                      {post.videos.map((vid, i) => (
+                        <PostVideoPlayer key={i} url={vid.url} />
+                      ))}
+                    </View>
+                  )}
+
                   {!isEvent && post.description ? (
                     <Text style={[styles.description, isPostClosed(post) && styles.closedText]}>{post.description}</Text>
                   ) : null}
@@ -1255,6 +1285,7 @@ const styles = StyleSheet.create({
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   imagesWrap: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },
+  postVideo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#000' },
   // Post menu modal
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },

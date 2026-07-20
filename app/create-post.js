@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatLi
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
@@ -82,6 +83,53 @@ function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
   );
 }
 
+// Videos: max 3 per post, 60 seconds, 50MB each. Chosen to keep upload
+// times and Storage costs reasonable for a community app on mobile data
+// — not a hard technical ceiling, just a sane default. Enforced here
+// (so people get instant feedback before waiting on an upload) AND in
+// storage.rules (size/type only — duration can't be checked server-side,
+// so that cap is client-side-only, same as most consumer apps).
+const MAX_VIDEOS = 3;
+const MAX_VIDEO_DURATION_SEC = 60;
+const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
+
+function VideoPickerSection({ videos, onAddVideo, onRemoveVideo }) {
+  return (
+    <>
+      <View style={styles.sectionBar}>
+        <Text style={styles.sectionBarText}>Videos ({videos.length}/{MAX_VIDEOS})</Text>
+      </View>
+      <View style={styles.fieldPad}>
+        <View style={styles.imageRow}>
+          {videos.map((vid, index) => (
+            <View key={index} style={styles.imageThumbWrap}>
+              {vid.thumbnailUri ? (
+                <Image source={{ uri: vid.thumbnailUri }} style={styles.imageThumb} />
+              ) : (
+                <View style={[styles.imageThumb, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Ionicons name="videocam" size={22} color="#fff" />
+                </View>
+              )}
+              <View style={styles.videoPlayBadge}>
+                <Ionicons name="play" size={12} color="#fff" />
+              </View>
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveVideo(index)}>
+                <Ionicons name="close-circle" size={20} color="#E53935" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {videos.length < MAX_VIDEOS && (
+            <TouchableOpacity style={styles.addImageBtn} onPress={onAddVideo}>
+              <Ionicons name="videocam-outline" size={24} color={Colors.brandGreen} />
+              <Text style={styles.addImageText}>Add Video</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </>
+  );
+}
+
 export default function CreatePostScreen() {
   const { category: paramCategory, preselect, editPostId } = useLocalSearchParams();
   const { user, profile } = useAuth();
@@ -120,6 +168,7 @@ export default function CreatePostScreen() {
   const [selectedService, setSelectedService] = useState(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [images, setImages] = useState([]); // array of { uri, existing? } — existing:true means an already-uploaded URL, not a fresh local pick
+  const [videos, setVideos] = useState([]); // array of { uri, thumbnailUri, duration, existing? }
   const [posting, setPosting] = useState(false);
   const scrollRef = useRef(null);
 
@@ -161,6 +210,9 @@ export default function CreatePostScreen() {
 
         if (data.images && data.images.length > 0) {
           setImages(data.images.map(url => ({ uri: url, existing: true })));
+        }
+        if (data.videos && data.videos.length > 0) {
+          setVideos(data.videos.map(v => ({ uri: v.url, thumbnailUri: v.thumbnailUrl, duration: v.duration, existing: true })));
         }
       } catch (e) {
         console.error(e);
@@ -222,6 +274,72 @@ export default function CreatePostScreen() {
 
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePickVideo = () => {
+    if (videos.length >= MAX_VIDEOS) { Alert.alert('Limit reached', `You can only add up to ${MAX_VIDEOS} videos.`); return; }
+    Alert.alert('Add Video', 'Choose an option', [
+      {
+        text: 'Record Video',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            videoMaxDuration: MAX_VIDEO_DURATION_SEC,
+            quality: 0.7,
+          });
+          if (!result.canceled) await stageVideo(result.assets[0]);
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            allowsEditing: false,
+          });
+          if (!result.canceled) await stageVideo(result.assets[0]);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  // Shared by both camera and library video picking — validates against
+  // MAX_VIDEO_DURATION_SEC / MAX_VIDEO_SIZE_BYTES up front (rather than
+  // letting a too-large upload start and only fail against
+  // storage.rules), and generates a local thumbnail for the picker UI
+  // and, later, the feed/list preview.
+  const stageVideo = async (asset) => {
+    const durationSec = (asset.duration || 0) / 1000; // expo-image-picker reports duration in ms
+    if (durationSec > MAX_VIDEO_DURATION_SEC) {
+      Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. This one is ${Math.round(durationSec)}s.`);
+      return;
+    }
+    if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+      Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. This one is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`);
+      return;
+    }
+
+    let thumbnailUri = null;
+    try {
+      const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
+      thumbnailUri = thumb.uri;
+    } catch (e) {
+      console.error('Video thumbnail generation failed:', e);
+      // Not fatal — the picker UI falls back to a generic video icon,
+      // and the post can still be created without a thumbnail.
+    }
+
+    setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
+    Keyboard.dismiss();
+  };
+
+  const removeVideo = (index) => {
+    setVideos(prev => prev.filter((_, i) => i !== index));
   };
 
   const fetchLfLocationSuggestions = async (text) => {
@@ -289,6 +407,45 @@ export default function CreatePostScreen() {
     return urls;
   };
 
+  // Same existing/fresh split as uploadImages, but each video uploads
+  // alongside its own thumbnail image (also to Storage) so the feed/list
+  // view has something to show without needing to load the full video.
+  // Returns objects, not bare URLs, since duration travels with each one
+  // (used for display, e.g. "0:42" on the thumbnail).
+  const uploadVideos = async (postId) => {
+    const results = [];
+    for (let i = 0; i < videos.length; i++) {
+      const vid = videos[i];
+      if (vid.existing) {
+        results.push({ url: vid.uri, thumbnailUrl: vid.thumbnailUri, duration: vid.duration });
+        continue;
+      }
+      const videoResponse = await fetch(vid.uri);
+      const videoBlob = await videoResponse.blob();
+      const videoRef = ref(storage, `posts/${postId}/video_${i}_${Date.now()}.mp4`);
+      await uploadBytes(videoRef, videoBlob, { contentType: videoBlob.type || 'video/mp4' });
+      const url = await getDownloadURL(videoRef);
+
+      let thumbnailUrl = null;
+      if (vid.thumbnailUri) {
+        try {
+          const thumbResponse = await fetch(vid.thumbnailUri);
+          const thumbBlob = await thumbResponse.blob();
+          const thumbRef = ref(storage, `posts/${postId}/video_thumb_${i}_${Date.now()}.jpg`);
+          await uploadBytes(thumbRef, thumbBlob);
+          thumbnailUrl = await getDownloadURL(thumbRef);
+        } catch (e) {
+          console.error('Video thumbnail upload failed:', e);
+          // Not fatal — the video itself still uploaded fine, the feed
+          // just falls back to a generic video icon for this one.
+        }
+      }
+
+      results.push({ url, thumbnailUrl, duration: vid.duration || 0 });
+    }
+    return results;
+  };
+
   const handlePost = async () => {
     if (isServices) {
       if (!selectedService) { Alert.alert('Error', 'Please select a service.'); return; }
@@ -344,9 +501,11 @@ export default function CreatePostScreen() {
       // --- Edit mode: update the existing post instead of creating one ---
       if (isEditMode) {
         const imageUrls = await uploadImages(editPostId);
+        const videoData = await uploadVideos(editPostId);
         await updateDoc(doc(db, 'posts', editPostId), {
           content: postContent,
           images: imageUrls,
+          videos: videoData,
           ...extraFields,
         });
         router.replace('/post/' + editPostId);
@@ -367,13 +526,17 @@ export default function CreatePostScreen() {
         commentCount: 0,
         isRemoved: false,
         images: [],
+        videos: [],
         ...extraFields,
       });
 
-      // Upload images if any
-      if (images.length > 0) {
-        const imageUrls = await uploadImages(postRef.id);
-        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
+      // Upload images and videos if any
+      if (images.length > 0 || videos.length > 0) {
+        const [imageUrls, videoData] = await Promise.all([
+          images.length > 0 ? uploadImages(postRef.id) : Promise.resolve([]),
+          videos.length > 0 ? uploadVideos(postRef.id) : Promise.resolve([]),
+        ]);
+        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls, videos: videoData });
       }
 
       // Notify all users who have this suburb active — whether it's their
@@ -520,6 +683,7 @@ export default function CreatePostScreen() {
               />
             </View>
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
+            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -581,6 +745,7 @@ export default function CreatePostScreen() {
               <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
             </View>
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
+            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -611,6 +776,7 @@ export default function CreatePostScreen() {
               </>
             )}
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
+            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -664,6 +830,7 @@ export default function CreatePostScreen() {
               )}
             </View>
             <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
+            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -720,6 +887,11 @@ const styles = StyleSheet.create({
   imageThumbWrap: { position: 'relative' },
   imageThumb: { width: 90, height: 90, borderRadius: 10, borderWidth: 1, borderColor: Colors.lightGrey },
   removeImageBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: Colors.white, borderRadius: 10 },
+  videoPlayBadge: {
+    position: 'absolute', top: '50%', left: '50%', marginTop: -12, marginLeft: -12,
+    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
   addImageBtn: { width: 90, height: 90, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.brandGreen, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 4 },
   addImageText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
   // Service modal

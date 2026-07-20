@@ -13,19 +13,24 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
-    // Post images — the storage path is keyed by postId (a generated
-    // Firestore document ID), not the uploader's uid, so ownership can't
-    // be checked from the path alone. Instead we look up the matching
-    // Firestore post document and confirm its authorId is the uploader.
-    // Safe because the post doc is always created (with authorId set)
-    // before its images are uploaded — see create-post.js / events.js.
-    // 10MB cap per image, must actually be an image.
+    // Post images AND videos — the storage path is keyed by postId (a
+    // generated Firestore document ID), not the uploader's uid, so
+    // ownership can't be checked from the path alone. Instead we look up
+    // the matching Firestore post document and confirm its authorId is
+    // the uploader. Safe because the post doc is always created (with
+    // authorId set) before its media is uploaded — see create-post.js /
+    // events.js. Images: 10MB cap. Videos: 50MB cap (max 3 per post,
+    // 60-second duration cap enforced client-side in create-post.js —
+    // Storage rules can't inspect video duration, only size/type).
     match /posts/{postId}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null
                    && firestore.get(/databases/(default)/documents/posts/$(postId)).data.authorId == request.auth.uid
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && (
+                        (request.resource.contentType.matches('image/.*') && request.resource.size < 10 * 1024 * 1024)
+                        ||
+                        (request.resource.contentType.matches('video/.*') && request.resource.size < 50 * 1024 * 1024)
+                      );
     }
 
     // Chat images — keyed by conversationId, so ownership is checked the

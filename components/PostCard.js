@@ -91,6 +91,30 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
         </View>
       )}
 
+      {item.videos && item.videos.length > 0 && (
+        <View style={styles.videoRow}>
+          {item.videos.map((vid, i) => (
+            <TouchableOpacity key={i} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
+              {vid.thumbnailUrl ? (
+                <Image source={{ uri: vid.thumbnailUrl }} style={styles.videoThumb} resizeMode="cover" />
+              ) : (
+                <View style={[styles.videoThumb, styles.videoThumbFallback]}>
+                  <Ionicons name="videocam" size={22} color="#fff" />
+                </View>
+              )}
+              <View style={styles.videoPlayOverlay}>
+                <Ionicons name="play" size={16} color="#fff" />
+              </View>
+              {vid.duration > 0 && (
+                <View style={styles.videoDurationBadge}>
+                  <Text style={styles.videoDurationText}>{Math.floor(vid.duration / 60)}:{String(vid.duration % 60).padStart(2, '0')}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       <TouchableOpacity onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
         <View style={styles.cardBody}>
           <Text style={styles.content} numberOfLines={4}>{item.content}</Text>
@@ -132,6 +156,16 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { backgroundColor: '#fff', width: 8, height: 8, borderRadius: 4 },
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
+  videoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
+  videoThumb: { width: 72, height: 72, borderRadius: 10, borderWidth: 1, borderColor: '#E0E0E0' },
+  videoThumbFallback: { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  videoPlayOverlay: {
+    position: 'absolute', top: '50%', left: '50%', marginTop: -12, marginLeft: -12,
+    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  videoDurationBadge: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
+  videoDurationText: { fontSize: 10, fontWeight: '700', color: '#fff' },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },

@@ -27,7 +27,10 @@
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "backgroundColor": "#FFD700"
       },
-      "permissions": ["READ_CALENDAR", "WRITE_CALENDAR"]
+      "permissions": [
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -49,7 +52,8 @@
         {
           "calendarPermission": "MySuburb needs calendar access so you can add community events to your calendar."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "scheme": "mysuburb",
     "extra": {
