@@ -33,12 +33,18 @@ export default function CommunityGuidelinesScreen() {
         <Text style={styles.bullet}>- Lost and Found: Lost or found pets, items and belongings</Text>
         <Text style={styles.bullet}>- Services: Services you're offering or looking for</Text>
 
+        <Text style={styles.heading}>Child Safety — Zero Tolerance</Text>
+        <Text style={styles.body}>My Suburb strictly and explicitly prohibits Child Sexual Abuse and Exploitation (CSAE) in any form. This includes, but is not limited to, Child Sexual Abuse Material (CSAM), grooming, sexualisation of minors, sextortion, trafficking, and any content or behaviour that sexually exploits, abuses, or endangers a child.</Text>
+        <Text style={styles.body}>My Suburb is intended for users aged 18 and over. Any account found to be engaging in, facilitating, or distributing CSAE/CSAM content will be permanently banned immediately upon discovery, with no warning and no exceptions.</Text>
+        <Text style={styles.body}>Confirmed CSAM is removed immediately upon our becoming aware of it, and is reported to the relevant authorities, including the Australian Centre to Counter Child Exploitation (ACCCE) and/or the National Center for Missing & Exploited Children (NCMEC), in accordance with applicable law.</Text>
+        <Text style={styles.body}>If you encounter any content that concerns child safety, please report it immediately using the Report feature on the relevant post, comment, or user, or contact us at community@mysuburb.com.au.</Text>
+
         <Text style={styles.heading}>What Is Not Allowed</Text>
         <Text style={styles.body}>The following content will be removed and may result in account suspension:</Text>
         <Text style={styles.bullet}>- Hate speech, racism, or discrimination of any kind</Text>
         <Text style={styles.bullet}>- Threats of violence or harm to any person</Text>
         <Text style={styles.bullet}>- Sexual or explicit content</Text>
-        <Text style={styles.bullet}>- Content involving or targeting minors inappropriately</Text>
+        <Text style={styles.bullet}>- Child Sexual Abuse and Exploitation (CSAE) in any form — see dedicated section above</Text>
         <Text style={styles.bullet}>- Spam, scams or fraudulent listings</Text>
         <Text style={styles.bullet}>- Unsolicited advertising or commercial promotion</Text>
         <Text style={styles.bullet}>- False emergency alerts or misleading safety warnings</Text>
