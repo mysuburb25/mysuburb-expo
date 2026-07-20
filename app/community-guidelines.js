@@ -14,7 +14,7 @@ export default function CommunityGuidelinesScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Community Guidelines</Text>
-        <Text style={styles.updated}>Last updated: 16 July 2026</Text>
+        <Text style={styles.updated}>Last updated: 20 July 2026</Text>
         <Text style={styles.intro}>My Suburb is your local community. These guidelines help keep our community safe, respectful and useful for everyone.</Text>
 
         <Text style={styles.heading}>Be Respectful</Text>
@@ -50,6 +50,17 @@ export default function CommunityGuidelinesScreen() {
         <Text style={styles.body}>My Suburb is for private sales between neighbours, not commercial businesses. Be honest about the condition of items.</Text>
         <Text style={styles.body}>Always meet in a safe public place when exchanging items with strangers. My Suburb is not responsible for transactions between users.</Text>
         <Text style={styles.body}>Once an item is sold, given away, or no longer available, mark the listing as Closed so other neighbours don't waste time asking.</Text>
+
+        <Text style={styles.heading}>Prohibited Items</Text>
+        <Text style={styles.body}>The following must never be listed for sale, trade, or giveaway on My Suburb. Listings will be removed immediately and the account permanently banned:</Text>
+        <Text style={styles.bullet}>- Illegal drugs or controlled substances of any kind</Text>
+        <Text style={styles.bullet}>- Prescription medicines or pharmaceuticals</Text>
+        <Text style={styles.bullet}>- Weapons, firearms, ammunition, or knives restricted under Australian law</Text>
+        <Text style={styles.bullet}>- Alcohol or tobacco products</Text>
+        <Text style={styles.bullet}>- Infant formula and baby food (these are regulated products in Australia and cannot be resold through informal listings)</Text>
+        <Text style={styles.bullet}>- Recalled, counterfeit, or stolen goods</Text>
+        <Text style={styles.bullet}>- Animals or pets (for adoption/rehoming, please use registered services)</Text>
+        <Text style={styles.body}>If you're unsure whether an item is allowed, please contact us before posting. Reported listings involving prohibited items will be escalated for immediate review.</Text>
 
         <Text style={styles.heading}>Lost and Found Guidelines</Text>
         <Text style={styles.body}>When posting about a lost pet or item, include as much detail as possible including description, location last seen, and a contact method.</Text>

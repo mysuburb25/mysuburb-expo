@@ -9,6 +9,7 @@ import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
+import { findProhibitedTerm, PROHIBITED_ITEMS_MESSAGE } from '../utils/contentModeration';
 
 const COMMUNITY_TABS = [
   { key: 'updates', label: 'General' },
@@ -292,12 +293,28 @@ export default function CreatePostScreen() {
     if (isServices) {
       if (!selectedService) { Alert.alert('Error', 'Please select a service.'); return; }
       if (!content.trim()) { Alert.alert('Error', 'Please add a description.'); return; }
+      const flaggedTerm = findProhibitedTerm(content);
+      if (flaggedTerm) {
+        Alert.alert('Listing not allowed', PROHIBITED_ITEMS_MESSAGE);
+        return;
+      }
     } else if (isLostFound) {
       if (!lfItem.trim()) { Alert.alert('Error', `Please describe what you ${selectedCategory === 'lost' ? 'lost' : 'found'}.`); return; }
     } else if (isMarketplace) {
       if (!mpTitle.trim()) { Alert.alert('Error', 'Please describe your listing.'); return; }
+      const combinedText = `${mpTitle} ${mpDescription || ''}`;
+      const flaggedTerm = findProhibitedTerm(combinedText);
+      if (flaggedTerm) {
+        Alert.alert('Listing not allowed', PROHIBITED_ITEMS_MESSAGE);
+        return;
+      }
     } else {
       if (!content.trim()) { Alert.alert('Error', 'Please write something!'); return; }
+      const flaggedTerm = findProhibitedTerm(content);
+      if (flaggedTerm) {
+        Alert.alert('Post not allowed', PROHIBITED_ITEMS_MESSAGE);
+        return;
+      }
     }
 
     setPosting(true);

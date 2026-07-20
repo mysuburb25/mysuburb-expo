@@ -44,6 +44,7 @@ export default function TermsOfServiceScreen() {
         <Text style={styles.bullet}>- Scrape or collect other users' data without consent</Text>
         <Text style={styles.bullet}>- Use the app for commercial solicitation without permission</Text>
         <Text style={styles.bullet}>- Post false safety alerts or misleading community notices</Text>
+        <Text style={styles.bullet}>- List, sell, trade, or give away illegal drugs, controlled substances, prescription medicines, weapons, alcohol, tobacco, infant formula, recalled or counterfeit goods, or any other item prohibited under our Community Guidelines</Text>
 
         <Text style={styles.heading}>6. Content Moderation and Reporting</Text>
         <Text style={styles.body}>My Suburb reserves the right to remove any content that violates these terms or our Community Guidelines, and to warn, suspend, or terminate accounts that violate our terms, without prior notice where reasonably necessary to protect user safety.</Text>

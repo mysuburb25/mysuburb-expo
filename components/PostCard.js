@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarWithOnlineDot from '../components/AvatarWithOnlineDot';
@@ -25,6 +26,8 @@ function formatDate(date) {
 }
 
 export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle, onToggleSave, onShare }) {
+  const [imgWidth, setImgWidth] = useState(0);
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
   const liked = item.likedBy?.includes(currentUserUid) || false;
   const saved = item.savedBy?.includes(currentUserUid) || false;
   const catConf = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.updates;
@@ -50,6 +53,38 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
           </View>
         </View>
       </View>
+
+      {item.images && item.images.length > 0 && (
+        <View
+          style={styles.imageCarouselWrap}
+          onLayout={(e) => setImgWidth(e.nativeEvent.layout.width)}
+        >
+          {imgWidth > 0 && (
+            <FlatList
+              data={item.images}
+              keyExtractor={(_, i) => String(i)}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / imgWidth);
+                setActiveImgIndex(idx);
+              }}
+              renderItem={({ item: url }) => (
+                <Image source={{ uri: url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+              )}
+            />
+          )}
+          {item.images.length > 1 && (
+            <View style={styles.dotsRow}>
+              {item.images.map((_, i) => (
+                <View key={i} style={[styles.dot, i === activeImgIndex && styles.dotActive]} />
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
       <View style={styles.cardBody}>
         <Text style={styles.content} numberOfLines={4}>{item.content}</Text>
       </View>
@@ -84,6 +119,10 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#EDF7EF', padding: 14 },
+  imageCarouselWrap: { position: 'relative', backgroundColor: '#000' },
+  dotsRow: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotActive: { backgroundColor: '#fff', width: 8, height: 8, borderRadius: 4 },
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },

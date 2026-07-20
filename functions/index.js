@@ -1,7 +1,8 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const logger = require('firebase-functions/logger');
+const { findProhibitedTerm } = require('./contentModeration');
 
 initializeApp();
 const db = getFirestore();
@@ -50,5 +51,57 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
     }
   } catch (e) {
     logger.error('sendPushOnNotification error:', e);
+  }
+});
+
+// Server-side backstop for prohibited-item screening. The client already
+// blocks obvious cases in app/create-post.js before a post is ever
+// submitted, but that check can be bypassed by anyone writing to
+// Firestore directly (an old app version, a modified build, or a raw API
+// call) — this trigger runs on EVERY new post regardless of how it was
+// created, so it can't be skipped that way.
+//
+// On a match, this does NOT delete the post outright. It hides it from
+// normal feeds (isRemoved: true) and files an auto-flagged entry in the
+// same `reports` collection the Moderation dashboard already reads from
+// (see app/moderation.js), so a human still makes the final call. This
+// avoids permanently losing content or banning someone over a false
+// positive (e.g. "I'm not a smoker, this stolen base looks amazing" for
+// a rug's "stolen valuables" vibe — deliberately far-fetched, but the
+// point is: keyword matches aren't proof of intent).
+exports.screenNewPost = onDocumentCreated('posts/{postId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const post = snap.data();
+  const postId = event.params.postId;
+
+  const textToScreen = [post.content, post.description]
+    .filter(Boolean)
+    .join(' ');
+
+  const flaggedTerm = findProhibitedTerm(textToScreen);
+  if (!flaggedTerm) return;
+
+  try {
+    await snap.ref.update({ isRemoved: true });
+
+    await db.collection('reports').add({
+      status: 'open',
+      category: 'Post content',
+      reason: `Auto-flagged: possible prohibited item ("${flaggedTerm}")`,
+      description: 'This post was automatically hidden by the system and needs manual review before it can be restored.',
+      postId,
+      postContent: post.content || null,
+      postAuthorName: post.authorName || 'Unknown',
+      suburb: post.suburb || null,
+      state: post.state || null,
+      userDisplayName: 'System (auto-flag)',
+      userEmail: null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.warn(`Post ${postId} auto-flagged and hidden for term: "${flaggedTerm}"`);
+  } catch (e) {
+    logger.error('screenNewPost error:', e);
   }
 });
