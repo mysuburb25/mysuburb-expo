@@ -45,5 +45,8 @@
   "overrides": {
     "react-dom": "19.1.0"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "firebase-admin": "^14.2.0"
+  }
 }

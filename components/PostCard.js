@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarWithOnlineDot from '../components/AvatarWithOnlineDot';
@@ -60,20 +60,22 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
           onLayout={(e) => setImgWidth(e.nativeEvent.layout.width)}
         >
           {imgWidth > 0 && (
-            <FlatList
-              data={item.images}
-              keyExtractor={(_, i) => String(i)}
+            <ScrollView
               horizontal
               pagingEnabled
+              directionalLockEnabled
               showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              scrollEventThrottle={16}
               onMomentumScrollEnd={(e) => {
                 const idx = Math.round(e.nativeEvent.contentOffset.x / imgWidth);
                 setActiveImgIndex(idx);
               }}
-              renderItem={({ item: url }) => (
-                <Image source={{ uri: url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
-              )}
-            />
+            >
+              {item.images.map((url, i) => (
+                <Image key={i} source={{ uri: url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+              ))}
+            </ScrollView>
           )}
           {item.images.length > 1 && (
             <View style={styles.dotsRow}>
