@@ -35,24 +35,26 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
   const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== currentUserUid;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
-      <View style={styles.cardHeader}>
-        <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
-          <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-          {isNew && (
-            <View style={styles.newBadge}>
-              <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+    <View style={styles.card}>
+      <TouchableOpacity onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
+        <View style={styles.cardHeader}>
+          <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
+            <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            {isNew && (
+              <View style={styles.newBadge}>
+                <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+              </View>
+            )}
+            <View style={[styles.badge, { backgroundColor: catConf.bg }]}>
+              <Text style={styles.badgeText}>{catConf.label}</Text>
             </View>
-          )}
-          <View style={[styles.badge, { backgroundColor: catConf.bg }]}>
-            <Text style={styles.badgeText}>{catConf.label}</Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {item.images && item.images.length > 0 && (
         <View
@@ -87,9 +89,11 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
         </View>
       )}
 
-      <View style={styles.cardBody}>
-        <Text style={styles.content} numberOfLines={4}>{item.content}</Text>
-      </View>
+      <TouchableOpacity onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
+        <View style={styles.cardBody}>
+          <Text style={styles.content} numberOfLines={4}>{item.content}</Text>
+        </View>
+      </TouchableOpacity>
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerBtn} onPress={() => onLikeToggle(item)}>
           <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
@@ -111,7 +115,7 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
           <Ionicons name="share-outline" size={20} color={Colors.charcoal} />
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 

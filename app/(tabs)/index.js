@@ -45,6 +45,11 @@ export default function HomeScreen() {
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
+  // Same idea: lets the focus effect check "do we already have posts?"
+  // without needing posts itself as a dependency.
+  const postsRef = useRef([]);
+  useEffect(() => { postsRef.current = posts; }, [posts]);
+
   // fetchPosts depends directly on the actual profile fields it reads (not
   // a ref) — this is what makes it automatically re-run the moment `profile`
   // finishes loading after login, and guarantees setLoading(false) always
@@ -151,7 +156,15 @@ export default function HomeScreen() {
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
+    // Only show the full-screen spinner when we have nothing yet. Once
+    // posts exist, returning to this screen (e.g. tapping back from a
+    // post) refreshes quietly in the background — this keeps the
+    // FlatList mounted the whole time, which is what preserves scroll
+    // position. Unmounting it (via the loading spinner swap) is what
+    // was silently resetting everyone back to the top of the feed.
+    if (postsRef.current.length === 0) {
+      setLoading(true);
+    }
     fetchPosts();
 
     const stored = profileRef.current?.lastVisited?.home;

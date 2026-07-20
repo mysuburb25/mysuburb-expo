@@ -75,6 +75,10 @@ export default function BuySellScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorsRef = useRef({});
   const exhaustedRef = useRef({});
+  // Lets the focus effect check "do we already have listings?" without
+  // needing listings itself as a dependency.
+  const listingsRef = useRef([]);
+  useEffect(() => { listingsRef.current = listings; }, [listings]);
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
@@ -162,7 +166,12 @@ export default function BuySellScreen() {
   useEffect(() => { fetchListings(); }, [fetchListings]);
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
+    // Only show the full-screen spinner when we have nothing yet — see
+    // app/(tabs)/index.js for the full explanation of why this matters
+    // for preserving scroll position when returning from a post.
+    if (listingsRef.current.length === 0) {
+      setLoading(true);
+    }
     fetchListings();
 
     const stored = profileRef.current?.lastVisited?.marketplace;

@@ -65,6 +65,10 @@ export default function LostFoundScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorsRef = useRef({});
   const exhaustedRef = useRef({});
+  // Lets the focus effect check "do we already have items?" without
+  // needing items itself as a dependency.
+  const itemsRef = useRef([]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
@@ -145,7 +149,11 @@ export default function LostFoundScreen() {
   };
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
+    // Only show the full-screen spinner when we have nothing yet — see
+    // app/(tabs)/index.js for the full explanation.
+    if (itemsRef.current.length === 0) {
+      setLoading(true);
+    }
     fetchItems();
 
     const stored = profileRef.current?.lastVisited?.lostfound;

@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Keyboard
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -91,13 +91,23 @@ export default function ChatScreen() {
   // Conversation ID — always sorted so same convo regardless of who starts
   const conversationId = [user.uid, userId].sort().join('_');
   const [isConvoPinned, setIsConvoPinned] = useState(false);
+  // undefined = not yet loaded, null = never cleared. Messages sent
+  // before this timestamp are hidden from this user — this is what
+  // actually enforces "delete conversation" regardless of how the
+  // screen is reached (notification tap, profile "Message" button,
+  // deep link, etc.), not just hiding it from the inbox list.
+  const [clearedAt, setClearedAt] = useState(undefined);
 
   useEffect(() => {
     (async () => {
       try {
         const snap = await getDoc(doc(db, 'conversations', conversationId));
         if (snap.exists()) {
-          setIsConvoPinned((snap.data().pinnedBy || []).includes(user.uid));
+          const data = snap.data();
+          setIsConvoPinned((data.pinnedBy || []).includes(user.uid));
+          setClearedAt(data.clearedAt?.[user.uid] || null);
+        } else {
+          setClearedAt(null);
         }
       } catch (e) { console.error(e); }
     })();
@@ -125,10 +135,15 @@ export default function ChatScreen() {
   }, [userId, userNameParam, user.uid]);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'conversations', conversationId, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    // Wait until we know whether this conversation was ever cleared —
+    // otherwise we'd briefly show full history before cutting it down,
+    // which defeats the point.
+    if (clearedAt === undefined) return;
+
+    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+    const q = clearedAt
+      ? query(messagesRef, orderBy('createdAt', 'asc'), where('createdAt', '>', clearedAt))
+      : query(messagesRef, orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setMessages(items);
@@ -144,7 +159,7 @@ export default function ChatScreen() {
       }
     });
     return unsub;
-  }, [conversationId, user.uid]);
+  }, [conversationId, user.uid, clearedAt]);
 
   // Shared by both text and image sends — handles the conversation
   // metadata update, the message document itself, and the notification.
@@ -298,7 +313,10 @@ export default function ChatScreen() {
           text: 'Delete', style: 'destructive',
           onPress: async () => {
             try {
-              await updateDoc(doc(db, 'conversations', conversationId), { deletedBy: arrayUnion(user.uid) });
+              await updateDoc(doc(db, 'conversations', conversationId), {
+                deletedBy: arrayUnion(user.uid),
+                [`clearedAt.${user.uid}`]: serverTimestamp(),
+              });
               router.back();
             } catch (e) { console.error(e); }
           },

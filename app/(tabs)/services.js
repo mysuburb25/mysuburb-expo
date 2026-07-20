@@ -69,6 +69,10 @@ export default function ServicesScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const cursorsRef = useRef({});
   const exhaustedRef = useRef({});
+  // Lets the focus effect check "do we already have posts?" without
+  // needing posts itself as a dependency.
+  const postsRef = useRef([]);
+  useEffect(() => { postsRef.current = posts; }, [posts]);
 
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
@@ -156,7 +160,11 @@ export default function ServicesScreen() {
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
+    // Only show the full-screen spinner when we have nothing yet — see
+    // app/(tabs)/index.js for the full explanation.
+    if (postsRef.current.length === 0) {
+      setLoading(true);
+    }
     fetchPosts();
 
     const stored = profileRef.current?.lastVisited?.services;

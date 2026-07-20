@@ -133,6 +133,10 @@ export default function EventsScreen() {
   const cursorsRef = useRef({});
   const exhaustedRef = useRef({});
   const scrollRef = useRef(null);
+  // Lets the focus effect check "do we already have events?" without
+  // needing events itself as a dependency.
+  const eventsRef = useRef([]);
+  useEffect(() => { eventsRef.current = events; }, [events]);
 
   // Reached from post/[id].js's "Edit Post" menu option on an event —
   // fetches the event and pre-fills the same New Event form, then opens
@@ -321,7 +325,11 @@ export default function EventsScreen() {
   };
 
   useFocusEffect(useCallback(() => {
-    setLoading(true);
+    // Only show the full-screen spinner when we have nothing yet — see
+    // app/(tabs)/index.js for the full explanation.
+    if (eventsRef.current.length === 0) {
+      setLoading(true);
+    }
     fetchEvents();
 
     // Capture the cutoff BEFORE updating it, so "NEW" badges stay visible
