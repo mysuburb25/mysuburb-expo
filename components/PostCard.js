@@ -75,7 +75,9 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
               }}
             >
               {item.images.map((url, i) => (
-                <Image key={i} source={{ uri: url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+                <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => router.push('/post/' + item.id)}>
+                  <Image source={{ uri: url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
