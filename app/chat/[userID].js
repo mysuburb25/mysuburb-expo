@@ -379,6 +379,7 @@ export default function ChatScreen() {
             style={[
               (item.imageUrl && !item.text) ? styles.bubbleImageOnly : styles.bubble,
               !(item.imageUrl && !item.text) && (isMe ? styles.bubbleMe : styles.bubbleThem),
+              replyingTo?.messageId === item.id && styles.bubbleReplyHighlight,
             ]}
           >
             {item.replyTo && (
@@ -450,6 +451,7 @@ export default function ChatScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           renderItem={renderItem}
+          extraData={replyingTo}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -609,6 +611,10 @@ const styles = StyleSheet.create({
   // entirely — the photo shows edge-to-edge with just rounded corners,
   // rather than sitting inside a green/white frame like text messages.
   bubbleImageOnly: { maxWidth: '75%', borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', gap: 2, flexShrink: 1 },
+  // Light yellow highlight on whichever bubble is currently selected as
+  // the reply target — overrides both bubbleMe (green) and bubbleThem
+  // (white) backgrounds so it's clearly visible regardless of sender.
+  bubbleReplyHighlight: { backgroundColor: '#FFF9C4', borderWidth: 1.5, borderColor: '#FFD700' },
   bubbleMe: { backgroundColor: Colors.brandGreen, borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: Colors.white, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: Colors.lightGrey },
   bubbleText: { fontSize: 15, color: Colors.charcoal, lineHeight: 20, flexShrink: 1 },

@@ -24,5 +24,13 @@
       "bucket": "mysuburb-82d3e.firebasestorage.app",
       "rules": "storage.rules"
     }
-  ]
+  ],
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
 }
