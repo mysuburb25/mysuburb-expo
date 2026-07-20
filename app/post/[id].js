@@ -535,6 +535,31 @@ export default function PostDetailScreen() {
     </View>
   );
 
+  // Covers posts removed by their author/an admin, and posts auto-hidden
+  // by the server-side content screening (functions/index.js
+  // screenNewPost). Without this check, anyone who already has a link or
+  // notification pointing at this post — even after it's gone — could
+  // still open it directly, the same gap we fixed for deleted messages.
+  if (post.isRemoved) return (
+    <View style={styles.container}>
+      <View style={styles.topHeader}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={Colors.white} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 10 }}>
+        <Ionicons name="eye-off-outline" size={40} color={Colors.lightGrey} />
+        <Text style={{ fontSize: 15, color: Colors.midGrey, textAlign: 'center' }}>
+          This post is no longer available.
+        </Text>
+      </View>
+    </View>
+  );
+
   const isEvent = post.category === 'events';
   const isLostFound = post.category === 'lostfound';
   const isServices = post.category === 'services';
