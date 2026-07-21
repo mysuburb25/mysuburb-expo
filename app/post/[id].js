@@ -13,6 +13,7 @@ import ImageViewerModal from '../../components/ImageViewerModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { getOrderedMedia } from '../../utils/mediaOrder';
 
 const REPORT_REASONS = [
   'Spam or scam',
@@ -612,6 +613,7 @@ export default function PostDetailScreen() {
   );
 
   const isEvent = post.category === 'events';
+  const orderedMedia = getOrderedMedia(post);
   const isLostFound = post.category === 'lostfound';
   const isServices = post.category === 'services';
   const isOwner = post.authorId === user?.uid;
@@ -831,22 +833,17 @@ export default function PostDetailScreen() {
                     </View>
                   )}
 
-                  {/* Images */}
-                  {post.images && post.images.length > 0 && (
+                  {/* Photos & Videos, interleaved in original pick order */}
+                  {orderedMedia.length > 0 && (
                     <View style={styles.imagesWrap}>
-                      {post.images.map((url, i) => (
-                        <TouchableOpacity key={i} onPress={() => setViewerIndex(i)}>
-                          <Image source={{ uri: url }} style={styles.postImage} resizeMode="cover" />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Videos */}
-                  {post.videos && post.videos.length > 0 && (
-                    <View style={styles.imagesWrap}>
-                      {post.videos.map((vid, i) => (
-                        <PostVideoPlayer key={i} url={vid.url} />
+                      {orderedMedia.map((m, i) => (
+                        m.type === 'video'
+                          ? <PostVideoPlayer key={i} url={m.url} />
+                          : (
+                            <TouchableOpacity key={i} onPress={() => setViewerIndex(post.images.indexOf(m.url))}>
+                              <Image source={{ uri: m.url }} style={styles.postImage} resizeMode="cover" />
+                            </TouchableOpacity>
+                          )
                       ))}
                     </View>
                   )}

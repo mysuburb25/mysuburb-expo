@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking, Share } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import { getOrderedMedia } from '../../utils/mediaOrder';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,40 +64,37 @@ function isToday(date) {
 // app/create-post.js. Kept in sync since events use a fully separate
 // creation flow, not the shared one.
 const MAX_MEDIA = 8;
-const MAX_VIDEO_DURATION_SEC = 60;
+const MAX_VIDEO_DURATION_SEC = 120;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
 
-function MediaPickerSection({ images, videos, onAddMedia, onRemoveImage, onRemoveVideo }) {
-  const total = images.length + videos.length;
-  const atLimit = total >= MAX_MEDIA;
+function MediaPickerSection({ media, onAddMedia, onRemoveMedia }) {
+  const atLimit = media.length >= MAX_MEDIA;
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_MEDIA})</Text>
+        <Text style={styles.sectionBarText}>Photos & Videos ({media.length}/{MAX_MEDIA})</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
-          {images.map((img, index) => (
-            <View key={`img-${index}`} style={styles.imageThumbWrap}>
-              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
-              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveImage(index)}>
-                <Ionicons name="close-circle" size={20} color="#E53935" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          {videos.map((vid, index) => (
-            <View key={`vid-${index}`} style={styles.imageThumbWrap}>
-              {vid.thumbnailUri ? (
-                <Image source={{ uri: vid.thumbnailUri }} style={styles.imageThumb} />
+          {media.map((item, index) => (
+            <View key={index} style={styles.imageThumbWrap}>
+              {item.kind === 'video' ? (
+                item.thumbnailUri ? (
+                  <Image source={{ uri: item.thumbnailUri }} style={styles.imageThumb} />
+                ) : (
+                  <View style={[styles.imageThumb, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                    <Ionicons name="videocam" size={22} color="#fff" />
+                  </View>
+                )
               ) : (
-                <View style={[styles.imageThumb, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-                  <Ionicons name="videocam" size={22} color="#fff" />
+                <Image source={{ uri: item.uri }} style={styles.imageThumb} />
+              )}
+              {item.kind === 'video' && (
+                <View style={styles.videoPlayBadge}>
+                  <Ionicons name="play" size={12} color="#fff" />
                 </View>
               )}
-              <View style={styles.videoPlayBadge}>
-                <Ionicons name="play" size={12} color="#fff" />
-              </View>
-              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveVideo(index)}>
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveMedia(index)}>
                 <Ionicons name="close-circle" size={20} color="#E53935" />
               </TouchableOpacity>
             </View>
@@ -148,8 +146,9 @@ export default function EventsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
-  const [images, setImages] = useState([]);
-  const [videos, setVideos] = useState([]); // array of { uri, thumbnailUri, duration, existing? }
+  // One combined, ordered array — see app/create-post.js for the full
+  // reasoning (kept in sync since events use a separate creation flow).
+  const [media, setMedia] = useState([]);
   const [priceType, setPriceType] = useState('free'); // 'free' or 'paid'
   const [eventPrice, setEventPrice] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
@@ -189,11 +188,13 @@ export default function EventsScreen() {
         setEventDate(data.eventDate?.toDate ? data.eventDate.toDate() : (data.eventDate ? new Date(data.eventDate) : new Date()));
         setPriceType(data.isFree === false ? 'paid' : 'free');
         setEventPrice(data.eventPrice != null ? String(data.eventPrice) : '');
-        if (data.images && data.images.length > 0) {
-          setImages(data.images.map(url => ({ uri: url, existing: true })));
-        }
-        if (data.videos && data.videos.length > 0) {
-          setVideos(data.videos.map(v => ({ uri: v.url, thumbnailUri: v.thumbnailUrl, duration: v.duration, existing: true })));
+        const orderedMedia = getOrderedMedia(data);
+        if (orderedMedia.length > 0) {
+          setMedia(orderedMedia.map(item =>
+            item.type === 'video'
+              ? { kind: 'video', uri: item.url, thumbnailUri: item.thumbnailUrl, duration: item.duration, existing: true }
+              : { kind: 'image', uri: item.url, existing: true }
+          ));
         }
         setShowModal(true);
       } catch (e) {
@@ -508,13 +509,11 @@ export default function EventsScreen() {
     }
   };
 
-  // Single entry point for the "Add Media" button — asks Photo vs Video
-  // first, then hands off to the per-type handlers below (each of which
   // Single "Add Media" entry point — mirrors create-post.js. Camera and
   // Library both accept either media type in one go; each result is
-  // routed to images or videos based on its own reported type.
+  // appended to the single ordered `media` array.
   const handleAddMedia = () => {
-    if (images.length + videos.length >= MAX_MEDIA) {
+    if (media.length >= MAX_MEDIA) {
       Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} photos and videos in total.`);
       return;
     }
@@ -537,7 +536,7 @@ export default function EventsScreen() {
         onPress: async () => {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
-          const remaining = MAX_MEDIA - (images.length + videos.length);
+          const remaining = MAX_MEDIA - media.length;
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.All,
             quality: 0.7,
@@ -560,11 +559,11 @@ export default function EventsScreen() {
     if (asset.type === 'video') {
       const durationSec = (asset.duration || 0) / 1000;
       if (durationSec > MAX_VIDEO_DURATION_SEC) {
-        Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. "${asset.fileName || 'This video'}" is ${Math.round(durationSec)}s and was skipped.`);
+        Alert.alert('Video skipped', `"${asset.fileName || 'A video'}" is ${Math.round(durationSec)}s, which is over the ${MAX_VIDEO_DURATION_SEC}s limit, so it wasn't added. Any other photos or videos you selected were added normally.`);
         return;
       }
       if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
-        Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. "${asset.fileName || 'This video'}" is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB and was skipped.`);
+        Alert.alert('Video skipped', `"${asset.fileName || 'A video'}" is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB, which is over the ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB limit, so it wasn't added. Any other photos or videos you selected were added normally.`);
         return;
       }
       let thumbnailUri = null;
@@ -574,32 +573,28 @@ export default function EventsScreen() {
       } catch (e) {
         console.error('Video thumbnail generation failed:', e);
       }
-      setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
+      setMedia(prev => [...prev, { kind: 'video', uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
     } else {
-      setImages(prev => [...prev, { uri: asset.uri }]);
+      setMedia(prev => [...prev, { kind: 'image', uri: asset.uri }]);
     }
     Keyboard.dismiss();
   };
 
-  const removeVideo = (index) => {
-    setVideos(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removeImage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+  const removeMedia = (index) => {
+    setMedia(prev => prev.filter((_, i) => i !== index));
   };
 
   // Existing (already-uploaded) images keep their URL as-is — only
   // freshly-picked local images need uploading. Mirrors create-post.js's
   // same edit-mode handling.
-  const uploadImages = async (postId) => {
+  const uploadImages = async (postId, imageItems) => {
     const urls = [];
-    for (let i = 0; i < images.length; i++) {
-      if (images[i].existing) {
-        urls.push(images[i].uri);
+    for (let i = 0; i < imageItems.length; i++) {
+      if (imageItems[i].existing) {
+        urls.push(imageItems[i].uri);
         continue;
       }
-      const response = await fetch(images[i].uri);
+      const response = await fetch(imageItems[i].uri);
       const blob = await response.blob();
       const storageRef = ref(storage, `posts/${postId}/image_${i}_${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
@@ -612,10 +607,10 @@ export default function EventsScreen() {
   // Mirrors create-post.js's uploadVideos — uploads each video alongside
   // its own thumbnail, and returns objects (not bare URLs) since
   // duration travels with each one.
-  const uploadVideos = async (postId) => {
+  const uploadVideos = async (postId, videoItems) => {
     const results = [];
-    for (let i = 0; i < videos.length; i++) {
-      const vid = videos[i];
+    for (let i = 0; i < videoItems.length; i++) {
+      const vid = videoItems[i];
       if (vid.existing) {
         results.push({ url: vid.uri, thumbnailUrl: vid.thumbnailUri, duration: vid.duration });
         continue;
@@ -643,13 +638,25 @@ export default function EventsScreen() {
     return results;
   };
 
+  // Mirrors create-post.js's uploadMedia — splits by kind for upload,
+  // then reassembles pick order as mediaOrder.
+  const uploadMedia = async (postId) => {
+    const imageItems = media.filter(m => m.kind === 'image');
+    const videoItems = media.filter(m => m.kind === 'video');
+    const [images, videos] = await Promise.all([
+      imageItems.length > 0 ? uploadImages(postId, imageItems) : Promise.resolve([]),
+      videoItems.length > 0 ? uploadVideos(postId, videoItems) : Promise.resolve([]),
+    ]);
+    const mediaOrder = media.map(m => m.kind);
+    return { images, videos, mediaOrder };
+  };
+
   const resetForm = () => {
     setShowModal(false);
     setEditingEventId(null);
     setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
     setLocationSuggestions([]); setShowLocationSuggestions(false);
-    setImages([]);
-    setVideos([]);
+    setMedia([]);
     setPriceType('free'); setEventPrice('');
   };
 
@@ -660,13 +667,11 @@ export default function EventsScreen() {
     try {
       // --- Editing an existing event ---
       if (editingEventId) {
-        const imageUrls = await uploadImages(editingEventId);
-        const videoData = await uploadVideos(editingEventId);
+        const { images, videos, mediaOrder } = await uploadMedia(editingEventId);
         await updateDoc(doc(db, 'posts', editingEventId), {
           content: title.trim(), description: description.trim(),
           eventLocation: location.trim(), eventDate: eventDate,
-          images: imageUrls,
-          videos: videoData,
+          images, videos, mediaOrder,
           isFree: priceType === 'free',
           eventPrice: priceType === 'paid' ? parseFloat(eventPrice) || 0 : 0,
         });
@@ -684,17 +689,15 @@ export default function EventsScreen() {
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, isRemoved: false,
         images: [],
         videos: [],
+        mediaOrder: [],
         isFree: priceType === 'free',
         eventPrice: priceType === 'paid' ? parseFloat(eventPrice) || 0 : 0,
         attendeeCount: 0, attendees: [], savedBy: [],
       });
 
-      if (images.length > 0 || videos.length > 0) {
-        const [imageUrls, videoData] = await Promise.all([
-          images.length > 0 ? uploadImages(postRef.id) : Promise.resolve([]),
-          videos.length > 0 ? uploadVideos(postRef.id) : Promise.resolve([]),
-        ]);
-        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls, videos: videoData });
+      if (media.length > 0) {
+        const { images, videos, mediaOrder } = await uploadMedia(postRef.id);
+        await updateDoc(doc(db, 'posts', postRef.id), { images, videos, mediaOrder });
       }
 
       resetForm();
@@ -1164,7 +1167,7 @@ export default function EventsScreen() {
                 </View>
               )}
             </View>
-            <MediaPickerSection images={images} videos={videos} onAddMedia={handleAddMedia} onRemoveImage={removeImage} onRemoveVideo={removeVideo} />
+            <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{editingEventId ? 'Save Changes' : 'Post Event'}</Text>}

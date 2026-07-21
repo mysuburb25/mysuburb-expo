@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarWithOnlineDot from '../components/AvatarWithOnlineDot';
 import { Colors } from '../constants/theme';
+import { getOrderedMedia } from '../utils/mediaOrder';
 
 const CATEGORY_CONFIG = {
   updates:     { label: 'General', bg: Colors.brandGreen },
@@ -34,6 +35,8 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
   const itemCreatedAt = item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : null);
   const isNew = newCutoff && itemCreatedAt && itemCreatedAt > newCutoff && item.authorId !== currentUserUid;
 
+  const media = getOrderedMedia(item);
+
   return (
     <View style={styles.card}>
       <TouchableOpacity onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
@@ -56,7 +59,7 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
         </View>
       </TouchableOpacity>
 
-      {item.images && item.images.length > 0 && (
+      {media.length > 0 && (
         <View
           style={styles.imageCarouselWrap}
           onLayout={(e) => setImgWidth(e.nativeEvent.layout.width)}
@@ -74,44 +77,40 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
                 setActiveImgIndex(idx);
               }}
             >
-              {item.images.map((url, i) => (
+              {media.map((m, i) => (
                 <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => router.push('/post/' + item.id)}>
-                  <Image source={{ uri: url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+                  {m.type === 'video' ? (
+                    <View style={{ width: imgWidth, height: 220 }}>
+                      {m.thumbnailUrl ? (
+                        <Image source={{ uri: m.thumbnailUrl }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+                      ) : (
+                        <View style={[{ width: imgWidth, height: 220 }, styles.videoThumbFallback]}>
+                          <Ionicons name="videocam" size={32} color="#fff" />
+                        </View>
+                      )}
+                      <View style={styles.videoPlayOverlay}>
+                        <Ionicons name="play" size={20} color="#fff" />
+                      </View>
+                      {m.duration > 0 && (
+                        <View style={styles.videoDurationBadge}>
+                          <Text style={styles.videoDurationText}>{Math.floor(m.duration / 60)}:{String(m.duration % 60).padStart(2, '0')}</Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <Image source={{ uri: m.url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
           )}
-          {item.images.length > 1 && (
+          {media.length > 1 && (
             <View style={styles.dotsRow}>
-              {item.images.map((_, i) => (
+              {media.map((_, i) => (
                 <View key={i} style={[styles.dot, i === activeImgIndex && styles.dotActive]} />
               ))}
             </View>
           )}
-        </View>
-      )}
-
-      {item.videos && item.videos.length > 0 && (
-        <View style={styles.videoRow}>
-          {item.videos.map((vid, i) => (
-            <TouchableOpacity key={i} onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
-              {vid.thumbnailUrl ? (
-                <Image source={{ uri: vid.thumbnailUrl }} style={styles.videoThumb} resizeMode="cover" />
-              ) : (
-                <View style={[styles.videoThumb, styles.videoThumbFallback]}>
-                  <Ionicons name="videocam" size={22} color="#fff" />
-                </View>
-              )}
-              <View style={styles.videoPlayOverlay}>
-                <Ionicons name="play" size={16} color="#fff" />
-              </View>
-              {vid.duration > 0 && (
-                <View style={styles.videoDurationBadge}>
-                  <Text style={styles.videoDurationText}>{Math.floor(vid.duration / 60)}:{String(vid.duration % 60).padStart(2, '0')}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
         </View>
       )}
 
@@ -156,8 +155,6 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { backgroundColor: '#fff', width: 8, height: 8, borderRadius: 4 },
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
-  videoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
-  videoThumb: { width: 72, height: 72, borderRadius: 10, borderWidth: 1, borderColor: '#E0E0E0' },
   videoThumbFallback: { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
   videoPlayOverlay: {
     position: 'absolute', top: '50%', left: '50%', marginTop: -12, marginLeft: -12,
