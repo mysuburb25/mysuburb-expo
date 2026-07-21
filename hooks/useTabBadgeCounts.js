@@ -1,28 +1,15 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Alert } from 'react-native';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '../config/firebase';
-
-// TEMP_DEBUG: set to false once badge counts are confirmed working —
-// this surfaces the real Firestore error via Alert so it's visible on
-// a physical device, instead of only appearing in a console log nobody
-// connected to Metro can see. Remove this whole flag/block once fixed.
-const TEMP_DEBUG = true;
-const debugErrors = [];
-let hasShownDebugAlert = false;
 
 // Mirrors the exact category filter each tab's own feed query uses (see
 // app/(tabs)/index.js, buy-sell.js, services.js, lost-found.js,
 // events.js) — kept in sync manually since count queries need the same
 // filters as the real feed to give an accurate number.
 //
-// 'home' is an array of the 3 actual category values rather than a
-// single value — every 'in' query has failed with a missing-index
-// error even after confirming byte-for-byte that the right composite
-// index exists, which points to an 'in' + range-filter indexing quirk
-// rather than a genuinely missing index. Counting each home
-// sub-category separately with a plain '==' query sidesteps that
-// entirely, using only the exact query shape already proven to work.
+// 'home' is an array of the 3 actual category values (rather than a
+// single value) — Firestore's `where('category', 'in', [...])` handles
+// this in one query, same pattern as the other tabs' own feed queries.
 const CATEGORY_FILTERS = {
   home: ['updates', 'notices', 'safety'],
   events: 'events',
@@ -60,45 +47,25 @@ export default function useTabBadgeCounts(user, profile) {
       const categoryValues = Array.isArray(catFilter) ? catFilter : [catFilter];
 
       const perSuburbCounts = await Promise.all(activeSuburbs.map(async ({ suburb, state }) => {
-        // One plain '==' query per category value, summed — instead of
-        // a single 'in' query — see note above on why.
-        const perCategoryCounts = await Promise.all(categoryValues.map(async (categoryValue) => {
-          try {
-            const q = query(
-              collection(db, 'posts'),
-              where('suburb', '==', suburb),
-              where('state', '==', state),
-              where('category', '==', categoryValue),
-              where('isRemoved', '==', false),
-              where('createdAt', '>', cutoff),
-            );
-            const snap = await getCountFromServer(q);
-            return snap.data().count;
-          } catch (e) {
-            console.error(`Tab badge count failed for ${key} (${categoryValue}) in ${suburb}:`, e);
-            if (TEMP_DEBUG) {
-              debugErrors.push(`${key} (${categoryValue}) in ${suburb}: ${e.message || e}`);
-            }
-            return 0;
-          }
-        }));
-        return perCategoryCounts.reduce((a, b) => a + b, 0);
+        try {
+          const q = query(
+            collection(db, 'posts'),
+            where('suburb', '==', suburb),
+            where('state', '==', state),
+            where('category', 'in', categoryValues),
+            where('isRemoved', '==', false),
+            where('createdAt', '>', cutoff),
+          );
+          const snap = await getCountFromServer(q);
+          return snap.data().count;
+        } catch (e) {
+          console.error(`Tab badge count failed for ${key} in ${suburb}:`, e);
+          return 0;
+        }
       }));
       results[key] = perSuburbCounts.reduce((a, b) => a + b, 0);
     }));
     setCounts(results);
-
-    if (TEMP_DEBUG && debugErrors.length > 0 && !hasShownDebugAlert) {
-      hasShownDebugAlert = true;
-      // Dedupe identical error messages (e.g. the same missing-index
-      // error repeating across suburbs) so this doesn't turn into a wall
-      // of near-duplicate text.
-      const unique = [...new Set(debugErrors)];
-      Alert.alert(
-        `Badge count debug (${unique.length} unique error${unique.length > 1 ? 's' : ''})`,
-        unique.slice(0, 5).join('\n\n') + (unique.length > 5 ? `\n\n...and ${unique.length - 5} more` : '')
-      );
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, profile?.suburb, profile?.state, JSON.stringify(profile?.suburbs), JSON.stringify(profile?.lastVisited)]);
 

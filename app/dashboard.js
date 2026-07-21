@@ -17,6 +17,15 @@ const SECTIONS = [
   { key: 'lostfound', label: 'Lost & Found', icon: 'search', color: '#E65100' },
 ];
 
+// Where each section's count pill navigates to when tapped.
+const SECTION_ROUTES = {
+  community: '/(tabs)',
+  events: '/(tabs)/events',
+  marketplace: '/(tabs)/buy-sell',
+  services: '/(tabs)/services',
+  lostfound: '/(tabs)/lost-found',
+};
+
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
@@ -173,9 +182,13 @@ export default function DashboardScreen() {
                     <Text style={styles.sectionTitle}>{section.label}</Text>
                   </View>
                   {newCount > 0 && (
-                    <View style={[styles.sectionCountPill, { backgroundColor: section.color }]}>
+                    <TouchableOpacity
+                      style={styles.sectionCountPill}
+                      onPress={() => router.push(SECTION_ROUTES[section.key])}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
                       <Text style={styles.sectionCountText}>{newCount > 9 ? '9+' : newCount} new</Text>
-                    </View>
+                    </TouchableOpacity>
                   )}
                 </View>
                 {items.map(item => (
@@ -239,8 +252,8 @@ const styles = StyleSheet.create({
   sectionHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   sectionIconBadge: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: Colors.charcoal },
-  sectionCountPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, minWidth: 26, alignItems: 'center' },
-  sectionCountText: { fontSize: 12, fontWeight: '800', color: Colors.white },
+  sectionCountPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, minWidth: 26, alignItems: 'center', backgroundColor: '#FFD700' },
+  sectionCountText: { fontSize: 12, fontWeight: '800', color: Colors.brandGreen },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 16, padding: 13, marginBottom: 9,
     borderWidth: 1, borderColor: '#D5D5D5',
