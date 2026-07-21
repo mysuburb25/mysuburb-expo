@@ -586,7 +586,12 @@ export default function PostDetailScreen() {
   // screenNewPost). Without this check, anyone who already has a link or
   // notification pointing at this post — even after it's gone — could
   // still open it directly, the same gap we fixed for deleted messages.
-  if (post.isRemoved) return (
+  //
+  // Admins are exempt from this block — they need to actually be able to
+  // open a removed post (e.g. from the Admin Dashboard's Resolved tab)
+  // to review what was removed and why. They see the real post below,
+  // with a banner making it clear it's been removed from public view.
+  if (post.isRemoved && !profile?.isAdmin) return (
     <View style={styles.container}>
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -666,6 +671,13 @@ export default function PostDetailScreen() {
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>{pageTitle}</Text>
       </View>
+
+      {post.isRemoved && profile?.isAdmin && (
+        <View style={styles.adminRemovedBanner}>
+          <Ionicons name="eye-off" size={16} color="#fff" />
+          <Text style={styles.adminRemovedBannerText}>Removed — hidden from all users. Only visible to you as an admin.</Text>
+        </View>
+      )}
 
       <FlatList
         ref={flatListRef}
@@ -1220,6 +1232,8 @@ const styles = StyleSheet.create({
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
+  adminRemovedBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#E53935', paddingVertical: 10, paddingHorizontal: 16 },
+  adminRemovedBannerText: { color: '#fff', fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'center' },
   scroll: { padding: 16, gap: 10, paddingBottom: 20 },
   eventDateBox: { width: 52, height: 58, borderRadius: 12, backgroundColor: '#5B7DB1', justifyContent: 'center', alignItems: 'center', gap: 1 },
   eventWeekday: { fontSize: 9, fontWeight: '900', color: 'rgba(255,255,255,0.75)' },
