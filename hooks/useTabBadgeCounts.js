@@ -37,7 +37,13 @@ export default function useTabBadgeCounts(user, profile) {
 
     const results = {};
     await Promise.all(Object.entries(CATEGORY_FILTERS).map(async ([key, catFilter]) => {
-      const lastVisited = profile?.lastVisited?.[key];
+      // A tab with no lastVisited entry means genuinely never visited —
+      // falling back to 0 here (as this used to) meant lightly-used
+      // accounts never saw a badge at all until they'd manually opened
+      // every tab once. Falling back to account creation date instead
+      // gives a real, meaningful "new since I joined" baseline for a
+      // tab someone's never seen, rather than silently showing nothing.
+      const lastVisited = profile?.lastVisited?.[key] || profile?.createdAt;
       if (!lastVisited) { results[key] = 0; return; }
       const cutoff = lastVisited.toDate ? lastVisited.toDate() : new Date(lastVisited);
 

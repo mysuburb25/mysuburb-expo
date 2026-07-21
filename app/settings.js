@@ -1,21 +1,20 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
 
-// Pulled from app config rather than hardcoded, so this always reflects
-// whatever was actually shipped in each build — no risk of someone
-// forgetting to bump a hardcoded string on release. `version` is the
-// marketing version (e.g. "1.0.0"); buildNumber/versionCode is the
-// per-build counter EAS auto-increments on every production build (see
-// eas.json's appVersionSource: "remote").
-const APP_VERSION = Constants.expoConfig?.version || '—';
-const BUILD_NUMBER = Platform.OS === 'ios'
-  ? Constants.expoConfig?.ios?.buildNumber
-  : Constants.expoConfig?.android?.versionCode;
+// expo-constants' Constants.expoConfig has no buildNumber/versionCode
+// here — this project uses eas.json's appVersionSource: "remote", which
+// means EAS injects the real build number directly into the native
+// project during the build step, but never writes it back into
+// app.json, so Constants.expoConfig has nothing to read. expo-application
+// reads the actual compiled binary's metadata directly from the OS
+// instead, which is accurate regardless of how the version was assigned.
+const APP_VERSION = Application.nativeApplicationVersion || '—';
+const BUILD_NUMBER = Application.nativeBuildVersion;
 const VERSION_STRING = BUILD_NUMBER ? `${APP_VERSION} (${BUILD_NUMBER})` : APP_VERSION;
 
 export default function SettingsScreen() {
