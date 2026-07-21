@@ -59,21 +59,20 @@ function isToday(date) {
 // Defined at module level, not inside EventsScreen, so React treats it as the
 // same component across renders — keeping it inside the screen would recreate
 // it on every keystroke and cause the selected photos to flicker.
-// Videos: max 3 per post, 60 seconds, 50MB each — same limits and
-// reasoning as app/create-post.js. Kept in sync with that file since
-// events use a fully separate creation flow, not the shared one.
-const MAX_IMAGES = 5;
-const MAX_VIDEOS = 3;
+// Media: 8 total (photos + videos combined) — same model as
+// app/create-post.js. Kept in sync since events use a fully separate
+// creation flow, not the shared one.
+const MAX_MEDIA = 8;
 const MAX_VIDEO_DURATION_SEC = 60;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
 
 function MediaPickerSection({ images, videos, onAddMedia, onRemoveImage, onRemoveVideo }) {
   const total = images.length + videos.length;
-  const atLimit = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
+  const atLimit = total >= MAX_MEDIA;
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_IMAGES + MAX_VIDEOS})</Text>
+        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_MEDIA})</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
@@ -511,35 +510,26 @@ export default function EventsScreen() {
 
   // Single entry point for the "Add Media" button — asks Photo vs Video
   // first, then hands off to the per-type handlers below (each of which
-  // still asks Camera vs Library).
+  // Single "Add Media" entry point — mirrors create-post.js. Camera and
+  // Library both accept either media type in one go; each result is
+  // routed to images or videos based on its own reported type.
   const handleAddMedia = () => {
-    const photoMaxed = images.length >= MAX_IMAGES;
-    const videoMaxed = videos.length >= MAX_VIDEOS;
-    if (photoMaxed && videoMaxed) {
-      Alert.alert('Limit reached', `You can add up to ${MAX_IMAGES} photos and ${MAX_VIDEOS} videos.`);
+    if (images.length + videos.length >= MAX_MEDIA) {
+      Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} photos and videos in total.`);
       return;
     }
-    Alert.alert('Add Media', 'What would you like to add?', [
-      ...(photoMaxed ? [] : [{ text: 'Photo', onPress: handlePickImage }]),
-      ...(videoMaxed ? [] : [{ text: 'Video', onPress: handlePickVideo }]),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const handlePickImage = () => {
-    if (images.length >= MAX_IMAGES) { Alert.alert('Limit reached', `You can only add up to ${MAX_IMAGES} images.`); return; }
-    const remaining = MAX_IMAGES - images.length;
-    Alert.alert('Add Photos', 'Choose an option', [
+    Alert.alert('Add Media', 'Choose an option', [
       {
-        text: 'Take Photo',
+        text: 'Use Camera',
         onPress: async () => {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
-          const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, aspect: [4, 3] });
-          if (!result.canceled) {
-            setImages(prev => [...prev, { uri: result.assets[0].uri }]);
-            Keyboard.dismiss();
-          }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            videoMaxDuration: MAX_VIDEO_DURATION_SEC,
+            quality: 0.7,
+          });
+          if (!result.canceled) await routeAsset(result.assets[0]);
         },
       },
       {
@@ -547,17 +537,18 @@ export default function EventsScreen() {
         onPress: async () => {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const remaining = MAX_MEDIA - (images.length + videos.length);
           const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
             quality: 0.7,
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsMultipleSelection: true,
             selectionLimit: remaining,
             allowsEditing: false,
           });
           if (!result.canceled) {
-            const newImages = result.assets.slice(0, remaining).map(a => ({ uri: a.uri }));
-            setImages(prev => [...prev, ...newImages]);
-            Keyboard.dismiss();
+            for (const asset of result.assets.slice(0, remaining)) {
+              await routeAsset(asset);
+            }
           }
         },
       },
@@ -565,56 +556,28 @@ export default function EventsScreen() {
     ]);
   };
 
-  const handlePickVideo = () => {
-    if (videos.length >= MAX_VIDEOS) { Alert.alert('Limit reached', `You can only add up to ${MAX_VIDEOS} videos.`); return; }
-    Alert.alert('Add Video', 'Choose an option', [
-      {
-        text: 'Record Video',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
-          const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-            videoMaxDuration: MAX_VIDEO_DURATION_SEC,
-            quality: 0.7,
-          });
-          if (!result.canceled) await stageVideo(result.assets[0]);
-        },
-      },
-      {
-        text: 'Choose from Library',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-            allowsEditing: false,
-          });
-          if (!result.canceled) await stageVideo(result.assets[0]);
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const stageVideo = async (asset) => {
-    const durationSec = (asset.duration || 0) / 1000;
-    if (durationSec > MAX_VIDEO_DURATION_SEC) {
-      Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. This one is ${Math.round(durationSec)}s.`);
-      return;
+  const routeAsset = async (asset) => {
+    if (asset.type === 'video') {
+      const durationSec = (asset.duration || 0) / 1000;
+      if (durationSec > MAX_VIDEO_DURATION_SEC) {
+        Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. "${asset.fileName || 'This video'}" is ${Math.round(durationSec)}s and was skipped.`);
+        return;
+      }
+      if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+        Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. "${asset.fileName || 'This video'}" is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB and was skipped.`);
+        return;
+      }
+      let thumbnailUri = null;
+      try {
+        const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
+        thumbnailUri = thumb.uri;
+      } catch (e) {
+        console.error('Video thumbnail generation failed:', e);
+      }
+      setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
+    } else {
+      setImages(prev => [...prev, { uri: asset.uri }]);
     }
-    if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
-      Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. This one is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`);
-      return;
-    }
-    let thumbnailUri = null;
-    try {
-      const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
-      thumbnailUri = thumb.uri;
-    } catch (e) {
-      console.error('Video thumbnail generation failed:', e);
-    }
-    setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
     Keyboard.dismiss();
   };
 

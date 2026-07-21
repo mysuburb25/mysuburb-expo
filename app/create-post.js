@@ -55,28 +55,21 @@ const COMMUNITY_PLACEHOLDERS = {
 // the same component across renders — keeping it inside the screen component
 // recreated a "new" component type on every keystroke, forcing the photos to
 // unmount/remount and visibly flicker every time the user typed.
-// Videos: max 3 per post, 60 seconds, 50MB each. Chosen to keep upload
-// times and Storage costs reasonable for a community app on mobile data
-// — not a hard technical ceiling, just a sane default. Enforced here
-// (so people get instant feedback before waiting on an upload) AND in
-// storage.rules (size/type only — duration can't be checked server-side,
-// so that cap is client-side-only, same as most consumer apps).
-const MAX_IMAGES = 5;
-const MAX_VIDEOS = 3;
+// Media: 8 total (photos + videos combined), no separate per-type cap.
+// Videos additionally capped at 60 seconds / 50MB each — enforced here
+// for instant feedback, and in storage.rules (size/type only; duration
+// can't be checked server-side).
+const MAX_MEDIA = 8;
 const MAX_VIDEO_DURATION_SEC = 60;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
 
-// One combined "Add Media" entry point and one combined thumbnail grid
-// for both photos and videos, rather than two separate sections — a
-// person adding a mix of photos and videos to a post shouldn't have to
-// think about which button to tap first.
 function MediaPickerSection({ images, videos, onAddMedia, onRemoveImage, onRemoveVideo }) {
   const total = images.length + videos.length;
-  const atLimit = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
+  const atLimit = total >= MAX_MEDIA;
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_IMAGES + MAX_VIDEOS})</Text>
+        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_MEDIA})</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
@@ -224,78 +217,29 @@ export default function CreatePostScreen() {
   // still ask Camera vs Library). Keeps the two original flows intact,
   // just adds one small decision in front of them instead of showing two
   // separate buttons in the UI.
+  // Single "Add Media" entry point — no separate Photo/Video choice.
+  // Camera and Library both accept either media type in one go; each
+  // resulting asset is routed to images or videos based on its own
+  // reported type. Total cap (MAX_MEDIA) covers photos and videos
+  // together; videos are additionally checked against the duration/size
+  // limits regardless of how they were picked.
   const handleAddMedia = () => {
-    const photoMaxed = images.length >= MAX_IMAGES;
-    const videoMaxed = videos.length >= MAX_VIDEOS;
-    if (photoMaxed && videoMaxed) {
-      Alert.alert('Limit reached', `You can add up to ${MAX_IMAGES} photos and ${MAX_VIDEOS} videos.`);
+    if (images.length + videos.length >= MAX_MEDIA) {
+      Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} photos and videos in total.`);
       return;
     }
-    Alert.alert('Add Media', 'What would you like to add?', [
-      ...(photoMaxed ? [] : [{ text: 'Photo', onPress: handlePickImage }]),
-      ...(videoMaxed ? [] : [{ text: 'Video', onPress: handlePickVideo }]),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const handlePickImage = () => {
-    if (images.length >= MAX_IMAGES) { Alert.alert('Limit reached', `You can only add up to ${MAX_IMAGES} images.`); return; }
-    const remaining = MAX_IMAGES - images.length;
-    Alert.alert('Add Photos', 'Choose an option', [
+    Alert.alert('Add Media', 'Choose an option', [
       {
-        text: 'Take Photo',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
-          const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, aspect: [4, 3] });
-          if (!result.canceled) {
-            setImages(prev => [...prev, { uri: result.assets[0].uri }]);
-            Keyboard.dismiss();
-          }
-        },
-      },
-      {
-        text: `Choose from Library`,
-        onPress: async () => {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({
-            quality: 0.7,
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsMultipleSelection: true,
-            selectionLimit: remaining,
-            allowsEditing: false,
-            preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
-          });
-          if (!result.canceled) {
-            const newImages = result.assets.slice(0, remaining).map(a => ({ uri: a.uri }));
-            setImages(prev => [...prev, ...newImages]);
-            Keyboard.dismiss();
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const removeImage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handlePickVideo = () => {
-    if (videos.length >= MAX_VIDEOS) { Alert.alert('Limit reached', `You can only add up to ${MAX_VIDEOS} videos.`); return; }
-    Alert.alert('Add Video', 'Choose an option', [
-      {
-        text: 'Record Video',
+        text: 'Use Camera',
         onPress: async () => {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
           const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
             videoMaxDuration: MAX_VIDEO_DURATION_SEC,
             quality: 0.7,
           });
-          if (!result.canceled) await stageVideo(result.assets[0]);
+          if (!result.canceled) await routeAsset(result.assets[0]);
         },
       },
       {
@@ -303,45 +247,58 @@ export default function CreatePostScreen() {
         onPress: async () => {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const remaining = MAX_MEDIA - (images.length + videos.length);
           const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            quality: 0.7,
+            allowsMultipleSelection: true,
+            selectionLimit: remaining,
             allowsEditing: false,
           });
-          if (!result.canceled) await stageVideo(result.assets[0]);
+          if (!result.canceled) {
+            for (const asset of result.assets.slice(0, remaining)) {
+              await routeAsset(asset);
+            }
+          }
         },
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
-  // Shared by both camera and library video picking — validates against
-  // MAX_VIDEO_DURATION_SEC / MAX_VIDEO_SIZE_BYTES up front (rather than
-  // letting a too-large upload start and only fail against
-  // storage.rules), and generates a local thumbnail for the picker UI
-  // and, later, the feed/list preview.
-  const stageVideo = async (asset) => {
-    const durationSec = (asset.duration || 0) / 1000; // expo-image-picker reports duration in ms
-    if (durationSec > MAX_VIDEO_DURATION_SEC) {
-      Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. This one is ${Math.round(durationSec)}s.`);
-      return;
+  // Sends a picked asset to the right place — images append directly,
+  // videos go through duration/size validation and thumbnail generation
+  // first. A video failing validation is simply skipped (with an alert)
+  // rather than blocking the rest of a multi-select batch.
+  const routeAsset = async (asset) => {
+    if (asset.type === 'video') {
+      const durationSec = (asset.duration || 0) / 1000; // expo-image-picker reports duration in ms
+      if (durationSec > MAX_VIDEO_DURATION_SEC) {
+        Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. "${asset.fileName || 'This video'}" is ${Math.round(durationSec)}s and was skipped.`);
+        return;
+      }
+      if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+        Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. "${asset.fileName || 'This video'}" is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB and was skipped.`);
+        return;
+      }
+      let thumbnailUri = null;
+      try {
+        const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
+        thumbnailUri = thumb.uri;
+      } catch (e) {
+        console.error('Video thumbnail generation failed:', e);
+        // Not fatal — the picker UI falls back to a generic video icon,
+        // and the post can still be created without a thumbnail.
+      }
+      setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
+    } else {
+      setImages(prev => [...prev, { uri: asset.uri }]);
     }
-    if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
-      Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. This one is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`);
-      return;
-    }
-
-    let thumbnailUri = null;
-    try {
-      const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
-      thumbnailUri = thumb.uri;
-    } catch (e) {
-      console.error('Video thumbnail generation failed:', e);
-      // Not fatal — the picker UI falls back to a generic video icon,
-      // and the post can still be created without a thumbnail.
-    }
-
-    setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
     Keyboard.dismiss();
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const removeVideo = (index) => {
