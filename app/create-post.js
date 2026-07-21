@@ -55,54 +55,41 @@ const COMMUNITY_PLACEHOLDERS = {
 // the same component across renders — keeping it inside the screen component
 // recreated a "new" component type on every keystroke, forcing the photos to
 // unmount/remount and visibly flicker every time the user typed.
-function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
-  return (
-    <>
-      <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos ({images.length}/5)</Text>
-      </View>
-      <View style={styles.fieldPad}>
-        <View style={styles.imageRow}>
-          {images.map((img, index) => (
-            <View key={index} style={styles.imageThumbWrap}>
-              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
-              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveImage(index)}>
-                <Ionicons name="close-circle" size={20} color="#E53935" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          {images.length < 5 && (
-            <TouchableOpacity style={styles.addImageBtn} onPress={onAddPhoto}>
-              <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
-              <Text style={styles.addImageText}>Add Photo</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </>
-  );
-}
-
 // Videos: max 3 per post, 60 seconds, 50MB each. Chosen to keep upload
 // times and Storage costs reasonable for a community app on mobile data
 // — not a hard technical ceiling, just a sane default. Enforced here
 // (so people get instant feedback before waiting on an upload) AND in
 // storage.rules (size/type only — duration can't be checked server-side,
 // so that cap is client-side-only, same as most consumer apps).
+const MAX_IMAGES = 5;
 const MAX_VIDEOS = 3;
 const MAX_VIDEO_DURATION_SEC = 60;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
 
-function VideoPickerSection({ videos, onAddVideo, onRemoveVideo }) {
+// One combined "Add Media" entry point and one combined thumbnail grid
+// for both photos and videos, rather than two separate sections — a
+// person adding a mix of photos and videos to a post shouldn't have to
+// think about which button to tap first.
+function MediaPickerSection({ images, videos, onAddMedia, onRemoveImage, onRemoveVideo }) {
+  const total = images.length + videos.length;
+  const atLimit = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Videos ({videos.length}/{MAX_VIDEOS})</Text>
+        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_IMAGES + MAX_VIDEOS})</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
+          {images.map((img, index) => (
+            <View key={`img-${index}`} style={styles.imageThumbWrap}>
+              <Image source={{ uri: img.uri }} style={styles.imageThumb} />
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveImage(index)}>
+                <Ionicons name="close-circle" size={20} color="#E53935" />
+              </TouchableOpacity>
+            </View>
+          ))}
           {videos.map((vid, index) => (
-            <View key={index} style={styles.imageThumbWrap}>
+            <View key={`vid-${index}`} style={styles.imageThumbWrap}>
               {vid.thumbnailUri ? (
                 <Image source={{ uri: vid.thumbnailUri }} style={styles.imageThumb} />
               ) : (
@@ -118,10 +105,10 @@ function VideoPickerSection({ videos, onAddVideo, onRemoveVideo }) {
               </TouchableOpacity>
             </View>
           ))}
-          {videos.length < MAX_VIDEOS && (
-            <TouchableOpacity style={styles.addImageBtn} onPress={onAddVideo}>
-              <Ionicons name="videocam-outline" size={24} color={Colors.brandGreen} />
-              <Text style={styles.addImageText}>Add Video</Text>
+          {!atLimit && (
+            <TouchableOpacity style={styles.addImageBtn} onPress={onAddMedia}>
+              <Ionicons name="images-outline" size={24} color={Colors.brandGreen} />
+              <Text style={styles.addImageText}>Add Media</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -232,9 +219,28 @@ export default function CreatePostScreen() {
   const pageTitle = isEditMode ? 'Edit Post' : (isCommunity ? 'Community Hub' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services');
   const pageIcon = isEditMode ? 'create' : (isCommunity ? 'home' : isMarketplace ? 'pricetag' : isLostFound ? 'flag' : 'briefcase');
 
+  // Single entry point for the "Add Media" button — asks Photo vs Video
+  // first, then hands off to the existing per-type handlers (which each
+  // still ask Camera vs Library). Keeps the two original flows intact,
+  // just adds one small decision in front of them instead of showing two
+  // separate buttons in the UI.
+  const handleAddMedia = () => {
+    const photoMaxed = images.length >= MAX_IMAGES;
+    const videoMaxed = videos.length >= MAX_VIDEOS;
+    if (photoMaxed && videoMaxed) {
+      Alert.alert('Limit reached', `You can add up to ${MAX_IMAGES} photos and ${MAX_VIDEOS} videos.`);
+      return;
+    }
+    Alert.alert('Add Media', 'What would you like to add?', [
+      ...(photoMaxed ? [] : [{ text: 'Photo', onPress: handlePickImage }]),
+      ...(videoMaxed ? [] : [{ text: 'Video', onPress: handlePickVideo }]),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const handlePickImage = () => {
-    if (images.length >= 5) { Alert.alert('Limit reached', 'You can only add up to 5 images.'); return; }
-    const remaining = 5 - images.length;
+    if (images.length >= MAX_IMAGES) { Alert.alert('Limit reached', `You can only add up to ${MAX_IMAGES} images.`); return; }
+    const remaining = MAX_IMAGES - images.length;
     Alert.alert('Add Photos', 'Choose an option', [
       {
         text: 'Take Photo',
@@ -682,8 +688,7 @@ export default function CreatePostScreen() {
                 onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
               />
             </View>
-            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
-            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
+            <MediaPickerSection images={images} videos={videos} onAddMedia={handleAddMedia} onRemoveImage={removeImage} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -744,8 +749,7 @@ export default function CreatePostScreen() {
             <View style={styles.fieldPad}>
               <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
             </View>
-            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
-            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
+            <MediaPickerSection images={images} videos={videos} onAddMedia={handleAddMedia} onRemoveImage={removeImage} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -775,8 +779,7 @@ export default function CreatePostScreen() {
                 </View>
               </>
             )}
-            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
-            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
+            <MediaPickerSection images={images} videos={videos} onAddMedia={handleAddMedia} onRemoveImage={removeImage} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
@@ -829,8 +832,7 @@ export default function CreatePostScreen() {
                 </View>
               )}
             </View>
-            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
-            <VideoPickerSection videos={videos} onAddVideo={handlePickVideo} onRemoveVideo={removeVideo} />
+            <MediaPickerSection images={images} videos={videos} onAddMedia={handleAddMedia} onRemoveImage={removeImage} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}

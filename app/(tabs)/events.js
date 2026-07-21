@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, RefreshControl, Keyboard, Image, Linking, Share } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,26 +59,53 @@ function isToday(date) {
 // Defined at module level, not inside EventsScreen, so React treats it as the
 // same component across renders — keeping it inside the screen would recreate
 // it on every keystroke and cause the selected photos to flicker.
-function ImagePickerSection({ images, onAddPhoto, onRemoveImage }) {
+// Videos: max 3 per post, 60 seconds, 50MB each — same limits and
+// reasoning as app/create-post.js. Kept in sync with that file since
+// events use a fully separate creation flow, not the shared one.
+const MAX_IMAGES = 5;
+const MAX_VIDEOS = 3;
+const MAX_VIDEO_DURATION_SEC = 60;
+const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
+
+function MediaPickerSection({ images, videos, onAddMedia, onRemoveImage, onRemoveVideo }) {
+  const total = images.length + videos.length;
+  const atLimit = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
   return (
     <>
       <View style={styles.sectionBar}>
-        <Text style={styles.sectionBarText}>Photos ({images.length}/5)</Text>
+        <Text style={styles.sectionBarText}>Photos & Videos ({total}/{MAX_IMAGES + MAX_VIDEOS})</Text>
       </View>
       <View style={styles.fieldPad}>
         <View style={styles.imageRow}>
           {images.map((img, index) => (
-            <View key={index} style={styles.imageThumbWrap}>
+            <View key={`img-${index}`} style={styles.imageThumbWrap}>
               <Image source={{ uri: img.uri }} style={styles.imageThumb} />
               <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveImage(index)}>
                 <Ionicons name="close-circle" size={20} color="#E53935" />
               </TouchableOpacity>
             </View>
           ))}
-          {images.length < 5 && (
-            <TouchableOpacity style={styles.addImageBtn} onPress={onAddPhoto}>
-              <Ionicons name="camera-outline" size={24} color={Colors.brandGreen} />
-              <Text style={styles.addImageText}>Add Photo</Text>
+          {videos.map((vid, index) => (
+            <View key={`vid-${index}`} style={styles.imageThumbWrap}>
+              {vid.thumbnailUri ? (
+                <Image source={{ uri: vid.thumbnailUri }} style={styles.imageThumb} />
+              ) : (
+                <View style={[styles.imageThumb, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Ionicons name="videocam" size={22} color="#fff" />
+                </View>
+              )}
+              <View style={styles.videoPlayBadge}>
+                <Ionicons name="play" size={12} color="#fff" />
+              </View>
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => onRemoveVideo(index)}>
+                <Ionicons name="close-circle" size={20} color="#E53935" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {!atLimit && (
+            <TouchableOpacity style={styles.addImageBtn} onPress={onAddMedia}>
+              <Ionicons name="images-outline" size={24} color={Colors.brandGreen} />
+              <Text style={styles.addImageText}>Add Media</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -122,6 +150,7 @@ export default function EventsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
   const [images, setImages] = useState([]);
+  const [videos, setVideos] = useState([]); // array of { uri, thumbnailUri, duration, existing? }
   const [priceType, setPriceType] = useState('free'); // 'free' or 'paid'
   const [eventPrice, setEventPrice] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
@@ -163,6 +192,9 @@ export default function EventsScreen() {
         setEventPrice(data.eventPrice != null ? String(data.eventPrice) : '');
         if (data.images && data.images.length > 0) {
           setImages(data.images.map(url => ({ uri: url, existing: true })));
+        }
+        if (data.videos && data.videos.length > 0) {
+          setVideos(data.videos.map(v => ({ uri: v.url, thumbnailUri: v.thumbnailUrl, duration: v.duration, existing: true })));
         }
         setShowModal(true);
       } catch (e) {
@@ -477,9 +509,26 @@ export default function EventsScreen() {
     }
   };
 
+  // Single entry point for the "Add Media" button — asks Photo vs Video
+  // first, then hands off to the per-type handlers below (each of which
+  // still asks Camera vs Library).
+  const handleAddMedia = () => {
+    const photoMaxed = images.length >= MAX_IMAGES;
+    const videoMaxed = videos.length >= MAX_VIDEOS;
+    if (photoMaxed && videoMaxed) {
+      Alert.alert('Limit reached', `You can add up to ${MAX_IMAGES} photos and ${MAX_VIDEOS} videos.`);
+      return;
+    }
+    Alert.alert('Add Media', 'What would you like to add?', [
+      ...(photoMaxed ? [] : [{ text: 'Photo', onPress: handlePickImage }]),
+      ...(videoMaxed ? [] : [{ text: 'Video', onPress: handlePickVideo }]),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const handlePickImage = () => {
-    if (images.length >= 5) { Alert.alert('Limit reached', 'You can only add up to 5 images.'); return; }
-    const remaining = 5 - images.length;
+    if (images.length >= MAX_IMAGES) { Alert.alert('Limit reached', `You can only add up to ${MAX_IMAGES} images.`); return; }
+    const remaining = MAX_IMAGES - images.length;
     Alert.alert('Add Photos', 'Choose an option', [
       {
         text: 'Take Photo',
@@ -516,6 +565,63 @@ export default function EventsScreen() {
     ]);
   };
 
+  const handlePickVideo = () => {
+    if (videos.length >= MAX_VIDEOS) { Alert.alert('Limit reached', `You can only add up to ${MAX_VIDEOS} videos.`); return; }
+    Alert.alert('Add Video', 'Choose an option', [
+      {
+        text: 'Record Video',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            videoMaxDuration: MAX_VIDEO_DURATION_SEC,
+            quality: 0.7,
+          });
+          if (!result.canceled) await stageVideo(result.assets[0]);
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            allowsEditing: false,
+          });
+          if (!result.canceled) await stageVideo(result.assets[0]);
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const stageVideo = async (asset) => {
+    const durationSec = (asset.duration || 0) / 1000;
+    if (durationSec > MAX_VIDEO_DURATION_SEC) {
+      Alert.alert('Video too long', `Videos can be up to ${MAX_VIDEO_DURATION_SEC} seconds long. This one is ${Math.round(durationSec)}s.`);
+      return;
+    }
+    if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+      Alert.alert('Video too large', `Videos can be up to ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB. This one is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`);
+      return;
+    }
+    let thumbnailUri = null;
+    try {
+      const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
+      thumbnailUri = thumb.uri;
+    } catch (e) {
+      console.error('Video thumbnail generation failed:', e);
+    }
+    setVideos(prev => [...prev, { uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
+    Keyboard.dismiss();
+  };
+
+  const removeVideo = (index) => {
+    setVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
   };
@@ -540,12 +646,47 @@ export default function EventsScreen() {
     return urls;
   };
 
+  // Mirrors create-post.js's uploadVideos — uploads each video alongside
+  // its own thumbnail, and returns objects (not bare URLs) since
+  // duration travels with each one.
+  const uploadVideos = async (postId) => {
+    const results = [];
+    for (let i = 0; i < videos.length; i++) {
+      const vid = videos[i];
+      if (vid.existing) {
+        results.push({ url: vid.uri, thumbnailUrl: vid.thumbnailUri, duration: vid.duration });
+        continue;
+      }
+      const videoResponse = await fetch(vid.uri);
+      const videoBlob = await videoResponse.blob();
+      const videoRef = ref(storage, `posts/${postId}/video_${i}_${Date.now()}.mp4`);
+      await uploadBytes(videoRef, videoBlob, { contentType: videoBlob.type || 'video/mp4' });
+      const url = await getDownloadURL(videoRef);
+
+      let thumbnailUrl = null;
+      if (vid.thumbnailUri) {
+        try {
+          const thumbResponse = await fetch(vid.thumbnailUri);
+          const thumbBlob = await thumbResponse.blob();
+          const thumbRef = ref(storage, `posts/${postId}/video_thumb_${i}_${Date.now()}.jpg`);
+          await uploadBytes(thumbRef, thumbBlob);
+          thumbnailUrl = await getDownloadURL(thumbRef);
+        } catch (e) {
+          console.error('Video thumbnail upload failed:', e);
+        }
+      }
+      results.push({ url, thumbnailUrl, duration: vid.duration || 0 });
+    }
+    return results;
+  };
+
   const resetForm = () => {
     setShowModal(false);
     setEditingEventId(null);
     setTitle(''); setDescription(''); setLocation(''); setEventDate(new Date());
     setLocationSuggestions([]); setShowLocationSuggestions(false);
     setImages([]);
+    setVideos([]);
     setPriceType('free'); setEventPrice('');
   };
 
@@ -557,10 +698,12 @@ export default function EventsScreen() {
       // --- Editing an existing event ---
       if (editingEventId) {
         const imageUrls = await uploadImages(editingEventId);
+        const videoData = await uploadVideos(editingEventId);
         await updateDoc(doc(db, 'posts', editingEventId), {
           content: title.trim(), description: description.trim(),
           eventLocation: location.trim(), eventDate: eventDate,
           images: imageUrls,
+          videos: videoData,
           isFree: priceType === 'free',
           eventPrice: priceType === 'paid' ? parseFloat(eventPrice) || 0 : 0,
         });
@@ -577,14 +720,18 @@ export default function EventsScreen() {
         authorId: user.uid, authorName: profile.displayName, authorPhotoURL: profile.photoURL || null,
         createdAt: serverTimestamp(), likeCount: 0, commentCount: 0, isRemoved: false,
         images: [],
+        videos: [],
         isFree: priceType === 'free',
         eventPrice: priceType === 'paid' ? parseFloat(eventPrice) || 0 : 0,
         attendeeCount: 0, attendees: [], savedBy: [],
       });
 
-      if (images.length > 0) {
-        const imageUrls = await uploadImages(postRef.id);
-        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls });
+      if (images.length > 0 || videos.length > 0) {
+        const [imageUrls, videoData] = await Promise.all([
+          images.length > 0 ? uploadImages(postRef.id) : Promise.resolve([]),
+          videos.length > 0 ? uploadVideos(postRef.id) : Promise.resolve([]),
+        ]);
+        await updateDoc(doc(db, 'posts', postRef.id), { images: imageUrls, videos: videoData });
       }
 
       resetForm();
@@ -1054,7 +1201,7 @@ export default function EventsScreen() {
                 </View>
               )}
             </View>
-            <ImagePickerSection images={images} onAddPhoto={handlePickImage} onRemoveImage={removeImage} />
+            <MediaPickerSection images={images} videos={videos} onAddMedia={handleAddMedia} onRemoveImage={removeImage} onRemoveVideo={removeVideo} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
                 {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{editingEventId ? 'Save Changes' : 'Post Event'}</Text>}
@@ -1189,6 +1336,11 @@ const styles = StyleSheet.create({
   imageThumbWrap: { position: 'relative' },
   imageThumb: { width: 90, height: 90, borderRadius: 10, borderWidth: 1, borderColor: Colors.lightGrey },
   removeImageBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: Colors.white, borderRadius: 10 },
+  videoPlayBadge: {
+    position: 'absolute', top: '50%', left: '50%', marginTop: -12, marginLeft: -12,
+    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
   addImageBtn: { width: 90, height: 90, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.brandGreen, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 4 },
   addImageText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
 });
