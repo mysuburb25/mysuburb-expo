@@ -38,6 +38,29 @@ We may update these terms at any time. Continued use of the app means you accept
 8. CONTACT
 For any questions, contact us through the app.`;
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: 100 }, (_, i) => CURRENT_YEAR - i);
+
+// Age is calculated conservatively since we only collect month + year, not
+// the exact day: we assume the person was born on the LAST day of the
+// selected month — the youngest possible date consistent with what they
+// entered. If even that youngest-possible date is 18+, the real person
+// (born any earlier day that month) definitely is too. This avoids ever
+// letting someone who could plausibly be under 18 through, at the cost of
+// occasionally asking a genuine 18-year-old to wait a few extra days
+// right at their birthday month boundary — the safer direction to err in.
+function isAtLeast18(month, year) {
+  const lastDayOfMonth = new Date(year, month, 0); // month is 1-indexed here; day 0 of next month = last day of this one
+  const today = new Date();
+  let age = today.getFullYear() - lastDayOfMonth.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > lastDayOfMonth.getMonth() ||
+    (today.getMonth() === lastDayOfMonth.getMonth() && today.getDate() >= lastDayOfMonth.getDate());
+  if (!hasHadBirthdayThisYear) age--;
+  return age >= 18;
+}
+
 export default function SignupScreen() {
   const { register, createProfile } = useAuth();
   const [signupMethod, setSignupMethod] = useState('email'); // 'email' or 'phone'
@@ -50,6 +73,10 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTC, setAgreedToTC] = useState(false);
   const [showTC, setShowTC] = useState(false);
+  const [birthMonth, setBirthMonth] = useState(null); // 1-12
+  const [birthYear, setBirthYear] = useState(null);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
@@ -60,6 +87,11 @@ export default function SignupScreen() {
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
     if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters.'); return; }
     if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match.'); return; }
+    if (!birthMonth || !birthYear) { Alert.alert('Error', 'Please select your date of birth.'); return; }
+    if (!isAtLeast18(birthMonth, birthYear)) {
+      Alert.alert('Age requirement', 'You must be 18 or older to use MySuburb.');
+      return;
+    }
     if (!agreedToTC) { Alert.alert('Error', 'Please agree to the Terms & Conditions.'); return; }
 
     const displayName = `${firstName.trim()} ${lastName.trim()}`;
@@ -83,6 +115,8 @@ export default function SignupScreen() {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           phone: signupMethod === 'phone' ? phone.trim() : '',
+          birthMonth: String(birthMonth),
+          birthYear: String(birthYear),
         }
       });
     } catch (e) {
@@ -218,6 +252,24 @@ export default function SignupScreen() {
             />
           </View>
 
+          {/* Date of birth (month + year only) */}
+          <Text style={styles.dobLabel}>Date of birth</Text>
+          <Text style={styles.dobHint}>We only ask for month and year — MySuburb is for adults 18 and over.</Text>
+          <View style={styles.dobRow}>
+            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowMonthPicker(true)}>
+              <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+              <Text style={[styles.input, !birthMonth && { color: Colors.midGrey }]}>
+                {birthMonth ? MONTHS[birthMonth - 1] : 'Month'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowYearPicker(true)}>
+              <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+              <Text style={[styles.input, !birthYear && { color: Colors.midGrey }]}>
+                {birthYear || 'Year'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Terms & Conditions */}
           <View style={styles.tcRow}>
             <TouchableOpacity style={styles.checkbox} onPress={() => setAgreedToTC(!agreedToTC)}>
@@ -266,6 +318,40 @@ export default function SignupScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Birth Month Picker */}
+      <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMonthPicker(false)}>
+          <View style={styles.pickerSheet}>
+            <Text style={styles.pickerTitle}>Birth Month</Text>
+            <ScrollView style={styles.pickerList}>
+              {MONTHS.map((m, i) => (
+                <TouchableOpacity key={m} style={styles.pickerItem} onPress={() => { setBirthMonth(i + 1); setShowMonthPicker(false); }}>
+                  <Text style={[styles.pickerItemText, birthMonth === i + 1 && styles.pickerItemTextActive]}>{m}</Text>
+                  {birthMonth === i + 1 && <Ionicons name="checkmark" size={18} color={Colors.brandGreen} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Birth Year Picker */}
+      <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
+          <View style={styles.pickerSheet}>
+            <Text style={styles.pickerTitle}>Birth Year</Text>
+            <ScrollView style={styles.pickerList}>
+              {YEARS.map((y) => (
+                <TouchableOpacity key={y} style={styles.pickerItem} onPress={() => { setBirthYear(y); setShowYearPicker(false); }}>
+                  <Text style={[styles.pickerItemText, birthYear === y && styles.pickerItemTextActive]}>{y}</Text>
+                  {birthYear === y && <Ionicons name="checkmark" size={18} color={Colors.brandGreen} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -289,6 +375,17 @@ const styles = StyleSheet.create({
   input: { flex: 1, paddingVertical: 14, fontSize: 15, color: Colors.charcoal },
   countryCode: { fontSize: 15, color: Colors.charcoal, fontWeight: '600', marginRight: 6 },
   eyeBtn: { padding: 4 },
+  dobLabel: { fontSize: 13, fontWeight: '700', color: Colors.charcoal, marginBottom: 2 },
+  dobHint: { fontSize: 12, color: Colors.midGrey, marginBottom: 8 },
+  dobRow: { flexDirection: 'row', gap: 10 },
+  dobField: { flex: 1 },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  pickerSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '60%', paddingTop: 16 },
+  pickerTitle: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 8 },
+  pickerList: { paddingHorizontal: 20 },
+  pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pickerItemText: { fontSize: 16, color: Colors.charcoal },
+  pickerItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   tcRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, marginTop: 4 },
   checkbox: { marginRight: 8 },
   tcText: { fontSize: 14, color: Colors.midGrey },
