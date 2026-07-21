@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -13,7 +14,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+// getAuth(app) alone defaults to in-memory-only persistence on React
+// Native — the auth session lives only as long as the JS engine does,
+// so it's wiped every time the app is backgrounded or killed, forcing a
+// fresh login each time. This is the single most common Expo+Firebase
+// gotcha. initializeAuth with AsyncStorage-backed persistence keeps the
+// session on-device properly, the same way every other app stays logged
+// in.
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export default app;

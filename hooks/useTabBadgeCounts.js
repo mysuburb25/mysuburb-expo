@@ -1,6 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Alert } from 'react-native';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '../config/firebase';
+
+// TEMP_DEBUG: set to false once badge counts are confirmed working —
+// this surfaces the real Firestore error via Alert so it's visible on
+// a physical device, instead of only appearing in a console log nobody
+// connected to Metro can see. Remove this whole flag/block once fixed.
+const TEMP_DEBUG = true;
+let hasShownDebugAlert = false;
 
 // Mirrors the exact category filter each tab's own feed query uses (see
 // app/(tabs)/index.js, buy-sell.js, services.js, lost-found.js,
@@ -64,6 +72,10 @@ export default function useTabBadgeCounts(user, profile) {
           return snap.data().count;
         } catch (e) {
           console.error(`Tab badge count failed for ${key} in ${suburb}:`, e);
+          if (TEMP_DEBUG && !hasShownDebugAlert) {
+            hasShownDebugAlert = true;
+            Alert.alert('Badge count debug', `Category: ${key}\nSuburb: ${suburb}\n\n${e.message || e}`);
+          }
           return 0;
         }
       }));
