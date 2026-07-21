@@ -444,6 +444,31 @@ export default function PostDetailScreen() {
     ]);
   };
 
+  // Same effect as handleDeletePost (isRemoved: true — hides it from
+  // every feed and direct access, never a hard delete), but reachable by
+  // an admin on ANY post, not just their own. Backed by the dedicated
+  // isAdmin() clause in firestore.rules, separate from the owner-edit
+  // clause. This exists so a report doesn't have to go through the
+  // Moderation/Admin dashboard report queue first — if an admin spots
+  // something directly on a post (e.g. a tip received outside the app),
+  // they can act immediately from right here.
+  const handleAdminRemovePost = () => {
+    setShowPostMenu(false);
+    Alert.alert('Remove Post (Admin)', 'This will hide the post from all feeds immediately. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive', onPress: async () => {
+          setDeletingPost(true);
+          try {
+            await updateDoc(doc(db, 'posts', id), { isRemoved: true });
+            router.back();
+          } catch (e) { Alert.alert('Error', e.message); }
+          finally { setDeletingPost(false); }
+        }
+      }
+    ]);
+  };
+
   const handleReportPost = () => {
     setShowPostMenu(false);
     setReportReason(null);
@@ -1038,6 +1063,14 @@ export default function PostDetailScreen() {
                   </View>
                   <Text style={styles.menuItemTextDanger}>Block {post.authorName}</Text>
                 </TouchableOpacity>
+                {profile?.isAdmin && (
+                  <TouchableOpacity style={styles.menuItem} onPress={handleAdminRemovePost} disabled={deletingPost}>
+                    <View style={styles.menuItemIcon}>
+                      <Ionicons name="shield-outline" size={20} color="#E53935" />
+                    </View>
+                    <Text style={styles.menuItemTextDanger}>Remove Post (Admin)</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
             <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowPostMenu(false)}>
