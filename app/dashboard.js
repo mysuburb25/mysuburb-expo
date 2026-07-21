@@ -7,6 +7,7 @@ import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
+import useTabBadgeCounts from '../hooks/useTabBadgeCounts';
 
 const SECTIONS = [
   { key: 'community', label: 'Community Hub', icon: 'home', color: Colors.brandGreen },
@@ -28,10 +29,11 @@ function formatDate(date) {
 }
 
 export default function DashboardScreen() {
-  const { profile, updateUserProfile, unreadCount, unreadMessageCount } = useAuth();
+  const { user, profile, updateUserProfile, unreadCount, unreadMessageCount } = useAuth();
+  const badgeCounts = useTabBadgeCounts(user, profile);
   const [grouped, setGrouped] = useState({});
   const [loading, setLoading] = useState(true);
-  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(profile?.skipDashboard || false);
   const [continuing, setContinuing] = useState(false);
 
   useEffect(() => {
@@ -89,8 +91,12 @@ export default function DashboardScreen() {
   const handleContinue = async () => {
     setContinuing(true);
     try {
-      if (dontShowAgain) {
-        await updateUserProfile({ skipDashboard: true });
+      // Always sync, not just when checked — otherwise someone who
+      // previously checked this and later opens the dashboard from
+      // Profile to uncheck it would have that change silently ignored,
+      // and skipDashboard would stay stuck at true.
+      if (dontShowAgain !== !!profile?.skipDashboard) {
+        await updateUserProfile({ skipDashboard: dontShowAgain });
       }
     } catch (e) {
       console.error(e);
@@ -153,6 +159,10 @@ export default function DashboardScreen() {
           {SECTIONS.map(section => {
             const items = grouped[section.key];
             if (!items || items.length === 0) return null;
+            // dashboard's 'community' section corresponds to the 'home'
+            // tab everywhere else (tab bar badges, lastVisited tracking).
+            const badgeKey = section.key === 'community' ? 'home' : section.key;
+            const newCount = badgeCounts[badgeKey] || 0;
             return (
               <View key={section.key} style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -162,9 +172,11 @@ export default function DashboardScreen() {
                     </View>
                     <Text style={styles.sectionTitle}>{section.label}</Text>
                   </View>
-                  <View style={[styles.sectionCountPill, { backgroundColor: section.color }]}>
-                    <Text style={styles.sectionCountText}>{items.length}</Text>
-                  </View>
+                  {newCount > 0 && (
+                    <View style={[styles.sectionCountPill, { backgroundColor: section.color }]}>
+                      <Text style={styles.sectionCountText}>{newCount > 9 ? '9+' : newCount} new</Text>
+                    </View>
+                  )}
                 </View>
                 {items.map(item => (
                   <TouchableOpacity

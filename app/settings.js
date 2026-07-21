@@ -1,9 +1,22 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
+
+// Pulled from app config rather than hardcoded, so this always reflects
+// whatever was actually shipped in each build — no risk of someone
+// forgetting to bump a hardcoded string on release. `version` is the
+// marketing version (e.g. "1.0.0"); buildNumber/versionCode is the
+// per-build counter EAS auto-increments on every production build (see
+// eas.json's appVersionSource: "remote").
+const APP_VERSION = Constants.expoConfig?.version || '—';
+const BUILD_NUMBER = Platform.OS === 'ios'
+  ? Constants.expoConfig?.ios?.buildNumber
+  : Constants.expoConfig?.android?.versionCode;
+const VERSION_STRING = BUILD_NUMBER ? `${APP_VERSION} (${BUILD_NUMBER})` : APP_VERSION;
 
 export default function SettingsScreen() {
   const { logout, profile } = useAuth();
@@ -63,7 +76,7 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <MenuItem icon="help-circle-outline" label="Help and FAQ" onPress={() => router.push('/help-faq')} />
         <MenuItem icon="flag-outline" label="Report a Problem" onPress={() => router.push('/report-problem')} />
-        <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', 'Version 1.0.0 - Built for Australian communities.')} />
+        <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', `Version ${VERSION_STRING} - Built for Australian communities.`)} />
       </View>
 
       <Text style={styles.sectionLabel}>Account Actions</Text>
@@ -72,7 +85,7 @@ export default function SettingsScreen() {
         <MenuItem icon="trash-outline" label="Delete Account" onPress={() => router.push('/delete-account')} danger />
       </View>
 
-      <Text style={styles.version}>My Suburb v1.0.0 - Made with love in Australia</Text>
+      <Text style={styles.version}>My Suburb v{VERSION_STRING} - Made with love in Australia</Text>
     </ScrollView>
   );
 }

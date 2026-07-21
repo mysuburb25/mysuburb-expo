@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AvatarWithOnlineDot from '../components/AvatarWithOnlineDot';
 import { Colors } from '../constants/theme';
 import { getOrderedMedia } from '../utils/mediaOrder';
+import LinkifiedText from '../components/LinkifiedText';
 
 const CATEGORY_CONFIG = {
   updates:     { label: 'General', bg: Colors.brandGreen },
@@ -116,7 +117,7 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
 
       <TouchableOpacity onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
         <View style={styles.cardBody}>
-          <Text style={styles.content} numberOfLines={4}>{item.content}</Text>
+          <LinkifiedText text={item.content} style={styles.content} linkStyle={styles.contentLink} numberOfLines={4} />
         </View>
       </TouchableOpacity>
       <View style={styles.footer}>
@@ -166,6 +167,7 @@ const styles = StyleSheet.create({
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  contentLink: { color: '#1565C0', textDecorationLine: 'underline' },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   footerText: { fontSize: 14, color: Colors.charcoal, fontWeight: '600' },

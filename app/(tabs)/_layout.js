@@ -7,11 +7,17 @@ import { Alert } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
+import useTabBadgeCounts from '../../hooks/useTabBadgeCounts';
 
-function TabIcon({ name, focused }) {
+function TabIcon({ name, focused, badgeCount }) {
   return (
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
       <Ionicons name={name} size={22} color={focused ? Colors.brandGreen : '#fff'} />
+      {badgeCount > 0 && (
+        <View style={styles.tabBadge}>
+          <Text style={styles.tabBadgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -19,6 +25,7 @@ function TabIcon({ name, focused }) {
 export default function TabLayout() {
   const { user, profile, loading, unreadCount, logout } = useAuth();
   const insets = useSafeAreaInsets();
+  const badgeCounts = useTabBadgeCounts(user, profile);
 
   useEffect(() => {
     if (!loading && !user) router.replace('/(auth)/login');
@@ -71,11 +78,11 @@ export default function TabLayout() {
         tabBarItemStyle: { marginHorizontal: -8 },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Hub', tabBarLabelStyle: { fontSize: 12, fontWeight: '700' }, tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} /> }} />
-      <Tabs.Screen name="events" options={{ title: 'Events', tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} /> }} />
-      <Tabs.Screen name="buy-sell" options={{ title: 'Buy & Sell', tabBarIcon: ({ focused }) => <TabIcon name="pricetag" focused={focused} /> }} />
-      <Tabs.Screen name="services" options={{ title: 'Services', tabBarIcon: ({ focused }) => <TabIcon name="briefcase" focused={focused} /> }} />
-      <Tabs.Screen name="lost-found" options={{ title: 'Lost & Found', tabBarIcon: ({ focused }) => <TabIcon name="flag" focused={focused} /> }} />
+      <Tabs.Screen name="index" options={{ title: 'Hub', tabBarLabelStyle: { fontSize: 12, fontWeight: '700' }, tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} badgeCount={badgeCounts.home} /> }} />
+      <Tabs.Screen name="events" options={{ title: 'Events', tabBarIcon: ({ focused }) => <TabIcon name="calendar" focused={focused} badgeCount={badgeCounts.events} /> }} />
+      <Tabs.Screen name="buy-sell" options={{ title: 'Buy & Sell', tabBarIcon: ({ focused }) => <TabIcon name="pricetag" focused={focused} badgeCount={badgeCounts.marketplace} /> }} />
+      <Tabs.Screen name="services" options={{ title: 'Services', tabBarIcon: ({ focused }) => <TabIcon name="briefcase" focused={focused} badgeCount={badgeCounts.services} /> }} />
+      <Tabs.Screen name="lost-found" options={{ title: 'Lost & Found', tabBarIcon: ({ focused }) => <TabIcon name="flag" focused={focused} badgeCount={badgeCounts.lostfound} /> }} />
       <Tabs.Screen
         name="notifications"
         options={{
@@ -101,6 +108,13 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   iconWrap: { width: 44, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   iconWrapActive: { backgroundColor: '#FFD700' },
+  tabBadge: {
+    position: 'absolute', top: -2, right: 2,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#E53935', borderWidth: 1.5, borderColor: Colors.brandGreen,
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3,
+  },
+  tabBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   badge: { position: 'absolute', top: -4, right: -2, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });

@@ -10,6 +10,7 @@ import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 import ImageViewerModal from '../../components/ImageViewerModal';
+import LinkifiedText from '../../components/LinkifiedText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -785,7 +786,11 @@ export default function PostDetailScreen() {
                     </View>
                   )}
                   {!isEvent && (
-                    <Text style={(post.category === 'marketplace' || isLostFound) ? styles.contentBold : styles.description}>{post.content}</Text>
+                    <LinkifiedText
+                      text={post.content}
+                      style={(post.category === 'marketplace' || isLostFound) ? styles.contentBold : styles.description}
+                      linkStyle={styles.contentLink}
+                    />
                   )}
 
                   {isEvent && eventDate && (
@@ -805,7 +810,7 @@ export default function PostDetailScreen() {
                               <Text style={[styles.labelBadgeText, styles.aboutBadgeText]}>DESCRIPTION</Text>
                             </View>
                           </View>
-                          <Text style={styles.fieldValue}>{post.description}</Text>
+                          <LinkifiedText text={post.description} style={styles.fieldValue} linkStyle={styles.contentLink} />
                         </View>
                       ) : null}
                       {post.isFree !== undefined && (
@@ -866,7 +871,11 @@ export default function PostDetailScreen() {
                   )}
 
                   {!isEvent && post.description ? (
-                    <Text style={[styles.description, isPostClosed(post) && styles.closedText]}>{post.description}</Text>
+                    <LinkifiedText
+                      text={post.description}
+                      style={[styles.description, isPostClosed(post) && styles.closedText]}
+                      linkStyle={styles.contentLink}
+                    />
                   ) : null}
                   {isLostFound && post.lostFoundLocation ? (
                     <TouchableOpacity style={styles.locationRow} onPress={handleGetDirections}>
@@ -1291,6 +1300,7 @@ const styles = StyleSheet.create({
   serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginHorizontal: 16, marginBottom: 6 },
   serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },
+  contentLink: { color: '#1565C0', textDecorationLine: 'underline' },
   closedText: { textDecorationLine: 'line-through' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   locationText: { fontSize: 14, color: Colors.charcoal },
