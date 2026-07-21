@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
+import WheelPicker from '../../components/WheelPicker';
 
 const TC_TEXT = `Terms & Conditions
 
@@ -75,8 +76,7 @@ export default function SignupScreen() {
   const [showTC, setShowTC] = useState(false);
   const [birthMonth, setBirthMonth] = useState(null); // 1-12
   const [birthYear, setBirthYear] = useState(null);
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [showDobPicker, setShowDobPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
@@ -254,15 +254,15 @@ export default function SignupScreen() {
 
           {/* Date of birth (month + year only) */}
           <Text style={styles.dobLabel}>Date of birth</Text>
-          <Text style={styles.dobHint}>We only ask for month and year — MySuburb is for adults 18 and over.</Text>
+          <Text style={styles.dobHint}>MySuburb is for adults 18 and over.</Text>
           <View style={styles.dobRow}>
-            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowMonthPicker(true)}>
+            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowDobPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
               <Text style={[styles.input, !birthMonth && { color: Colors.midGrey }]}>
                 {birthMonth ? MONTHS[birthMonth - 1] : 'Month'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowYearPicker(true)}>
+            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowDobPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
               <Text style={[styles.input, !birthYear && { color: Colors.midGrey }]}>
                 {birthYear || 'Year'}
@@ -319,37 +319,27 @@ export default function SignupScreen() {
         </View>
       </Modal>
 
-      {/* Birth Month Picker */}
-      <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMonthPicker(false)}>
-          <View style={styles.pickerSheet}>
-            <Text style={styles.pickerTitle}>Birth Month</Text>
-            <ScrollView style={styles.pickerList}>
-              {MONTHS.map((m, i) => (
-                <TouchableOpacity key={m} style={styles.pickerItem} onPress={() => { setBirthMonth(i + 1); setShowMonthPicker(false); }}>
-                  <Text style={[styles.pickerItemText, birthMonth === i + 1 && styles.pickerItemTextActive]}>{m}</Text>
-                  {birthMonth === i + 1 && <Ionicons name="checkmark" size={18} color={Colors.brandGreen} />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Birth Year Picker */}
-      <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
-          <View style={styles.pickerSheet}>
-            <Text style={styles.pickerTitle}>Birth Year</Text>
-            <ScrollView style={styles.pickerList}>
-              {YEARS.map((y) => (
-                <TouchableOpacity key={y} style={styles.pickerItem} onPress={() => { setBirthYear(y); setShowYearPicker(false); }}>
-                  <Text style={[styles.pickerItemText, birthYear === y && styles.pickerItemTextActive]}>{y}</Text>
-                  {birthYear === y && <Ionicons name="checkmark" size={18} color={Colors.brandGreen} />}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+      {/* Date of Birth Picker — Month and Year wheels side by side */}
+      <Modal visible={showDobPicker} animationType="slide" transparent onRequestClose={() => setShowDobPicker(false)}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDobPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.pickerSheet}>
+            <Text style={styles.pickerTitle}>Date of Birth</Text>
+            <View style={styles.wheelRow}>
+              <WheelPicker
+                data={MONTHS.map((m, i) => ({ label: m, value: i + 1 }))}
+                selectedValue={birthMonth}
+                onValueChange={setBirthMonth}
+              />
+              <WheelPicker
+                data={YEARS.map((y) => ({ label: String(y), value: y }))}
+                selectedValue={birthYear}
+                onValueChange={setBirthYear}
+              />
+            </View>
+            <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowDobPicker(false)}>
+              <Text style={styles.dobDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
@@ -380,10 +370,11 @@ const styles = StyleSheet.create({
   dobRow: { flexDirection: 'row', gap: 10 },
   dobField: { flex: 1 },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  pickerSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '60%', paddingTop: 16 },
-  pickerTitle: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 8 },
-  pickerList: { paddingHorizontal: 20 },
-  pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pickerSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingBottom: 24, paddingHorizontal: 20 },
+  pickerTitle: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 12 },
+  wheelRow: { flexDirection: 'row', gap: 12 },
+  dobDoneBtn: { marginTop: 16, backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  dobDoneBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   pickerItemText: { fontSize: 16, color: Colors.charcoal },
   pickerItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   tcRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, marginTop: 4 },
