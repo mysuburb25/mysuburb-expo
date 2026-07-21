@@ -323,7 +323,10 @@ export default function SignupScreen() {
       <Modal visible={showDobPicker} animationType="slide" transparent onRequestClose={() => setShowDobPicker(false)}>
         <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDobPicker(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.pickerSheet}>
-            <Text style={styles.pickerTitle}>Date of Birth</Text>
+            <View style={styles.wheelHeaderBar}>
+              <Text style={styles.wheelHeaderText}>Month</Text>
+              <Text style={styles.wheelHeaderText}>Year</Text>
+            </View>
             <View style={styles.wheelRow}>
               <WheelPicker
                 data={MONTHS.map((m, i) => ({ label: m, value: i + 1 }))}
@@ -370,10 +373,11 @@ const styles = StyleSheet.create({
   dobRow: { flexDirection: 'row', gap: 10 },
   dobField: { flex: 1 },
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  pickerSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingBottom: 24, paddingHorizontal: 20 },
-  pickerTitle: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, textAlign: 'center', marginBottom: 12 },
-  wheelRow: { flexDirection: 'row', gap: 12 },
-  dobDoneBtn: { marginTop: 16, backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  pickerSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden', paddingBottom: 24 },
+  wheelHeaderBar: { flexDirection: 'row', backgroundColor: Colors.brandGreen, paddingVertical: 14 },
+  wheelHeaderText: { flex: 1, textAlign: 'center', color: Colors.white, fontSize: 16, fontWeight: '800' },
+  wheelRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 8 },
+  dobDoneBtn: { marginTop: 12, marginHorizontal: 20, backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   dobDoneBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
   pickerItemText: { fontSize: 16, color: Colors.charcoal },
   pickerItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },

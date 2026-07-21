@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { Colors } from '../constants/theme';
 
 const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 5; // odd, so there's a clear single centered row
+const VISIBLE_ITEMS = 3; // odd, so there's a clear single centered row — kept small so there's minimal empty space above the first item
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 const CENTER_OFFSET = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
 
@@ -34,12 +34,8 @@ export default function WheelPicker({ data, selectedValue, onValueChange }) {
     onValueChange(data[clamped].value);
   }, [data, onValueChange]);
 
-  const scrollToIndex = (index) => {
-    listRef.current?.scrollToOffset({ offset: index * ITEM_HEIGHT, animated: true });
-  };
-
   return (
-    <View style={{ height: WHEEL_HEIGHT, width: '100%' }}>
+    <View style={{ height: WHEEL_HEIGHT, flex: 1 }}>
       <View style={styles.centerHighlight} pointerEvents="none" />
       <FlatList
         ref={listRef}
@@ -57,7 +53,7 @@ export default function WheelPicker({ data, selectedValue, onValueChange }) {
         renderItem={({ item, index }) => {
           const isCentered = index === centeredIndex;
           return (
-            <View style={styles.item} onTouchEnd={() => scrollToIndex(index)}>
+            <View style={styles.item}>
               <Text style={[styles.itemText, isCentered && styles.itemTextSelected]}>{item.label}</Text>
             </View>
           );
