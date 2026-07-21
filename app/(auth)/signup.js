@@ -76,7 +76,8 @@ export default function SignupScreen() {
   const [showTC, setShowTC] = useState(false);
   const [birthMonth, setBirthMonth] = useState(null); // 1-12
   const [birthYear, setBirthYear] = useState(null);
-  const [showDobPicker, setShowDobPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
@@ -256,13 +257,13 @@ export default function SignupScreen() {
           <Text style={styles.dobLabel}>Date of birth</Text>
           <Text style={styles.dobHint}>MySuburb is for adults 18 and over.</Text>
           <View style={styles.dobRow}>
-            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowDobPicker(true)}>
+            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowMonthPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
               <Text style={[styles.input, !birthMonth && { color: Colors.midGrey }]}>
                 {birthMonth ? MONTHS[birthMonth - 1] : 'Month'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowDobPicker(true)}>
+            <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowYearPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
               <Text style={[styles.input, !birthYear && { color: Colors.midGrey }]}>
                 {birthYear || 'Year'}
@@ -319,13 +320,12 @@ export default function SignupScreen() {
         </View>
       </Modal>
 
-      {/* Date of Birth Picker — Month and Year wheels side by side */}
-      <Modal visible={showDobPicker} animationType="slide" transparent onRequestClose={() => setShowDobPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowDobPicker(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.pickerSheet}>
+      {/* Birth Month Picker */}
+      <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerSheet}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText}>Month</Text>
-              <Text style={styles.wheelHeaderText}>Year</Text>
             </View>
             <View style={styles.wheelRow}>
               <WheelPicker
@@ -333,17 +333,33 @@ export default function SignupScreen() {
                 selectedValue={birthMonth}
                 onValueChange={setBirthMonth}
               />
+            </View>
+            <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowMonthPicker(false)}>
+              <Text style={styles.dobDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Birth Year Picker */}
+      <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.wheelHeaderBar}>
+              <Text style={styles.wheelHeaderText}>Year</Text>
+            </View>
+            <View style={styles.wheelRow}>
               <WheelPicker
                 data={YEARS.map((y) => ({ label: String(y), value: y }))}
                 selectedValue={birthYear}
                 onValueChange={setBirthYear}
               />
             </View>
-            <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowDobPicker(false)}>
+            <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowYearPicker(false)}>
               <Text style={styles.dobDoneBtnText}>Done</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </KeyboardAvoidingView>
   );
