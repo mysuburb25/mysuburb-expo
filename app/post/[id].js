@@ -114,18 +114,35 @@ function isPostClosed(post) {
 // component. Doesn't autoplay: starts paused, person taps the native
 // controls to play, same as tapping "play" on any other video app —
 // nobody's mobile data gets used for a video they didn't ask to watch.
+//
+// The native controls do include a fullscreen icon, but it's small and
+// easy to miss — this adds an explicit, obvious fullscreen button (top
+// corner, always visible) that calls the player's own enterFullscreen(),
+// giving videos the same "tap to go fullscreen" feel that tapping a
+// photo already has via ImageViewerModal.
 function PostVideoPlayer({ url }) {
+  const videoViewRef = useRef(null);
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
   });
   return (
-    <VideoView
-      style={styles.postVideo}
-      player={player}
-      nativeControls
-      allowsFullscreen
-      contentFit="cover"
-    />
+    <View>
+      <VideoView
+        ref={videoViewRef}
+        style={styles.postVideo}
+        player={player}
+        nativeControls
+        allowsFullscreen
+        contentFit="cover"
+      />
+      <TouchableOpacity
+        style={styles.videoFullscreenBtn}
+        onPress={() => videoViewRef.current?.enterFullscreen()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="expand" size={18} color="#fff" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -1330,6 +1347,12 @@ const styles = StyleSheet.create({
   imagesWrap: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },
   postVideo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#000' },
+  videoFullscreenBtn: {
+    position: 'absolute', top: 10, right: 10,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
   // Post menu modal
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
