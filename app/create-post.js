@@ -11,6 +11,7 @@ import { db, storage } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
+import MentionInput from '../components/MentionInput';
 import { findProhibitedTerm, PROHIBITED_ITEMS_MESSAGE } from '../utils/contentModeration';
 
 const COMMUNITY_TABS = [
@@ -52,14 +53,6 @@ const COMMUNITY_PLACEHOLDERS = {
   safety:  "Report a safety concern — suspicious activity, hazards, emergencies in your area...",
 };
 
-// Defined at module level (not inside CreatePostScreen) so React treats it as
-// the same component across renders — keeping it inside the screen component
-// recreated a "new" component type on every keystroke, forcing the photos to
-// unmount/remount and visibly flicker every time the user typed.
-// Media: 8 total (photos + videos combined), no separate per-type cap.
-// Videos additionally capped at 60 seconds / 50MB each — enforced here
-// for instant feedback, and in storage.rules (size/type only; duration
-// can't be checked server-side).
 const MAX_MEDIA = 8;
 const MAX_VIDEO_DURATION_SEC = 120;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
@@ -116,11 +109,6 @@ export default function CreatePostScreen() {
   const [editPost, setEditPost] = useState(null);
   const [loadingEditPost, setLoadingEditPost] = useState(isEditMode);
 
-  // In edit mode, which category branch to show isn't known from route
-  // params (we only got an editPostId) — it's only known once the post
-  // itself has loaded. effectiveCategory covers both: route params in
-  // create mode (available immediately), or the fetched post's own
-  // category once it's loaded in edit mode.
   const effectiveCategory = isEditMode ? editPost?.category : paramCategory;
 
   const getDefaultCat = () => {
@@ -133,6 +121,7 @@ export default function CreatePostScreen() {
 
   const [selectedCategory, setSelectedCategory] = useState(isEditMode ? '' : getDefaultCat());
   const [content, setContent] = useState('');
+  const [contentMentions, setContentMentions] = useState([]);
   const [lfItem, setLfItem] = useState('');
   const [lfDescription, setLfDescription] = useState('');
   const [lfLocation, setLfLocation] = useState('');
@@ -145,18 +134,10 @@ export default function CreatePostScreen() {
   const [mpPrice, setMpPrice] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
-  // One combined, ordered array — { kind: 'image'|'video', uri, thumbnailUri?, duration?, existing? }.
-  // Tracking pick order in a single array (rather than two separate
-  // image/video arrays) is what lets the feed/detail view show photos
-  // and videos interleaved in the order they were actually added,
-  // instead of always grouping all photos before all videos.
   const [media, setMedia] = useState([]);
   const [posting, setPosting] = useState(false);
   const scrollRef = useRef(null);
 
-  // Fetch the post being edited and populate every field from it — this
-  // is what makes "Edit Post" actually reopen the same form pre-filled,
-  // rather than a stripped-down separate edit screen.
   useEffect(() => {
     if (!editPostId) return;
     (async () => {
@@ -183,11 +164,13 @@ export default function CreatePostScreen() {
         } else if (data.category === 'services') {
           setSelectedCategory(data.serviceTab || 'offering');
           setContent(data.content || '');
+          setContentMentions(data.mentions || []);
           const svc = SERVICE_CATEGORIES.find(s => s.key === data.serviceType);
           if (svc) setSelectedService(svc);
         } else {
           setSelectedCategory(data.category || 'updates');
           setContent(data.content || '');
+          setContentMentions(data.mentions || []);
         }
 
         const orderedMedia = getOrderedMedia(data);
@@ -216,17 +199,6 @@ export default function CreatePostScreen() {
   const pageTitle = isEditMode ? 'Edit Post' : (isCommunity ? 'Community Hub' : isMarketplace ? 'Buy & Sell' : isLostFound ? 'Lost & Found' : 'Services');
   const pageIcon = isEditMode ? 'create' : (isCommunity ? 'home' : isMarketplace ? 'pricetag' : isLostFound ? 'flag' : 'briefcase');
 
-  // Single entry point for the "Add Media" button — asks Photo vs Video
-  // first, then hands off to the existing per-type handlers (which each
-  // still ask Camera vs Library). Keeps the two original flows intact,
-  // just adds one small decision in front of them instead of showing two
-  // separate buttons in the UI.
-  // Single "Add Media" entry point — no separate Photo/Video choice.
-  // Camera and Library both accept either media type in one go; each
-  // resulting asset is routed to images or videos based on its own
-  // reported type. Total cap (MAX_MEDIA) covers photos and videos
-  // together; videos are additionally checked against the duration/size
-  // limits regardless of how they were picked.
   const handleAddMedia = () => {
     if (media.length >= MAX_MEDIA) {
       Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} photos and videos in total.`);
@@ -270,13 +242,9 @@ export default function CreatePostScreen() {
     ]);
   };
 
-  // Appends a picked asset onto the single ordered `media` array —
-  // videos go through duration/size validation and thumbnail generation
-  // first. A video failing validation is simply skipped (with an alert)
-  // rather than blocking the rest of a multi-select batch.
   const routeAsset = async (asset) => {
     if (asset.type === 'video') {
-      const durationSec = (asset.duration || 0) / 1000; // expo-image-picker reports duration in ms
+      const durationSec = (asset.duration || 0) / 1000;
       if (durationSec > MAX_VIDEO_DURATION_SEC) {
         Alert.alert('Video skipped', `"${asset.fileName || 'A video'}" is ${Math.round(durationSec)}s, which is over the ${MAX_VIDEO_DURATION_SEC}s limit, so it wasn't added. Any other photos or videos you selected were added normally.`);
         return;
@@ -291,8 +259,6 @@ export default function CreatePostScreen() {
         thumbnailUri = thumb.uri;
       } catch (e) {
         console.error('Video thumbnail generation failed:', e);
-        // Not fatal — the picker UI falls back to a generic video icon,
-        // and the post can still be created without a thumbnail.
       }
       setMedia(prev => [...prev, { kind: 'video', uri: asset.uri, thumbnailUri, duration: Math.round(durationSec) }]);
     } else {
@@ -350,8 +316,6 @@ export default function CreatePostScreen() {
     setShowLfLocationSuggestions(false);
   };
 
-  // Existing (already-uploaded) images just keep their URL as-is — only
-  // freshly-picked local images actually need uploading.
   const uploadImages = async (postId, imageItems) => {
     const urls = [];
     for (let i = 0; i < imageItems.length; i++) {
@@ -369,11 +333,6 @@ export default function CreatePostScreen() {
     return urls;
   };
 
-  // Same existing/fresh split as uploadImages, but each video uploads
-  // alongside its own thumbnail image (also to Storage) so the feed/list
-  // view has something to show without needing to load the full video.
-  // Returns objects, not bare URLs, since duration travels with each one
-  // (used for display, e.g. "0:42" on the thumbnail).
   const uploadVideos = async (postId, videoItems) => {
     const results = [];
     for (let i = 0; i < videoItems.length; i++) {
@@ -398,8 +357,6 @@ export default function CreatePostScreen() {
           thumbnailUrl = await getDownloadURL(thumbRef);
         } catch (e) {
           console.error('Video thumbnail upload failed:', e);
-          // Not fatal — the video itself still uploaded fine, the feed
-          // just falls back to a generic video icon for this one.
         }
       }
 
@@ -408,10 +365,6 @@ export default function CreatePostScreen() {
     return results;
   };
 
-  // Splits the unified `media` array by kind for upload (images/videos
-  // upload differently), then reassembles the pick-order sequence as
-  // `mediaOrder` so the feed/detail view can display them interleaved
-  // rather than always grouping all photos before all videos.
   const uploadMedia = async (postId) => {
     const imageItems = media.filter(m => m.kind === 'image');
     const videoItems = media.filter(m => m.kind === 'video');
@@ -473,6 +426,15 @@ export default function CreatePostScreen() {
       } else if (isServices) {
         categoryValue = 'services';
         extraFields = { serviceType: selectedService.key, serviceTab: selectedCategory };
+      }
+
+      // Community and Services are the only two branches whose main text
+      // field goes through MentionInput — Marketplace/Lost & Found titles
+      // and descriptions aren't wired for @mentions (not a natural fit
+      // for a product title or item name).
+      if (isCommunity || isServices) {
+        extraFields.mentions = contentMentions;
+        extraFields.mentionedUserIds = contentMentions.map(m => m.uid);
       }
 
       // --- Edit mode: update the existing post instead of creating one ---
@@ -552,6 +514,23 @@ export default function CreatePostScreen() {
           })
         ));
       } catch (e) { console.error('notification error:', e); }
+
+      // @mention notifications — separate from the broadcast above, since
+      // a mention is a direct, specific "someone called you out" rather
+      // than "a new post exists in your suburb".
+      if ((isCommunity || isServices) && contentMentions.length > 0) {
+        try {
+          await Promise.all(contentMentions
+            .filter(m => m.uid !== user.uid)
+            .map(m => addDoc(collection(db, 'notifications'), {
+              userId: m.uid, type: 'mention',
+              message: `${profile.displayName} mentioned you in a post`,
+              postId: postRef.id, fromUserId: user.uid, fromUserName: profile.displayName,
+              isRead: false, createdAt: serverTimestamp(),
+            }))
+          );
+        } catch (e) { console.error('mention notification error:', e); }
+      }
 
       router.back();
     } catch (e) { Alert.alert('Error', e.message); }
@@ -647,10 +626,12 @@ export default function CreatePostScreen() {
               <Text style={styles.sectionBarText}>{selectedCategory === 'offering' ? 'Describe your service' : 'What are you looking for?'}</Text>
             </View>
             <View style={styles.fieldPad}>
-              <TextInput
+              <MentionInput
                 style={[styles.input, styles.inputLarge]}
                 placeholder={selectedCategory === 'offering' ? 'Tell neighbours about your service — experience, availability, rates...' : 'Describe what you need — location, timing, budget...'}
                 placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent}
+                mentions={contentMentions} onMentionsChange={setContentMentions}
+                suburb={profile.suburb} state={profile.state} currentUserId={user.uid}
                 multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true}
                 onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
               />
@@ -714,7 +695,7 @@ export default function CreatePostScreen() {
               </Text>
             </View>
             <View style={styles.fieldPad}>
-              <TextInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
+              <MentionInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} mentions={contentMentions} onMentionsChange={setContentMentions} suburb={profile.suburb} state={profile.state} currentUserId={user.uid} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
             </View>
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
@@ -851,7 +832,6 @@ const styles = StyleSheet.create({
   inputSingle: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 15, color: Colors.charcoal },
   postBtnBottom: { backgroundColor: Colors.brandGreen, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   postBtnBottomText: { fontSize: 20, fontWeight: '800', color: Colors.white },
-  // Image picker
   imageRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   imageThumbWrap: { position: 'relative' },
   imageThumb: { width: 90, height: 90, borderRadius: 10, borderWidth: 1, borderColor: Colors.lightGrey },
@@ -863,7 +843,6 @@ const styles = StyleSheet.create({
   },
   addImageBtn: { width: 90, height: 90, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.brandGreen, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', gap: 4 },
   addImageText: { fontSize: 11, color: Colors.brandGreen, fontWeight: '600' },
-  // Service modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '80%', overflow: 'hidden' },
   modalHandle: { width: 40, height: 4, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 2, alignSelf: 'center', marginBottom: 10 },

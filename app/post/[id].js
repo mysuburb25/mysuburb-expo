@@ -11,6 +11,8 @@ import AppName from '../../components/AppName';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
 import ImageViewerModal from '../../components/ImageViewerModal';
 import LinkifiedText from '../../components/LinkifiedText';
+import MentionInput from '../../components/MentionInput';
+import { renderTextWithMentions } from '../../utils/renderTextWithMentions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -155,6 +157,7 @@ export default function PostDetailScreen() {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState('');
+  const [commentMentions, setCommentMentions] = useState([]);
   const [posting, setPosting] = useState(false);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
@@ -376,11 +379,13 @@ export default function PostDetailScreen() {
     setPosting(true);
     const parentCommentId = replyTarget?.id || null;
     try {
-      await addDoc(collection(db, 'comments'), {
+      const newCommentRef = await addDoc(collection(db, 'comments'), {
         postId: id, content: comment.trim(),
         authorId: user.uid, authorName: profile.displayName,
         createdAt: serverTimestamp(), likeCount: 0, likedBy: [],
         parentCommentId,
+        mentions: commentMentions,
+        mentionedUserIds: commentMentions.map(m => m.uid),
       });
       await updateDoc(doc(db, 'posts', id), { commentCount: increment(1) });
 
@@ -404,7 +409,28 @@ export default function PostDetailScreen() {
         });
       }
 
+      // @mention notifications — one per mentioned person, skipping
+      // yourself and anyone who already got a comment/reply notification
+      // above (no need to double-notify the same person twice for the
+      // same comment).
+      const alreadyNotified = parentCommentId
+        ? [comments.find(c => c.id === parentCommentId)?.authorId]
+        : [post.authorId];
+      for (const mention of commentMentions) {
+        if (mention.uid === user.uid) continue;
+        if (alreadyNotified.includes(mention.uid)) continue;
+        try {
+          await addDoc(collection(db, 'notifications'), {
+            userId: mention.uid, type: 'mention',
+            message: `${profile.displayName} mentioned you in a comment`,
+            postId: id, commentId: newCommentRef.id, fromUserId: user.uid, fromUserName: profile.displayName,
+            isRead: false, createdAt: serverTimestamp(),
+          });
+        } catch (e) { console.error('mention notification error:', e); }
+      }
+
       setComment('');
+      setCommentMentions([]);
       setReplyTarget(null);
       Keyboard.dismiss();
       inputRef.current?.blur();
@@ -980,7 +1006,11 @@ export default function PostDetailScreen() {
                     <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
                       <Text style={styles.commentAuthor}>{item.authorName}</Text>
                     </TouchableOpacity>
-                    <Text style={[styles.commentContent, item.isDeleted && styles.deletedText]}>{item.content}</Text>
+                    {item.isDeleted ? (
+                      <Text style={[styles.commentContent, styles.deletedText]}>{item.content}</Text>
+                    ) : (
+                      renderTextWithMentions(item.content, item.mentions, styles.commentContent, styles.mentionLink)
+                    )}
                     {FooterRow}
                   </View>
                   {isMyComment && !item.isDeleted && (
@@ -1010,7 +1040,11 @@ export default function PostDetailScreen() {
                   <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
                     <Text style={styles.replyAuthorInline}>{item.authorName}</Text>
                   </TouchableOpacity>
-                  <Text style={[styles.replyText, item.isDeleted && styles.deletedText]}>{item.content}</Text>
+                  {item.isDeleted ? (
+                    <Text style={[styles.replyText, styles.deletedText]}>{item.content}</Text>
+                  ) : (
+                    renderTextWithMentions(item.content, item.mentions, styles.replyText, styles.mentionLink)
+                  )}
                 </View>
                 {FooterRow}
               </View>
@@ -1034,15 +1068,21 @@ export default function PostDetailScreen() {
         </View>
       )}
 
-      {/* Comment Input */}
+      {/* Comment Input — @mention autocomplete works in both a fresh
+          comment and a reply, since they share this same input. */}
       <View style={[styles.commentInputRow, { paddingBottom: Math.max(12, insets.bottom) }]}>
-        <TextInput
+        <MentionInput
           ref={inputRef}
           style={styles.input}
           placeholder={replyTarget ? `Reply to ${replyTarget.authorName}...` : 'Write a comment...'}
           placeholderTextColor={Colors.midGrey}
           value={comment}
           onChangeText={setComment}
+          mentions={commentMentions}
+          onMentionsChange={setCommentMentions}
+          suburb={post?.suburb}
+          state={post?.state}
+          currentUserId={user.uid}
           multiline
           autoCorrect={true}
           autoCapitalize="sentences"
@@ -1301,6 +1341,7 @@ const styles = StyleSheet.create({
   serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },
   contentLink: { color: '#1565C0', textDecorationLine: 'underline' },
+  mentionLink: { color: Colors.brandGreen, fontWeight: '700' },
   closedText: { textDecorationLine: 'line-through' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 8 },
   locationText: { fontSize: 14, color: Colors.charcoal },

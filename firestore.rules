@@ -101,12 +101,14 @@ service cloud.firestore {
       allow update: if
         // Owner editing their own post — covers both the original
         // remove/restore + content/images path, and the newer Edit Post
-        // feature (description, price, and location fields). Kept in one
-        // clause since they're all "the owner editing their own content"
-        // and share the same authorization check.
+        // feature (description, price, and location fields). mentions +
+        // mentionedUserIds are included here since Edit Post can change
+        // who's @mentioned in a Community/Services post's own text.
+        // Kept in one clause since they're all "the owner editing their
+        // own content" and share the same authorization check.
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['isRemoved', 'content', 'images', 'videos', 'mediaOrder', 'description', 'price', 'eventLocation', 'lostFoundLocation', 'marketplaceType', 'isFree', 'isWanted', 'lostFoundType', 'serviceType', 'serviceTab', 'eventDate', 'eventPrice']))
+               .hasOnly(['isRemoved', 'content', 'images', 'videos', 'mediaOrder', 'description', 'price', 'eventLocation', 'lostFoundLocation', 'marketplaceType', 'isFree', 'isWanted', 'lostFoundType', 'serviceType', 'serviceTab', 'eventDate', 'eventPrice', 'mentions', 'mentionedUserIds']))
         ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -248,6 +250,25 @@ service cloud.firestore {
         return isAdmin();
       }
 
+      // A mention can happen inside a comment OR directly inside a post's
+      // own content — commentId takes priority when both are present
+      // (a mention within a comment always includes the comment's parent
+      // postId too, for the "view post" link, so postId alone isn't
+      // enough to tell the two cases apart). Either way, the mentioned
+      // userId must actually appear in that document's mentionedUserIds
+      // array — a simple parallel array of just UIDs kept alongside the
+      // richer {uid, name} mentions array used for rendering, since rules
+      // can't cleanly check "is my UID in this array of objects".
+      function isValidMentionNotification() {
+        return (
+          (request.resource.data.commentId is string
+            && request.resource.data.userId in get(/databases/$(database)/documents/comments/$(request.resource.data.commentId)).data.get('mentionedUserIds', []))
+          ||
+          (!('commentId' in request.resource.data) && request.resource.data.postId is string
+            && request.resource.data.userId in get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.get('mentionedUserIds', []))
+        );
+      }
+
       allow create: if isSignedIn()
                     && request.resource.data.fromUserId == request.auth.uid
                     && request.resource.data.isRead == false
@@ -258,6 +279,7 @@ service cloud.firestore {
                          || (request.resource.data.type == 'message' && isValidMessageNotification())
                          || (request.resource.data.type == 'new_post' && isValidNewPostNotification())
                          || (request.resource.data.type == 'admin_warning' && isValidWarningNotification())
+                         || (request.resource.data.type == 'mention' && isValidMentionNotification())
                        );
 
       allow update: if isSignedIn()
