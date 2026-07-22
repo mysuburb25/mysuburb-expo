@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import WheelPicker from '../../components/WheelPicker';
-import { phoneToFakeEmail } from '../../utils/normalizePhone';
 
 const TC_TEXT = `Terms & Conditions
 
@@ -26,7 +25,7 @@ You are responsible for all content you post. You must not post content that is:
 - Spam or advertising without permission
 
 4. PRIVACY
-We collect your name, email/phone, and suburb to provide the service. Your email/phone is kept private and is never shown to other users. We do not sell your data to third parties. Posts are visible to other users in your suburb. See our full Privacy Policy for details.
+We collect your name, email, and suburb to provide the service. Your email is kept private and is never shown to other users. We do not sell your data to third parties. Posts are visible to other users in your suburb. See our full Privacy Policy for details.
 
 5. MODERATION
 We reserve the right to remove posts, issue warnings, or suspend accounts that violate these terms.
@@ -65,11 +64,9 @@ function isAtLeast18(month, year) {
 
 export default function SignupScreen() {
   const { register, createProfile } = useAuth();
-  const [signupMethod, setSignupMethod] = useState('email'); // 'email' or 'phone'
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -84,12 +81,7 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     if (!firstName.trim()) { Alert.alert('Error', 'Please enter your first name.'); return; }
     if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
-    if (signupMethod === 'email' && !email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
-    if (signupMethod === 'phone' && !phone.trim()) { Alert.alert('Error', 'Please enter your mobile number.'); return; }
-    if (signupMethod === 'phone' && phone.trim() && !phoneToFakeEmail(phone)) {
-      Alert.alert('Error', 'Please enter a valid Australian mobile number (e.g. 0412 345 678).');
-      return;
-    }
+    if (!email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
     if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters.'); return; }
     if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match.'); return; }
@@ -104,32 +96,24 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      // For phone signup, create a fake email format — built from the
-      // canonical normalized number, so this always matches exactly what
-      // login.js computes later, no matter how the number was typed.
-      const emailToUse = signupMethod === 'email'
-        ? email.trim()
-        : phoneToFakeEmail(phone);
-
-      const cred = await register(emailToUse, password, displayName);
+      const cred = await register(email.trim(), password, displayName);
 
       // Navigate to suburb selection
       router.replace({
         pathname: '/(auth)/select-suburb',
         params: {
           uid: cred.user.uid,
-          email: emailToUse,
+          email: email.trim(),
           displayName,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          phone: signupMethod === 'phone' ? phone.trim() : '',
           birthMonth: String(birthMonth),
           birthYear: String(birthYear),
         }
       });
     } catch (e) {
       if (e.code === 'auth/email-already-in-use') {
-        Alert.alert('Error', 'This email/phone is already registered. Please sign in.');
+        Alert.alert('Error', 'This email is already registered. Please sign in.');
       } else {
         Alert.alert('Error', e.message);
       }
@@ -151,24 +135,6 @@ export default function SignupScreen() {
         <View style={styles.card}>
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Join your suburb community</Text>
-
-          {/* Sign up method toggle */}
-          <View style={styles.methodToggle}>
-            <TouchableOpacity
-              style={[styles.methodBtn, signupMethod === 'email' && styles.methodBtnActive]}
-              onPress={() => setSignupMethod('email')}
-            >
-              <Ionicons name="mail-outline" size={16} color={signupMethod === 'email' ? Colors.white : Colors.brandGreen} />
-              <Text style={[styles.methodBtnText, signupMethod === 'email' && styles.methodBtnTextActive]}>Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.methodBtn, signupMethod === 'phone' && styles.methodBtnActive]}
-              onPress={() => setSignupMethod('phone')}
-            >
-              <Ionicons name="phone-portrait-outline" size={16} color={signupMethod === 'phone' ? Colors.white : Colors.brandGreen} />
-              <Text style={[styles.methodBtnText, signupMethod === 'phone' && styles.methodBtnTextActive]}>Mobile</Text>
-            </TouchableOpacity>
-          </View>
 
           {/* First name */}
           <View style={styles.inputWrap}>
@@ -198,36 +164,20 @@ export default function SignupScreen() {
             />
           </View>
 
-          {/* Email or Phone */}
-          {signupMethod === 'email' ? (
-            <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Email address"
-                placeholderTextColor={Colors.midGrey}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoCorrect={false}
-              />
-            </View>
-          ) : (
-            <View style={styles.inputWrap}>
-              <Ionicons name="phone-portrait-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
-              <Text style={styles.countryCode}>+61</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Mobile number"
-                placeholderTextColor={Colors.midGrey}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                autoCorrect={false}
-              />
-            </View>
-          )}
+          {/* Email */}
+          <View style={styles.inputWrap}>
+            <Ionicons name="mail-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email address"
+              placeholderTextColor={Colors.midGrey}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+            />
+          </View>
 
           {/* Password */}
           <View style={styles.inputWrap}>
@@ -381,15 +331,9 @@ const styles = StyleSheet.create({
   card: { backgroundColor: Colors.white, borderRadius: 24, padding: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
   title: { fontSize: 26, fontWeight: '800', color: Colors.brandGreen, marginBottom: 4, textAlign: 'center' },
   subtitle: { fontSize: 15, color: Colors.midGrey, marginBottom: 20, textAlign: 'center' },
-  methodToggle: { flexDirection: 'row', gap: 10, marginBottom: 20, backgroundColor: Colors.brandGreenPale, borderRadius: 14, padding: 4 },
-  methodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12 },
-  methodBtnActive: { backgroundColor: Colors.brandGreen },
-  methodBtnText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
-  methodBtnTextActive: { color: Colors.white },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 12, marginBottom: 12, paddingHorizontal: 14, backgroundColor: '#FAFAFA' },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, paddingVertical: 14, fontSize: 15, color: Colors.charcoal },
-  countryCode: { fontSize: 15, color: Colors.charcoal, fontWeight: '600', marginRight: 6 },
   eyeBtn: { padding: 4 },
   dobLabel: { fontSize: 13, fontWeight: '700', color: Colors.charcoal, marginBottom: 2 },
   dobHint: { fontSize: 12, color: Colors.midGrey, marginBottom: 8 },

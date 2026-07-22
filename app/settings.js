@@ -49,7 +49,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={styles.scrollBody}>
-      <Text style={styles.sectionLabel}>Account</Text>
+      <Text style={[styles.sectionLabel, { marginTop: 15 }]}>Account</Text>
       <View style={styles.section}>
         <MenuItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
         <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/change-password')} />

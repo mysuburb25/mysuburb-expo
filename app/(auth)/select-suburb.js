@@ -34,7 +34,7 @@ const emptySlot = () => ({ state: '', suburb: '', active: true });
 const suburbKey = (state, suburb) => `${state}|${suburb}`;
 
 export default function SelectSuburbScreen() {
-  const { uid, email, displayName, phone } = useLocalSearchParams();
+  const { uid, email, displayName } = useLocalSearchParams();
   const { createProfile, updateUserProfile, user, profile } = useAuth();
   const isEditing = !!profile?.suburb;
 
@@ -156,8 +156,6 @@ export default function SelectSuburbScreen() {
           email: email || user?.email,
           displayName: displayName || user?.displayName,
           photoURL: null,
-          isPhoneAccount: !!phone,
-          ...(phone ? { phone } : {}),
           ...data,
         });
         router.replace('/dashboard');

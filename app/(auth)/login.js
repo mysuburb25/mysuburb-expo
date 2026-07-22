@@ -8,41 +8,26 @@ import { auth, db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
-import { phoneToFakeEmail } from '../../utils/normalizePhone';
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
   const [sendingReset, setSendingReset] = useState(false);
 
   const handleLogin = async () => {
-    if (!identifier.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter your email/phone and password.');
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter your email and password.');
       return;
     }
     setLoading(true);
     try {
-      let emailToUse;
-      if (identifier.includes('@')) {
-        emailToUse = identifier.trim();
-      } else {
-        // Same canonical normalization used at signup — this is what
-        // fixes testers being unable to log back in with a phone number
-        // typed slightly differently than they signed up with.
-        emailToUse = phoneToFakeEmail(identifier);
-        if (!emailToUse) {
-          Alert.alert('Error', "That doesn't look like a valid Australian mobile number. Please check and try again.");
-          setLoading(false);
-          return;
-        }
-      }
-      await login(emailToUse, password);
+      await login(email.trim(), password);
 
       // A fresh direct read here, rather than AuthContext's profile state,
       // since that loads asynchronously after login and may not be ready
@@ -55,36 +40,25 @@ export default function LoginScreen() {
 
       router.replace(skipDashboard ? '/(tabs)' : '/dashboard');
     } catch (e) {
-      Alert.alert('Login Failed', 'Incorrect email/phone or password. Please try again.');
+      Alert.alert('Login Failed', 'Incorrect email or password. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const openForgotModal = () => {
-    setResetIdentifier(identifier.includes('@') ? identifier : '');
+    setResetEmail(email);
     setShowForgotModal(true);
   };
 
-  // Mobile-number accounts sign in with a fake generated email
-  // ({phone}@mysuburb.app) that they can never actually access — sending a
-  // reset link there would be useless, so those accounts get a clear
-  // message instead, rather than silently failing or pretending to work.
   const handleSendReset = async () => {
-    if (!resetIdentifier.trim()) {
+    if (!resetEmail.trim()) {
       Alert.alert('Error', 'Please enter your email address.');
-      return;
-    }
-    if (!resetIdentifier.includes('@')) {
-      Alert.alert(
-        'Mobile Number Accounts',
-        "Password reset for accounts signed up with a mobile number isn't available yet. Please contact support to reset your password."
-      );
       return;
     }
     setSendingReset(true);
     try {
-      await sendPasswordResetEmail(auth, resetIdentifier.trim());
+      await sendPasswordResetEmail(auth, resetEmail.trim());
     } catch (e) {
       // Deliberately not surfacing auth/user-not-found here — showing the
       // exact same confirmation either way avoids revealing whether a
@@ -96,7 +70,7 @@ export default function LoginScreen() {
     } finally {
       setSendingReset(false);
       setShowForgotModal(false);
-      setResetIdentifier('');
+      setResetEmail('');
       Alert.alert(
         'Check Your Email',
         'If an account exists with this email, a password reset link has been sent. Check your inbox (and spam folder).'
@@ -117,13 +91,13 @@ export default function LoginScreen() {
         {/* Fields */}
         <View style={styles.form}>
           <View style={styles.inputWrap}>
-            <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
+            <Ionicons name="mail-outline" size={18} color="rgba(255,255,255,0.7)" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Email or mobile number"
+              placeholder="Email address"
               placeholderTextColor="rgba(255,255,255,0.5)"
-              value={identifier}
-              onChangeText={setIdentifier}
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
@@ -174,8 +148,8 @@ export default function LoginScreen() {
                 style={styles.forgotInput}
                 placeholder="Your email"
                 placeholderTextColor={Colors.midGrey}
-                value={resetIdentifier}
-                onChangeText={setResetIdentifier}
+                value={resetEmail}
+                onChangeText={setResetEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoCorrect={false}
