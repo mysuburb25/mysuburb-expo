@@ -34,7 +34,7 @@ const emptySlot = () => ({ state: '', suburb: '', active: true });
 const suburbKey = (state, suburb) => `${state}|${suburb}`;
 
 export default function SelectSuburbScreen() {
-  const { uid, email, displayName, phone, birthMonth, birthYear } = useLocalSearchParams();
+  const { uid, email, displayName, phone } = useLocalSearchParams();
   const { createProfile, updateUserProfile, user, profile } = useAuth();
   const isEditing = !!profile?.suburb;
 
@@ -54,6 +54,13 @@ export default function SelectSuburbScreen() {
   };
 
   const [slots, setSlots] = useState(initSlots());
+  // Defaults to whichever is larger: 3, or however many slots already
+  // have real data — so editing an existing profile with 4-5 suburbs
+  // saved never hides one behind the "+ Add more" link. Only genuinely
+  // empty extra slots stay collapsed by default.
+  const [visibleSlotCount, setVisibleSlotCount] = useState(() =>
+    Math.max(3, slots.filter(s => s.suburb && s.state).length)
+  );
   const [activeSlotIndex, setActiveSlotIndex] = useState(null); // which slot is being edited
   const [search, setSearch] = useState('');
   const [showStateModal, setShowStateModal] = useState(false);
@@ -151,7 +158,6 @@ export default function SelectSuburbScreen() {
           photoURL: null,
           isPhoneAccount: !!phone,
           ...(phone ? { phone } : {}),
-          ...(birthMonth && birthYear ? { birthMonth: Number(birthMonth), birthYear: Number(birthYear) } : {}),
           ...data,
         });
         router.replace('/dashboard');
@@ -172,12 +178,15 @@ export default function SelectSuburbScreen() {
         </Text>
       </View>
 
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Select Suburbs</Text>
+      </View>
+
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} automaticallyAdjustKeyboardInsets={true}>
         <View style={styles.topSection}>
-          <Text style={styles.title}>{isEditing ? 'My Suburbs' : 'Select Your Suburbs'}</Text>
-          <Text style={styles.subtitle}>Select up to 5 suburbs. Your Primary suburb is where your posts will appear.</Text>
+          <Text style={styles.subtitle}>Your posts appear in your Primary Suburb.</Text>
 
-          {SUBURB_SLOTS.map((slot, index) => (
+          {SUBURB_SLOTS.slice(0, visibleSlotCount).map((slot, index) => (
             <View key={slot.key} style={styles.slotSection}>
               <Text style={styles.slotLabel}>
                 {slot.label} {slot.required ? <Text style={styles.required}>*</Text> : <Text style={styles.optionalLabel}>(optional)</Text>}
@@ -259,6 +268,20 @@ export default function SelectSuburbScreen() {
           ))}
         </View>
 
+        {/* Only shown while there are still empty, unrevealed slots —
+            keeps the default view short enough that Save/Continue stays
+            visible without scrolling, while still letting anyone add up
+            to 5 suburbs if they actually want to. */}
+        {visibleSlotCount < SUBURB_SLOTS.length && (
+          <TouchableOpacity
+            style={styles.addMoreWrap}
+            onPress={() => setVisibleSlotCount(SUBURB_SLOTS.length)}
+          >
+            <Ionicons name="add-circle-outline" size={16} color={Colors.brandGreen} />
+            <Text style={styles.addMoreText}>Add suburbs</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Save button */}
         <View style={styles.saveWrap}>
           <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSave} disabled={loading}>
@@ -304,24 +327,27 @@ const styles = StyleSheet.create({
   headerBar: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, alignItems: 'center' },
   headerTitle: { fontSize: 27, fontWeight: '800', color: Colors.white },
   headerTagline: { fontSize: 17, color: '#FFD700', marginTop: 4 },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageTitle: { fontSize: 21, fontWeight: '700', color: Colors.brandGreen },
   topSection: { padding: 20 },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.brandGreen, marginBottom: 6 },
   subtitle: { fontSize: 13, color: Colors.midGrey, marginBottom: 24, lineHeight: 18 },
   slotSection: { marginBottom: 24 },
-  slotLabel: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen, marginBottom: 8 },
+  slotLabel: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, marginBottom: 8 },
   optionalLabel: { fontSize: 13, fontWeight: '500', color: Colors.midGrey },
   required: { color: '#E53935' },
-  selectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FAFAFA' },
+  selectorBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#FAFAFA' },
   selectorBtnActive: { borderColor: Colors.brandGreen, backgroundColor: Colors.brandGreenPale },
   selectorBtnText: { flex: 1, fontSize: 15, color: Colors.brandGreen, fontWeight: '600' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen, paddingHorizontal: 14, paddingVertical: 13, marginTop: 8 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.brandGreen, paddingHorizontal: 14, paddingVertical: 9, marginTop: 8 },
   searchInput: { flex: 1, fontSize: 15, color: Colors.charcoal },
-  selectedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 12, backgroundColor: Colors.brandGreenPale, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen + '40' },
+  selectedBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, padding: 12, backgroundColor: '#FFF9E6', borderRadius: 12, borderWidth: 1, borderColor: '#FFD700' + '60' },
   selectedBadgeText: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.brandGreen },
   dropdownList: { marginTop: 4, borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, backgroundColor: Colors.white, maxHeight: 200, overflow: 'hidden' },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   dropdownItemText: { fontSize: 14, color: Colors.charcoal },
   emptyListText: { fontSize: 14, color: Colors.midGrey, padding: 16, textAlign: 'center' },
+  addMoreWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, marginHorizontal: 20, marginBottom: 4 },
+  addMoreText: { fontSize: 14, fontWeight: '700', color: Colors.brandGreen },
   saveWrap: { paddingHorizontal: 20, paddingBottom: 20 },
   button: { backgroundColor: Colors.brandGreen, borderRadius: 14, padding: 16, alignItems: 'center' },
   buttonDisabled: { opacity: 0.7 },

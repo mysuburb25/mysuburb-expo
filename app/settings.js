@@ -18,14 +18,7 @@ const BUILD_NUMBER = Application.nativeBuildVersion;
 const VERSION_STRING = BUILD_NUMBER ? `${APP_VERSION} (${BUILD_NUMBER})` : APP_VERSION;
 
 export default function SettingsScreen() {
-  const { logout, profile } = useAuth();
-
-  const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); router.replace('/(auth)/login'); } },
-    ]);
-  };
+  const { profile } = useAuth();
 
   const MenuItem = ({ icon, label, onPress, danger }) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -36,7 +29,7 @@ export default function SettingsScreen() {
   );
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -55,10 +48,10 @@ export default function SettingsScreen() {
         <Text style={styles.pageTitle}>Settings</Text>
       </View>
 
+      <ScrollView style={styles.scrollBody}>
       <Text style={styles.sectionLabel}>Account</Text>
       <View style={styles.section}>
         <MenuItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
-        <MenuItem icon="location-outline" label="Change Suburb" onPress={() => router.push('/(auth)/select-suburb')} />
         <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/change-password')} />
         <MenuItem icon="notifications-outline" label="Notification Preferences" onPress={() => router.push('/notification-preferences')} />
         <MenuItem icon="ban-outline" label="Blocked Users" onPress={() => router.push('/blocked-users')} />
@@ -75,22 +68,22 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <MenuItem icon="help-circle-outline" label="Help and FAQ" onPress={() => router.push('/help-faq')} />
         <MenuItem icon="flag-outline" label="Report a Problem" onPress={() => router.push('/report-problem')} />
-        <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', `Version ${VERSION_STRING} - Built for Australian communities.`)} />
+        <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', `Version ${VERSION_STRING}\nMade in Australia`)} />
       </View>
 
       <Text style={styles.sectionLabel}>Account Actions</Text>
       <View style={styles.section}>
-        <MenuItem icon="log-out-outline" label="Sign Out" onPress={handleLogout} danger />
         <MenuItem icon="trash-outline" label="Delete Account" onPress={() => router.push('/delete-account')} danger />
       </View>
 
-      <Text style={styles.version}>My Suburb v{VERSION_STRING} - Made with love in Australia</Text>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
+  scrollBody: { flex: 1 },
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerCenter: { alignItems: 'center' },
@@ -103,5 +96,4 @@ const styles = StyleSheet.create({
   section: { backgroundColor: Colors.white, borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: Colors.lightGrey },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: Colors.lightGrey },
   menuLabel: { flex: 1, fontSize: 15, color: Colors.charcoal },
-  version: { textAlign: 'center', fontSize: 13, color: Colors.midGrey, padding: 24 },
 });

@@ -8,6 +8,7 @@ import { auth, db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
+import { phoneToFakeEmail } from '../../utils/normalizePhone';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -27,9 +28,20 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const emailToUse = identifier.includes('@')
-        ? identifier.trim()
-        : `${identifier.replace(/\D/g, '')}@mysuburb.app`;
+      let emailToUse;
+      if (identifier.includes('@')) {
+        emailToUse = identifier.trim();
+      } else {
+        // Same canonical normalization used at signup — this is what
+        // fixes testers being unable to log back in with a phone number
+        // typed slightly differently than they signed up with.
+        emailToUse = phoneToFakeEmail(identifier);
+        if (!emailToUse) {
+          Alert.alert('Error', "That doesn't look like a valid Australian mobile number. Please check and try again.");
+          setLoading(false);
+          return;
+        }
+      }
       await login(emailToUse, password);
 
       // A fresh direct read here, rather than AuthContext's profile state,

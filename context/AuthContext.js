@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -21,6 +21,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  // True from the moment register() creates a new Auth account until
+  // createProfile() finishes writing its Firestore document — the brief,
+  // EXPECTED window where an account exists but has no profile yet,
+  // while the person is still on the suburb-selection screen. Using a
+  // ref (not state) since this never needs to trigger a re-render, just
+  // be readable inside the onAuthStateChanged closure below.
+  const isSigningUp = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -42,7 +49,35 @@ export function AuthProvider({ children }) {
         // now retries a couple of times before giving up, rather than
         // silently leaving profile null while loading flips to false and
         // the tabs render with an empty/broken profile underneath them.
-        await loadProfile(firebaseUser.uid);
+        const found = await loadProfile(firebaseUser.uid);
+        if (!found && !isSigningUp.current) {
+          // A genuinely missing profile (not just a transient failure —
+          // loadProfile already retried 3 times) means this is a
+          // Firebase Auth account with no matching Firestore document,
+          // almost always from a signup that got interrupted between
+          // creating the account and finishing suburb selection (e.g.
+          // the app was closed or reloaded mid-flow). Leaving someone
+          // signed in with no profile traps them on a blank/broken
+          // screen forever, since the rest of the app assumes a profile
+          // always exists once user is set — signing them out here
+          // sends them back to a normal login/signup screen instead,
+          // where they can either finish signing up again or sign in if
+          // they already have a working account.
+          //
+          // isSigningUp guards against the false-positive version of
+          // this exact same situation — right after register() creates
+          // the Auth account, but before select-suburb.js has finished
+          // and called createProfile(), a missing profile is completely
+          // normal and expected, not a broken account.
+          console.warn('No profile found for authenticated user — signing out to recover.', firebaseUser.uid);
+          await signOut(auth);
+          setUser(null);
+          setProfile(null);
+          setUnreadCount(0);
+          setUnreadMessageCount(0);
+          setLoading(false);
+          return;
+        }
         registerForPushNotifications(firebaseUser.uid);
       } else {
         setUser(null);
@@ -96,7 +131,16 @@ export function AuthProvider({ children }) {
           await sleep(attempt * 500);
           return loadProfile(uid, attempt + 1);
         }
-        console.error('loadProfile: no profile document found after retries for uid', uid);
+        // console.warn, not console.error — this fires as a completely
+        // normal, expected part of the signup flow (profile genuinely
+        // doesn't exist yet while createProfile() is still running), not
+        // just for a truly broken account. console.error triggers Expo's
+        // dev-only red error toast, which made this look like a crash
+        // during normal testing even though nothing was actually wrong.
+        // The genuinely-broken-account case is already clearly logged
+        // and handled separately, right where onAuthStateChanged decides
+        // whether to sign out — see the warning there.
+        console.warn('loadProfile: no profile document found after retries for uid', uid);
         return false;
       }
       const mainData = snap.data();
@@ -160,11 +204,22 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    await loadProfile(cred.user.uid);
+    const found = await loadProfile(cred.user.uid);
+    if (!found) {
+      // Same recovery as the onAuthStateChanged path — a login that
+      // succeeds at the Auth layer but has no matching profile document
+      // is the same broken state, just discovered via explicit sign-in
+      // instead of an app relaunch. Sign back out and surface a clear
+      // error rather than returning a "successful" login that then
+      // leaves the app stuck.
+      await signOut(auth);
+      throw new Error('Your account could not be found. Please try signing up again.');
+    }
     return cred;
   };
 
   const register = async (email, password, displayName) => {
+    isSigningUp.current = true;
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName });
     return cred;
@@ -191,6 +246,9 @@ export function AuthProvider({ children }) {
     }
 
     setProfile({ uid, ...profileData, email, phone, createdAt: new Date() });
+    // Signup is now genuinely complete — a missing profile from this
+    // point on is a real problem again, not an expected in-progress state.
+    isSigningUp.current = false;
   };
 
   const updateUserProfile = async (data) => {

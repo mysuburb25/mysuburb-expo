@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import WheelPicker from '../../components/WheelPicker';
+import { phoneToFakeEmail } from '../../utils/normalizePhone';
 
 const TC_TEXT = `Terms & Conditions
 
@@ -19,10 +20,10 @@ My Suburb is a community platform for suburb residents to share information, eve
 
 3. USER CONTENT
 You are responsible for all content you post. You must not post content that is:
-• Offensive, abusive or hateful
-• False or misleading
-• Illegal or harmful
-• Spam or advertising without permission
+- Offensive, abusive or hateful
+- False or misleading
+- Illegal or harmful
+- Spam or advertising without permission
 
 4. PRIVACY
 We collect your name, email/phone, and suburb to provide the service. Your email/phone is kept private and is never shown to other users. We do not sell your data to third parties. Posts are visible to other users in your suburb. See our full Privacy Policy for details.
@@ -85,6 +86,10 @@ export default function SignupScreen() {
     if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
     if (signupMethod === 'email' && !email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
     if (signupMethod === 'phone' && !phone.trim()) { Alert.alert('Error', 'Please enter your mobile number.'); return; }
+    if (signupMethod === 'phone' && phone.trim() && !phoneToFakeEmail(phone)) {
+      Alert.alert('Error', 'Please enter a valid Australian mobile number (e.g. 0412 345 678).');
+      return;
+    }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
     if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters.'); return; }
     if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match.'); return; }
@@ -99,10 +104,12 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      // For phone signup, create a fake email format
+      // For phone signup, create a fake email format — built from the
+      // canonical normalized number, so this always matches exactly what
+      // login.js computes later, no matter how the number was typed.
       const emailToUse = signupMethod === 'email'
         ? email.trim()
-        : `${phone.replace(/\D/g, '')}@mysuburb.app`;
+        : phoneToFakeEmail(phone);
 
       const cred = await register(emailToUse, password, displayName);
 
