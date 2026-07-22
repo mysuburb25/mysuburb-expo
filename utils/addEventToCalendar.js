@@ -2,26 +2,29 @@ import { Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
 
 // Finds (or creates) a writable device calendar to add events into. iOS
-// ships a default calendar tied to the device's local account; Android has
-// no universal equivalent, so we create a dedicated "My Suburb" calendar
-// the first time and reuse it after that.
+// ships a default calendar tied to the device's local account.
+//
+// Android has no equivalent "default calendar" or Calendar.getSourcesAsync()
+// support — that API is iOS-only in expo-calendar, and calling it on
+// Android returns empty/unreliable results, which was silently breaking
+// calendar creation here. Android's own documented pattern instead is to
+// pass a plain { isLocalAccount: true, name } object directly as the
+// source — no source lookup needed at all.
 async function getTargetCalendarId() {
   if (Platform.OS === 'ios') {
     const defaultCal = await Calendar.getDefaultCalendarAsync();
     return defaultCal.id;
   }
+
   const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
   const existing = calendars.find(c => c.title === 'My Suburb' && c.allowsModifications);
   if (existing) return existing.id;
 
-  const sources = await Calendar.getSourcesAsync();
-  const localSource = sources.find(s => s.type === Calendar.SourceType.LOCAL) || sources[0];
   return await Calendar.createCalendarAsync({
     title: 'My Suburb',
     color: '#2D6A4F',
     entityType: Calendar.EntityTypes.EVENT,
-    sourceId: localSource?.id,
-    source: localSource,
+    source: { isLocalAccount: true, name: 'My Suburb' },
     name: 'mySuburbEvents',
     ownerAccount: 'My Suburb',
     accessLevel: Calendar.CalendarAccessLevel.OWNER,

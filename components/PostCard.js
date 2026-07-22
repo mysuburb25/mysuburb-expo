@@ -1,11 +1,21 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarWithOnlineDot from '../components/AvatarWithOnlineDot';
 import { Colors } from '../constants/theme';
 import { getOrderedMedia } from '../utils/mediaOrder';
 import LinkifiedText from '../components/LinkifiedText';
+
+// Card width is the full screen width minus the feed's own horizontal
+// padding — computed once, synchronously, at module load. This replaces
+// an earlier onLayout-based measurement that wasn't reliably firing on
+// some Android devices, which left the image carousel stuck at 0 width
+// forever — since the wrapping View has no explicit height of its own,
+// it would then collapse to nothing, revealing the plain white card
+// background right where the photo should have been.
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_IMAGE_WIDTH = SCREEN_WIDTH - 32; // matches the feed's horizontal padding (16 each side)
 
 const CATEGORY_CONFIG = {
   updates:     { label: 'General', bg: Colors.brandGreen },
@@ -28,7 +38,6 @@ function formatDate(date) {
 }
 
 export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle, onToggleSave, onShare }) {
-  const [imgWidth, setImgWidth] = useState(0);
   const [activeImgIndex, setActiveImgIndex] = useState(0);
   const liked = item.likedBy?.includes(currentUserUid) || false;
   const saved = item.savedBy?.includes(currentUserUid) || false;
@@ -61,50 +70,45 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
       </TouchableOpacity>
 
       {media.length > 0 && (
-        <View
-          style={styles.imageCarouselWrap}
-          onLayout={(e) => setImgWidth(e.nativeEvent.layout.width)}
-        >
-          {imgWidth > 0 && (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              directionalLockEnabled
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              scrollEventThrottle={16}
-              onMomentumScrollEnd={(e) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / imgWidth);
-                setActiveImgIndex(idx);
-              }}
-            >
-              {media.map((m, i) => (
-                <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => router.push('/post/' + item.id)}>
-                  {m.type === 'video' ? (
-                    <View style={{ width: imgWidth, height: 220 }}>
-                      {m.thumbnailUrl ? (
-                        <Image source={{ uri: m.thumbnailUrl }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
-                      ) : (
-                        <View style={[{ width: imgWidth, height: 220 }, styles.videoThumbFallback]}>
-                          <Ionicons name="videocam" size={32} color="#fff" />
-                        </View>
-                      )}
-                      <View style={styles.videoPlayOverlay}>
-                        <Ionicons name="play" size={20} color="#fff" />
+        <View style={styles.imageCarouselWrap}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            directionalLockEnabled
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_IMAGE_WIDTH);
+              setActiveImgIndex(idx);
+            }}
+          >
+            {media.map((m, i) => (
+              <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => router.push('/post/' + item.id)}>
+                {m.type === 'video' ? (
+                  <View style={{ width: CARD_IMAGE_WIDTH, height: 220 }}>
+                    {m.thumbnailUrl ? (
+                      <Image source={{ uri: m.thumbnailUrl }} style={{ width: CARD_IMAGE_WIDTH, height: 220 }} resizeMode="cover" />
+                    ) : (
+                      <View style={[{ width: CARD_IMAGE_WIDTH, height: 220 }, styles.videoThumbFallback]}>
+                        <Ionicons name="videocam" size={32} color="#fff" />
                       </View>
-                      {m.duration > 0 && (
-                        <View style={styles.videoDurationBadge}>
-                          <Text style={styles.videoDurationText}>{Math.floor(m.duration / 60)}:{String(m.duration % 60).padStart(2, '0')}</Text>
-                        </View>
-                      )}
+                    )}
+                    <View style={styles.videoPlayOverlay}>
+                      <Ionicons name="play" size={20} color="#fff" />
                     </View>
-                  ) : (
-                    <Image source={{ uri: m.url }} style={{ width: imgWidth, height: 220 }} resizeMode="cover" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+                    {m.duration > 0 && (
+                      <View style={styles.videoDurationBadge}>
+                        <Text style={styles.videoDurationText}>{Math.floor(m.duration / 60)}:{String(m.duration % 60).padStart(2, '0')}</Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <Image source={{ uri: m.url }} style={{ width: CARD_IMAGE_WIDTH, height: 220 }} resizeMode="cover" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
           {media.length > 1 && (
             <View style={styles.dotsRow}>
               {media.map((_, i) => (
