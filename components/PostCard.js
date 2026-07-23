@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import AvatarWithOnlineDot from '../components/AvatarWithOnlineDot';
 import { Colors } from '../constants/theme';
 import { getOrderedMedia } from '../utils/mediaOrder';
@@ -35,6 +36,59 @@ function formatDate(date) {
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Plays directly inline in the small card carousel — "small screen
+// mode" — rather than just showing a static thumbnail that requires
+// navigating to the post to actually watch. Native controls handle
+// their own tap/scrub interaction, so this deliberately isn't wrapped
+// in a navigate-on-press TouchableOpacity the way photo items are.
+function CardVideoPlayer({ url, width, isActive }) {
+  const videoViewRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = false;
+  });
+
+  // Tracks the player's own playing state so the play-button overlay
+  // below only shows while paused/not-yet-started — once someone taps
+  // play, it disappears, and comes back if they pause again. Without
+  // this, a video looked identical to a photo at a glance until you
+  // actually touched it, since expo-video's native controls only
+  // appear on interaction rather than being permanently visible.
+  useEffect(() => {
+    const sub = player.addListener('playingChange', (event) => {
+      setIsPlaying(event.isPlaying);
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  // Pause and rewind to the start the moment this item scrolls out of
+  // view in the carousel — without this, a video kept playing invisibly
+  // in the background (audio and all) after swiping to the next photo.
+  useEffect(() => {
+    if (isActive) return;
+    player.pause();
+    player.currentTime = 0;
+  }, [isActive, player]);
+
+  return (
+    <View style={{ width, height: 220 }}>
+      <VideoView
+        ref={videoViewRef}
+        style={{ width, height: 220 }}
+        player={player}
+        nativeControls
+        allowsFullscreen
+        contentFit="cover"
+      />
+      {!isPlaying && (
+        <View style={styles.cardPlayOverlay} pointerEvents="none">
+          <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.92)" />
+        </View>
+      )}
+    </View>
+  );
 }
 
 export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle, onToggleSave, onShare }) {
@@ -84,29 +138,13 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
             }}
           >
             {media.map((m, i) => (
-              <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => router.push('/post/' + item.id)}>
-                {m.type === 'video' ? (
-                  <View style={{ width: CARD_IMAGE_WIDTH, height: 220 }}>
-                    {m.thumbnailUrl ? (
-                      <Image source={{ uri: m.thumbnailUrl }} style={{ width: CARD_IMAGE_WIDTH, height: 220 }} resizeMode="cover" />
-                    ) : (
-                      <View style={[{ width: CARD_IMAGE_WIDTH, height: 220 }, styles.videoThumbFallback]}>
-                        <Ionicons name="videocam" size={32} color="#fff" />
-                      </View>
-                    )}
-                    <View style={styles.videoPlayOverlay}>
-                      <Ionicons name="play" size={20} color="#fff" />
-                    </View>
-                    {m.duration > 0 && (
-                      <View style={styles.videoDurationBadge}>
-                        <Text style={styles.videoDurationText}>{Math.floor(m.duration / 60)}:{String(m.duration % 60).padStart(2, '0')}</Text>
-                      </View>
-                    )}
-                  </View>
-                ) : (
+              m.type === 'video' ? (
+                <CardVideoPlayer key={i} url={m.url} width={CARD_IMAGE_WIDTH} isActive={i === activeImgIndex} />
+              ) : (
+                <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => router.push('/post/' + item.id)}>
                   <Image source={{ uri: m.url }} style={{ width: CARD_IMAGE_WIDTH, height: 220 }} resizeMode="cover" />
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+              )
             ))}
           </ScrollView>
           {media.length > 1 && (
@@ -160,14 +198,7 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { backgroundColor: '#fff', width: 8, height: 8, borderRadius: 4 },
   cardBody: { backgroundColor: Colors.white, padding: 16, gap: 8 },
-  videoThumbFallback: { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  videoPlayOverlay: {
-    position: 'absolute', top: '50%', left: '50%', marginTop: -12, marginLeft: -12,
-    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  videoDurationBadge: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
-  videoDurationText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  cardPlayOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },

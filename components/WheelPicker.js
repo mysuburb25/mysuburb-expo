@@ -11,7 +11,9 @@ const CENTER_OFFSET = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
  * A vertically-scrolling wheel picker (like a native date picker): the
  * item centered in the highlighted band is the selected value. Snaps
  * cleanly to each row and highlights whichever item is centered as you
- * scroll, not just after you stop.
+ * scroll, not just after you stop. Items fade and shrink slightly the
+ * further they sit from center, giving a bit of the natural depth a
+ * native wheel picker has, rather than a flat list of equal-weight rows.
  *
  * @param data - array of { label, value }
  * @param selectedValue - currently committed value
@@ -51,10 +53,22 @@ export default function WheelPicker({ data, selectedValue, onValueChange }) {
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleMomentumEnd}
         renderItem={({ item, index }) => {
-          const isCentered = index === centeredIndex;
+          const distance = Math.abs(index - centeredIndex);
+          const isCentered = distance === 0;
+          // Fades and shrinks progressively further from center — one
+          // row away is still clearly readable, two+ rows away recedes
+          // into the background, giving the wheel a sense of depth
+          // instead of every row looking equally weighted.
+          const fadeStyle = isCentered
+            ? { opacity: 1, transform: [{ scale: 1 }] }
+            : distance === 1
+              ? { opacity: 0.55, transform: [{ scale: 0.92 }] }
+              : { opacity: 0.28, transform: [{ scale: 0.85 }] };
           return (
             <View style={styles.item}>
-              <Text style={[styles.itemText, isCentered && styles.itemTextSelected]}>{item.label}</Text>
+              <Text style={[styles.itemText, isCentered && styles.itemTextSelected, fadeStyle]}>
+                {item.label}
+              </Text>
             </View>
           );
         }}
@@ -67,12 +81,18 @@ const styles = StyleSheet.create({
   centerHighlight: {
     position: 'absolute',
     top: CENTER_OFFSET,
-    left: 0, right: 0, height: ITEM_HEIGHT,
-    backgroundColor: '#F4F9F6',
-    borderTopWidth: 1, borderBottomWidth: 1,
-    borderColor: '#D7E9DF',
+    left: 4, right: 4, height: ITEM_HEIGHT,
+    backgroundColor: Colors.brandGreenPale,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.brandGreen + '30',
+    shadowColor: Colors.brandGreen,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 1,
   },
   item: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' },
-  itemText: { fontSize: 17, color: Colors.midGrey },
+  itemText: { fontSize: 16, color: Colors.midGrey, fontWeight: '500' },
   itemTextSelected: { fontSize: 19, fontWeight: '800', color: Colors.brandGreen },
 });

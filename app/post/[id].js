@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import AvatarWithOnlineDot from '../../components/AvatarWithOnlineDot';
-import ImageViewerModal from '../../components/ImageViewerModal';
+import MediaViewerModal from '../../components/MediaViewerModal';
 import LinkifiedText from '../../components/LinkifiedText';
 import MentionInput from '../../components/MentionInput';
 import { renderTextWithMentions } from '../../utils/renderTextWithMentions';
@@ -118,16 +118,29 @@ function isPostClosed(post) {
 // controls to play, same as tapping "play" on any other video app —
 // nobody's mobile data gets used for a video they didn't ask to watch.
 //
-// The native controls do include a fullscreen icon, but it's small and
-// easy to miss — this adds an explicit, obvious fullscreen button (top
-// corner, always visible) that calls the player's own enterFullscreen(),
-// giving videos the same "tap to go fullscreen" feel that tapping a
-// photo already has via ImageViewerModal.
-function PostVideoPlayer({ url }) {
+// The expand button opens the app's own unified MediaViewerModal (big
+// mode) at this video's position, rather than the native OS-level
+// fullscreen — that keeps it consistent with photos, letting someone
+// swipe through every photo and video in the post, in posted order,
+// from one unified full-screen viewer instead of two separate systems.
+function PostVideoPlayer({ url, onExpand }) {
   const videoViewRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
   });
+
+  // Same reasoning as the feed card's version — the play-button overlay
+  // only shows while paused/not-yet-started, so a video is visually
+  // distinguishable from a photo at a glance, and disappears once
+  // someone actually starts watching.
+  useEffect(() => {
+    const sub = player.addListener('playingChange', (event) => {
+      setIsPlaying(event.isPlaying);
+    });
+    return () => sub.remove();
+  }, [player]);
+
   return (
     <View>
       <VideoView
@@ -138,9 +151,14 @@ function PostVideoPlayer({ url }) {
         allowsFullscreen
         contentFit="cover"
       />
+      {!isPlaying && (
+        <View style={styles.postVideoPlayOverlay} pointerEvents="none">
+          <Ionicons name="play-circle" size={54} color="rgba(255,255,255,0.92)" />
+        </View>
+      )}
       <TouchableOpacity
         style={styles.videoFullscreenBtn}
-        onPress={() => videoViewRef.current?.enterFullscreen()}
+        onPress={onExpand}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Ionicons name="expand" size={18} color="#fff" />
@@ -886,9 +904,9 @@ export default function PostDetailScreen() {
                     <View style={styles.imagesWrap}>
                       {orderedMedia.map((m, i) => (
                         m.type === 'video'
-                          ? <PostVideoPlayer key={i} url={m.url} />
+                          ? <PostVideoPlayer key={i} url={m.url} onExpand={() => setViewerIndex(i)} />
                           : (
-                            <TouchableOpacity key={i} onPress={() => setViewerIndex(post.images.indexOf(m.url))}>
+                            <TouchableOpacity key={i} onPress={() => setViewerIndex(i)}>
                               <Image source={{ uri: m.url }} style={styles.postImage} resizeMode="cover" />
                             </TouchableOpacity>
                           )
@@ -1156,7 +1174,7 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <ImageViewerModal images={viewerIndex !== null ? post?.images : null} initialIndex={viewerIndex ?? 0} onClose={() => setViewerIndex(null)} />
+      <MediaViewerModal media={viewerIndex !== null ? orderedMedia : null} initialIndex={viewerIndex ?? 0} onClose={() => setViewerIndex(null)} />
 
       {/* Share modal */}
       <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>
@@ -1398,6 +1416,7 @@ const styles = StyleSheet.create({
   imagesWrap: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },
   postVideo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#000' },
+  postVideoPlayOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 220, justifyContent: 'center', alignItems: 'center' },
   videoFullscreenBtn: {
     position: 'absolute', top: 10, right: 10,
     width: 32, height: 32, borderRadius: 16,

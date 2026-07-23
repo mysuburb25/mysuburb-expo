@@ -249,7 +249,7 @@ export default function SelectSuburbScreen() {
 
               {/* Suburb list dropdown */}
               {activeSlotIndex === index && showSuburbList && slots[index].state && !slots[index].suburb && (
-                <View style={styles.dropdownList}>
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                   {filteredSuburbs.length === 0 ? (
                     <Text style={styles.emptyListText}>No suburbs found</Text>
                   ) : (
@@ -260,7 +260,7 @@ export default function SelectSuburbScreen() {
                       </TouchableOpacity>
                     ))
                   )}
-                </View>
+                </ScrollView>
               )}
             </View>
           ))}
@@ -273,7 +273,7 @@ export default function SelectSuburbScreen() {
         {visibleSlotCount < SUBURB_SLOTS.length && (
           <TouchableOpacity
             style={styles.addMoreWrap}
-            onPress={() => setVisibleSlotCount(SUBURB_SLOTS.length)}
+            onPress={() => setVisibleSlotCount(prev => Math.min(prev + 1, SUBURB_SLOTS.length))}
           >
             <Ionicons name="add-circle-outline" size={16} color={Colors.brandGreen} />
             <Text style={styles.addMoreText}>Add suburbs</Text>
