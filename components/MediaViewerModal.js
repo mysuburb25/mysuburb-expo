@@ -81,7 +81,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose }) {
               initialScrollIndex={initialIndex}
               getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
               onMomentumScrollEnd={onScrollEnd}
-              renderItem={({ item, index }) => <MediaPage item={item} isActive={index === currentIndex} />}
+              renderItem={({ item, index }) => <MediaPage item={item} isActive={index === currentIndex} onClose={onClose} />}
             />
           </Animated.View>
         )}
@@ -102,7 +102,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose }) {
 // is a hook — it can't be called conditionally or inside a .map/render-
 // item callback directly. Every page gets its own instance; photo pages
 // simply never touch the player.
-function MediaPage({ item, isActive }) {
+function MediaPage({ item, isActive, onClose }) {
   const videoViewRef = useRef(null);
   const isVideo = item.type === 'video';
   const [isPlaying, setIsPlaying] = useState(false);
@@ -132,7 +132,7 @@ function MediaPage({ item, isActive }) {
 
   if (isVideo) {
     return (
-      <View style={styles.page}>
+      <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.page}>
         <VideoView
           ref={videoViewRef}
           style={styles.video}
@@ -146,22 +146,24 @@ function MediaPage({ item, isActive }) {
             <Ionicons name="play-circle" size={64} color="rgba(255,255,255,0.92)" />
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   }
 
   return (
-    <View style={styles.page}>
-      <Image source={{ uri: item.url }} style={styles.image} resizeMode="contain" />
-    </View>
+    <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.page}>
+      <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+        <Image source={{ uri: item.url }} style={styles.image} resizeMode="contain" />
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center' },
   page: { width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center' },
-  image: { width: SCREEN_WIDTH, height: '80%' },
-  video: { width: SCREEN_WIDTH, height: '60%' },
+  image: { width: SCREEN_WIDTH, height: '90%' },
+  video: { width: SCREEN_WIDTH, height: '90%' },
   playOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   closeBtn: { position: 'absolute', top: 56, right: 20, padding: 8 },
   counter: { position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
