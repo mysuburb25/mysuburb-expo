@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 const FAQS = [
   { q: 'How does My Suburb work?', a: 'My Suburb connects you with neighbours in your exact suburb. All posts are only visible to people who live in the same suburb as you.' },
-  { q: 'How do I change my suburb?', a: 'Go to Profile, tap Settings, then tap Change Suburb. You can search for any suburb in Australia.' },
+  { q: 'How do I change my suburb?', a: 'Go to your Profile and tap Edit Suburbs. You can search for any suburb in Australia.' },
   { q: 'Can I follow more than one suburb?', a: 'Yes, you can select up to 5 suburbs — a Primary plus four others. Posts from all your active suburbs appear together in your feed.' },
   { q: 'What is a Primary suburb?', a: 'Your Primary suburb is the first one you select and is where all your posts are published. It cannot be turned off, but you can replace it any time from Change Suburb.' },
   { q: 'How do I turn a suburb on or off in my feed?', a: 'Go to Profile and open the Suburbs tab. Each of your other suburbs has a switch you can toggle on or off to control whether its posts show in your feed. Your Primary suburb is always on.' },
@@ -14,16 +14,15 @@ const FAQS = [
   { q: 'How do I report a post?', a: 'Tap the three-dot menu on any post and choose Report. Our moderation team reviews all reports promptly.' },
   { q: 'How do I block someone?', a: 'Open their profile and tap Block, or use the Block option from the menu on any of their posts. Once blocked, they can\'t message you and their posts are hidden from your feed. You can unblock them any time from Settings > Blocked Users.' },
   { q: 'Is My Suburb free to use?', a: 'Yes, My Suburb is completely free to use. There are no ads or paid features.' },
-  { q: 'How do I delete my account?', a: 'Go to Settings, scroll down to Account Actions and tap Delete Account. You can also email us at support@mysuburb.com.au' },
-  { q: 'I forgot my password — what do I do?', a: 'On the login screen, tap "Forgot Password?" and enter your email to receive a reset link. This currently only works for accounts signed up with an email address — if you signed up with a mobile number, please contact support@mysuburb.com.au to reset your password.' },
+  { q: 'How do I delete my account?', a: 'Go to Settings, scroll down to Account Actions and tap Delete Account. You can also email us at mysuburb-support@mysuburb.app' },
+  { q: 'I forgot my password — what do I do?', a: 'On the login screen, tap "Forgot Password?" and enter your email to receive a reset link.' },
   { q: 'What is Buy and Sell?', a: 'Buy and Sell lets you list items for sale, give things away for free, or post what you are looking for. All transactions are between neighbours directly. Once an item is no longer available, mark the listing as Closed.' },
   { q: 'How do Safety Alerts work?', a: 'Safety Alerts are for genuine urgent safety concerns in your suburb such as break-ins or dangerous conditions. For emergencies always call 000 first.' },
   { q: 'How do I message another neighbour directly?', a: 'Tap on a neighbour\'s name or profile from any post to open a private one-on-one chat with them.' },
   { q: 'Can I add photos to a post?', a: 'Yes, when creating a post you can attach up to 3 photos from your camera or photo library.' },
   { q: 'How do I change my profile photo?', a: 'Go to Profile and tap the camera icon on your avatar. You can take a new photo or choose one from your photo library.' },
   { q: 'How do I turn off notifications?', a: 'Go to Settings > Notification Preferences to manage which notifications you receive, such as likes, comments, and new posts in your suburb.' },
-  { q: 'Can I sign up using just my mobile number?', a: 'Yes, on the sign up screen choose the Mobile option instead of Email and enter your Australian mobile number.' },
-  { q: 'What happens to my posts and data if I delete my account?', a: 'Deleting your account removes your profile and personal details. Your posts may remain visible to protect ongoing conversations, but they will no longer be linked to your name. Contact support@mysuburb.com.au if you would like your posts removed as well.' },
+  { q: 'What happens to my posts and data if I delete my account?', a: 'Deleting your account removes your profile and personal details. Your posts may remain visible to protect ongoing conversations, but they will no longer be linked to your name. Contact mysuburb-support@mysuburb.app if you would like your posts removed as well.' },
 ];
 
 export default function HelpFAQScreen() {
@@ -51,7 +50,7 @@ export default function HelpFAQScreen() {
         ))}
         <View style={styles.contact}>
           <Text style={styles.contactTitle}>Still need help?</Text>
-          <Text style={styles.contactText}>Email us at support@mysuburb.com.au and we will get back to you within 24 hours.</Text>
+          <Text style={styles.contactText}>Email us at mysuburb-support@mysuburb.app and we will get back to you within 24 hours.</Text>
         </View>
       </ScrollView>
     </View>

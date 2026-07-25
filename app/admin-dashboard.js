@@ -161,18 +161,29 @@ export default function AdminDashboardScreen() {
     ]);
   };
 
+  // Works for either kind of report — a post-content report always has
+  // postAuthorId; a Report a Problem submission about someone's
+  // behaviour (Safety concern / Inappropriate content) has
+  // reportedUserId instead, from the optional "Who is this about?"
+  // search field.
+  const getTargetUser = (report) => ({
+    id: report.postAuthorId || report.reportedUserId || null,
+    name: report.postAuthorName || report.reportedUserName || null,
+  });
+
   const handleSuspendUser = (report) => {
-    if (!report.postAuthorId) { Alert.alert('Error', 'Could not identify the post author.'); return; }
+    const target = getTargetUser(report);
+    if (!target.id) { Alert.alert('Error', 'No user was identified for this report.'); return; }
     Alert.alert(
-      `Suspend ${report.postAuthorName || 'this user'}?`,
+      `Suspend ${target.name || 'this user'}?`,
       'They will be signed out and unable to use the app until you unsuspend them.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Suspend', style: 'destructive', onPress: async () => {
             try {
-              await updateDoc(doc(db, 'users', report.postAuthorId), { isSuspended: true });
-              Alert.alert('User Suspended', `${report.postAuthorName || 'This user'} has been suspended.`);
+              await updateDoc(doc(db, 'users', target.id), { isSuspended: true });
+              Alert.alert('User Suspended', `${target.name || 'This user'} has been suspended.`);
               fetchSuspendedUsers();
             } catch (e) { Alert.alert('Error', e.message); }
           }
@@ -182,7 +193,8 @@ export default function AdminDashboardScreen() {
   };
 
   const openWarnModal = (report) => {
-    if (!report.postAuthorId) { Alert.alert('Error', 'Could not identify the post author.'); return; }
+    const target = getTargetUser(report);
+    if (!target.id) { Alert.alert('Error', 'No user was identified for this report.'); return; }
     setWarnTarget(report);
     setWarnMessage('');
     setShowWarnModal(true);
@@ -190,10 +202,18 @@ export default function AdminDashboardScreen() {
 
   const submitWarning = async () => {
     if (!warnMessage.trim()) { Alert.alert('Error', 'Please enter a warning message.'); return; }
+    const target = getTargetUser(warnTarget);
+    // Defensive backstop — openWarnModal already checks this before the
+    // modal even opens, but re-checking here too means a warning can
+    // never be sent with a missing recipient, which would otherwise
+    // silently succeed (Firestore rules only check isAdmin(), not that
+    // userId is a real user) and create a notification nobody could
+    // ever actually see.
+    if (!target.id) { Alert.alert('Error', 'No user was identified for this report.'); setShowWarnModal(false); return; }
     setSendingWarning(true);
     try {
       await addDoc(collection(db, 'notifications'), {
-        userId: warnTarget.postAuthorId,
+        userId: target.id,
         type: 'admin_warning',
         message: warnMessage.trim(),
         fromUserId: user.uid,
@@ -202,7 +222,7 @@ export default function AdminDashboardScreen() {
         createdAt: serverTimestamp(),
       });
       setShowWarnModal(false);
-      Alert.alert('Warning Sent', `${warnTarget.postAuthorName || 'The user'} has been notified.`);
+      Alert.alert('Warning Sent', `${target.name || 'The user'} has been notified.`);
     } catch (e) {
       Alert.alert('Error', e.message);
     } finally {
@@ -361,7 +381,7 @@ export default function AdminDashboardScreen() {
               reports.map(report => (
                 <View key={report.id} style={styles.reportCard}>
                   <View style={styles.reportCardHeader}>
-                    <Text style={styles.reasonHeading}>{report.reason || 'Other'}</Text>
+                    <Text style={styles.reasonHeading}>{report.reason || report.category || 'Other'}</Text>
                     <Text style={styles.reportDate}>{formatDate(report.createdAt)}</Text>
                   </View>
 
@@ -382,37 +402,76 @@ export default function AdminDashboardScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.reportFieldRow}>
-                    <View style={styles.reportFieldLabel}>
-                      <Text style={styles.reportFieldLabelText}>POSTED BY</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={{ flex: 1 }}
-                      disabled={!report.postAuthorId}
-                      onPress={() => report.postAuthorId && router.push('/user/' + report.postAuthorId)}
-                    >
-                      <Text style={[styles.reportFieldValue, styles.reportFieldValueLink]}>{report.postAuthorName || 'Unknown'}</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {report.postId ? (
+                    <>
+                      <View style={styles.reportFieldRow}>
+                        <View style={styles.reportFieldLabel}>
+                          <Text style={styles.reportFieldLabelText}>POSTED BY</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={{ flex: 1 }}
+                          disabled={!report.postAuthorId}
+                          onPress={() => report.postAuthorId && router.push('/user/' + report.postAuthorId)}
+                        >
+                          <Text style={[styles.reportFieldValue, styles.reportFieldValueLink]}>{report.postAuthorName || 'Unknown'}</Text>
+                        </TouchableOpacity>
+                      </View>
 
-                  <TouchableOpacity style={styles.reportPostPreview} onPress={() => report.postId && router.push('/post/' + report.postId)}>
-                    <Text style={styles.reportPostPreviewContent} numberOfLines={2}>{report.postContent || '(post content unavailable)'}</Text>
-                  </TouchableOpacity>
+                      <TouchableOpacity style={styles.reportPostPreview} onPress={() => report.postId && router.push('/post/' + report.postId)}>
+                        <Text style={styles.reportPostPreviewContent} numberOfLines={2}>{report.postContent || '(post content unavailable)'}</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : report.reportedUserId ? (
+                    // Safety concern / Inappropriate content reported via
+                    // Report a Problem, with a specific person identified —
+                    // no post exists to preview, but there's someone to
+                    // review directly.
+                    <View style={styles.reportFieldRow}>
+                      <View style={styles.reportFieldLabel}>
+                        <Text style={styles.reportFieldLabelText}>ABOUT</Text>
+                      </View>
+                      <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push('/user/' + report.reportedUserId)}>
+                        <Text style={[styles.reportFieldValue, styles.reportFieldValueLink]}>{report.reportedUserName || 'View profile'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <>
+                      {report.reportedLocation ? (
+                        <View style={styles.reportFieldRow}>
+                          <View style={styles.reportFieldLabel}>
+                            <Text style={styles.reportFieldLabelText}>WHERE</Text>
+                          </View>
+                          <Text style={[styles.reportFieldValue, { flex: 1 }]}>{report.reportedLocation}</Text>
+                        </View>
+                      ) : null}
+                      {report.technicalContext ? (
+                        <Text style={styles.metaLine}>
+                          {report.technicalContext.platform} · OS {report.technicalContext.osVersion} · App v{report.technicalContext.appVersion || '—'}
+                        </Text>
+                      ) : null}
+                    </>
+                  )}
 
                   {reportStatus === 'open' ? (
                     <View style={styles.reportActions}>
-                      <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleRemovePost(report)}>
-                        <Ionicons name="trash-outline" size={15} color={Colors.midGrey} />
-                        <Text style={styles.reportActionText}>Remove</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.reportActionBtn} onPress={() => openWarnModal(report)}>
-                        <Ionicons name="warning-outline" size={15} color={Colors.midGrey} />
-                        <Text style={styles.reportActionText}>Warn</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleSuspendUser(report)}>
-                        <Ionicons name="ban-outline" size={15} color={Colors.midGrey} />
-                        <Text style={styles.reportActionText}>Suspend</Text>
-                      </TouchableOpacity>
+                      {report.postId ? (
+                        <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleRemovePost(report)}>
+                          <Ionicons name="trash-outline" size={15} color={Colors.midGrey} />
+                          <Text style={styles.reportActionText}>Remove</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {(report.postId || report.reportedUserId) ? (
+                        <>
+                          <TouchableOpacity style={styles.reportActionBtn} onPress={() => openWarnModal(report)}>
+                            <Ionicons name="warning-outline" size={15} color={Colors.midGrey} />
+                            <Text style={styles.reportActionText}>Warn</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleSuspendUser(report)}>
+                            <Ionicons name="ban-outline" size={15} color={Colors.midGrey} />
+                            <Text style={styles.reportActionText}>Suspend</Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : null}
                       <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleDismissReport(report)}>
                         <Ionicons name="close-circle-outline" size={15} color={Colors.midGrey} />
                         <Text style={styles.reportActionText}>Dismiss</Text>
@@ -544,6 +603,7 @@ const styles = StyleSheet.create({
   reportFieldLabelText: { fontSize: 10, fontWeight: '900', color: '#1B4F72', letterSpacing: 0.3 },
   reportFieldLabelTextAlt: { color: '#3949AB' },
   reportFieldValue: { fontSize: 13, fontWeight: '600', color: Colors.charcoal },
+  metaLine: { fontSize: 12, color: Colors.midGrey, marginTop: 2 },
   reportFieldValueLink: { color: '#1B4F72', textDecorationLine: 'underline' },
 
   reportPostPreview: { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#EFEFEF' },

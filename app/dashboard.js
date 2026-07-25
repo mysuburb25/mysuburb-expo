@@ -224,7 +224,7 @@ export default function DashboardScreen() {
           <Text style={styles.checkboxLabel}>Don't show this dashboard again</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.continueBtn, continuing && { opacity: 0.7 }]} onPress={handleContinue} disabled={continuing}>
-          {continuing ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.continueBtnText}>Continue to Home</Text>}
+          {continuing ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.continueBtnText}>Continue to Hub</Text>}
         </TouchableOpacity>
       </View>
     </View>

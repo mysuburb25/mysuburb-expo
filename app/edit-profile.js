@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 
 export default function EditProfileScreen() {
-  const { profile, updateUserProfile, user: authUser } = useAuth();
+  const { profile, updateUserProfile } = useAuth();
 
   const parseName = (fullName) => {
     const trimmed = (fullName || '').trim();
@@ -19,36 +19,21 @@ export default function EditProfileScreen() {
   };
   const originalName = parseName(profile?.displayName);
 
-  // isPhoneAccount is decided once, permanently, at signup (see
-  // select-suburb.js's createProfile call) — it must NOT be inferred from
-  // whether profile.phone merely exists, since an email-signup account can
-  // also add a phone number later as a plain contact field, which would
-  // otherwise get misread as "this is a phone-login account" and try to
-  // swap the real login email for a fake generated one. For accounts
-  // created before that permanent flag existed, we fall back to checking
-  // whether the real Firebase Auth login email matches the fake-email
-  // pattern phone signups always get (see signup.js's emailToUse logic).
-  const isPhoneAccount = profile?.isPhoneAccount ?? (authUser?.email || '').endsWith('@mysuburb.app');
-
   const [firstName, setFirstName] = useState(originalName.first);
   const [lastName, setLastName] = useState(originalName.last);
   const [email, setEmail] = useState(profile?.email || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const nameChanged = firstName.trim() !== originalName.first || lastName.trim() !== originalName.last;
-  const emailChanged = !isPhoneAccount && email.trim() !== (profile?.email || '');
-  const phoneChanged = phone.trim() !== (profile?.phone || '');
-
-  const needsReauth = emailChanged || (isPhoneAccount && phoneChanged);
+  const emailChanged = email.trim() !== (profile?.email || '');
+  const needsReauth = emailChanged;
 
   const handleSave = async () => {
     if (!firstName.trim()) { Alert.alert('Error', 'First name cannot be empty.'); return; }
     if (emailChanged && !email.trim()) { Alert.alert('Error', 'Email cannot be empty.'); return; }
-    if (isPhoneAccount && phoneChanged && !phone.trim()) { Alert.alert('Error', 'Mobile number cannot be empty.'); return; }
-    if (!nameChanged && !emailChanged && !phoneChanged) { router.back(); return; }
+    if (!nameChanged && !emailChanged) { router.back(); return; }
     if (needsReauth && !password) { Alert.alert('Error', 'Please enter your current password to confirm this change.'); return; }
 
     setLoading(true);
@@ -64,21 +49,9 @@ export default function EditProfileScreen() {
       const firestoreUpdates = {};
       if (nameChanged) firestoreUpdates.displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
 
-      if (isPhoneAccount) {
-        if (phoneChanged) {
-          const newFakeEmail = `${phone.replace(/\D/g, '')}@mysuburb.app`;
-          await updateEmail(user, newFakeEmail);
-          firestoreUpdates.phone = phone.trim();
-          firestoreUpdates.email = newFakeEmail;
-        }
-      } else {
-        if (emailChanged) {
-          await updateEmail(user, email.trim());
-          firestoreUpdates.email = email.trim();
-        }
-        if (phoneChanged) {
-          firestoreUpdates.phone = phone.trim();
-        }
+      if (emailChanged) {
+        await updateEmail(user, email.trim());
+        firestoreUpdates.email = email.trim();
       }
 
       if (Object.keys(firestoreUpdates).length > 0) {
@@ -92,7 +65,7 @@ export default function EditProfileScreen() {
       if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
         Alert.alert('Error', 'Your current password is incorrect.');
       } else if (e.code === 'auth/email-already-in-use') {
-        Alert.alert('Error', isPhoneAccount ? 'That mobile number is already registered to another account.' : 'That email is already registered to another account.');
+        Alert.alert('Error', 'That email is already registered to another account.');
       } else if (e.code === 'auth/requires-recent-login') {
         Alert.alert('Error', 'For security, please sign out and sign back in before making this change.');
       } else if (e.code === 'auth/invalid-email') {
@@ -126,28 +99,11 @@ export default function EditProfileScreen() {
           <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Last name" placeholderTextColor="#9CA3AF" autoCapitalize="words" />
         </View>
 
-        {isPhoneAccount ? (
-          <>
-            <Text style={styles.label}>Mobile Number</Text>
-            <View style={styles.inputRow}>
-              <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Your mobile number" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
-            </View>
-            <Text style={styles.hint}>You log in with this number, so changing it updates your sign-in details too.</Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.label}>Email</Text>
-            <View style={styles.inputRow}>
-              <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Your email" placeholderTextColor="#9CA3AF" keyboardType="email-address" autoCapitalize="none" />
-            </View>
-            <Text style={styles.hint}>You log in with this email, so changing it updates your sign-in details too.</Text>
-
-            <Text style={styles.label}>Mobile Number (optional)</Text>
-            <View style={styles.inputRow}>
-              <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Add a contact number" placeholderTextColor="#9CA3AF" keyboardType="phone-pad" />
-            </View>
-          </>
-        )}
+        <Text style={styles.label}>Email</Text>
+        <View style={styles.inputRow}>
+          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Your email" placeholderTextColor="#9CA3AF" keyboardType="email-address" autoCapitalize="none" />
+        </View>
+        <Text style={styles.hint}>You log in with this email, so changing it updates your sign-in details too.</Text>
 
         {needsReauth && (
           <>

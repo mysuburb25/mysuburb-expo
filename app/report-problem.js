@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,8 +15,51 @@ export default function ReportProblemScreen() {
   const [description, setDescription] = useState('');
   const [issueLocation, setIssueLocation] = useState('');
   const [loading, setLoading] = useState(false);
+  const [reportedUser, setReportedUser] = useState(null); // { uid, displayName } | null
+  const [userSearch, setUserSearch] = useState('');
+  const [userResults, setUserResults] = useState([]);
+  const [showUserResults, setShowUserResults] = useState(false);
+  const [searchingUsers, setSearchingUsers] = useState(false);
 
   const isTechnicalIssue = category === 'Bug or technical issue';
+  // Only these two categories are actually about someone's behavior —
+  // asking "who is this about" for a bug report or generic account
+  // issue wouldn't make sense.
+  const needsReportedUser = category === 'Safety concern' || category === 'Inappropriate content';
+
+  // Scoped to the reporter's own suburb, same as the suggestion pattern
+  // used for @mentions elsewhere in the app — keeps results relevant
+  // and avoids a full unscoped user search.
+  const handleUserSearch = async (text) => {
+    setUserSearch(text);
+    setReportedUser(null);
+    if (text.trim().length < 2 || !profile?.suburb || !profile?.state) {
+      setUserResults([]);
+      setShowUserResults(false);
+      return;
+    }
+    setSearchingUsers(true);
+    try {
+      const key = `${profile.state}|${profile.suburb}`;
+      const snap = await getDocs(query(collection(db, 'users'), where('activeSuburbKeys', 'array-contains', key)));
+      const matches = snap.docs
+        .map(d => ({ uid: d.id, displayName: d.data().displayName || '' }))
+        .filter(m => m.displayName && m.uid !== user?.uid && m.displayName.toLowerCase().includes(text.trim().toLowerCase()))
+        .slice(0, 5);
+      setUserResults(matches);
+      setShowUserResults(matches.length > 0);
+    } catch (e) {
+      console.error('User search error:', e);
+    } finally {
+      setSearchingUsers(false);
+    }
+  };
+
+  const handleSelectReportedUser = (u) => {
+    setReportedUser(u);
+    setUserSearch(u.displayName);
+    setShowUserResults(false);
+  };
 
   const handleSubmit = async () => {
     if (!category) { Alert.alert('Error', 'Please select a category.'); return; }
@@ -51,6 +94,11 @@ export default function ReportProblemScreen() {
         };
       }
 
+      if (needsReportedUser && reportedUser) {
+        reportData.reportedUserId = reportedUser.uid;
+        reportData.reportedUserName = reportedUser.displayName;
+      }
+
       await addDoc(collection(db, 'reports'), reportData);
 
       Alert.alert('Report Submitted', 'Thank you for your report. We will review it within 24 hours.', [
@@ -64,7 +112,7 @@ export default function ReportProblemScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -72,7 +120,7 @@ export default function ReportProblemScreen() {
         <Text style={styles.headerTitle}>Report a Problem</Text>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>Category</Text>
         <View style={styles.categories}>
           {CATEGORIES.map(cat => (
@@ -96,6 +144,39 @@ export default function ReportProblemScreen() {
               value={issueLocation}
               onChangeText={setIssueLocation}
             />
+          </>
+        )}
+
+        {needsReportedUser && (
+          <>
+            <Text style={styles.label}>Who is this about? (optional)</Text>
+            <View style={styles.userSearchWrap}>
+              <Ionicons name="search-outline" size={16} color="#9CA3AF" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.userSearchInput}
+                placeholder="Search their name..."
+                placeholderTextColor="#9CA3AF"
+                value={userSearch}
+                onChangeText={handleUserSearch}
+                onFocus={() => setShowUserResults(userResults.length > 0)}
+              />
+              {searchingUsers && <ActivityIndicator size="small" color="#2D6A4F" />}
+              {reportedUser && (
+                <Ionicons name="checkmark-circle" size={18} color="#2D6A4F" />
+              )}
+            </View>
+            {showUserResults && (
+              <View style={styles.userResultsBox}>
+                {userResults.map(u => (
+                  <TouchableOpacity key={u.uid} style={styles.userResultItem} onPress={() => handleSelectReportedUser(u)}>
+                    <Text style={styles.userResultText}>{u.displayName}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <Text style={styles.userSearchHint}>
+              If you know who this is about, search for their name so our team can review their account directly. Leave blank if you're not sure.
+            </Text>
           </>
         )}
 
@@ -128,7 +209,7 @@ export default function ReportProblemScreen() {
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Submit Report</Text>}
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -146,6 +227,12 @@ const styles = StyleSheet.create({
   catTextActive: { color: '#fff', fontWeight: '700' },
   input: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#1B1F23', minHeight: 140 },
   locationInput: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#1B1F23' },
+  userSearchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4 },
+  userSearchInput: { flex: 1, paddingVertical: 10, fontSize: 15, color: '#1B1F23' },
+  userResultsBox: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, marginTop: 4, backgroundColor: '#fff', overflow: 'hidden' },
+  userResultItem: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0' },
+  userResultText: { fontSize: 14, color: '#1B1F23', fontWeight: '600' },
+  userSearchHint: { fontSize: 12, color: '#9CA3AF', lineHeight: 17, marginTop: 4 },
   techNote: { flexDirection: 'row', gap: 8, backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, marginTop: 4, alignItems: 'flex-start' },
   techNoteText: { flex: 1, fontSize: 12, color: '#6B7280', lineHeight: 17 },
   hint: { fontSize: 13, color: '#9CA3AF', lineHeight: 20, marginTop: 8 },
