@@ -49,7 +49,7 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={styles.scrollBody}>
-      <Text style={[styles.sectionLabel, { marginTop: 15 }]}>Account</Text>
+      <Text style={[styles.sectionLabel, { marginTop: 10 }]}>Account</Text>
       <View style={styles.section}>
         <MenuItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
         <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/change-password')} />
@@ -68,7 +68,7 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <MenuItem icon="help-circle-outline" label="Help and FAQ" onPress={() => router.push('/help-faq')} />
         <MenuItem icon="flag-outline" label="Report a Problem" onPress={() => router.push('/report-problem')} />
-        <MenuItem icon="information-circle-outline" label="About My Suburb" onPress={() => Alert.alert('My Suburb', `Version ${VERSION_STRING}\nMade in Australia`)} />
+        <MenuItem icon="information-circle-outline" label="About MySuburb" onPress={() => Alert.alert('MySuburb', `Version ${VERSION_STRING}\nMade in Australia`)} />
       </View>
 
       <Text style={styles.sectionLabel}>Account Actions</Text>
