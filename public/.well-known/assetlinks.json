@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mysuburb.app",
+      "sha256_cert_fingerprints": [
+        "39:78:1A:55:96:8A:56:C1:B8:76:9F:8C:CC:01:AF:A0:03:89:AF:6C:47:A1:DD:5F:B4:42:BC:29:1B:F7:7B:7B"
+      ]
+    }
+  }
+]

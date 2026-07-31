@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["P464C7FWBP.com.mysuburb.app"],
+        "paths": ["/post/*"]
+      }
+    ]
+  }
+}

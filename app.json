@@ -14,6 +14,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mysuburb.app",
+      "associatedDomains": ["applinks:mysuburb.app"],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "MySuburb uses your camera so you can take photos to attach to posts and update your profile picture.",
@@ -30,6 +31,20 @@
       "permissions": [
         "READ_CALENDAR",
         "WRITE_CALENDAR"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "mysuburb.app",
+              "pathPrefix": "/post"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "plugins": [
