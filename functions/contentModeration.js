@@ -13,7 +13,7 @@ const PROHIBITED_TERMS = [
   'cocaine', 'heroin', 'meth', 'methamphetamine', 'mdma', 'ecstasy',
   'cannabis', 'marijuana', 'weed', 'ice pipe', 'bong',
   // Prescription / pharmaceuticals
-  'prescription', 'xanax', 'valium', 'oxycontin', 'oxycodone', 'codeine',
+  'prescription drugs', 'prescription medication', 'prescription medicine', 'prescription pills', 'xanax', 'valium', 'oxycontin', 'oxycodone', 'codeine',
   // Weapons
   'firearm', 'handgun', 'pistol', 'rifle', 'shotgun', 'ammunition', 'ammo',
   'switchblade', 'flick knife', 'taser',

@@ -45,13 +45,15 @@ export default function AdminDashboardScreen() {
   // Stats use getCountFromServer — a count-only query that doesn't read
   // full documents, so it stays cheap regardless of how large the
   // collections grow (unlike getDocs, which reads and bills for every
-  // matching document).
+  // matching document). Both openReports and resolvedReports are
+  // fetched here so the Reports tab chips can show live counts without
+  // needing their own separate query.
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
       const [
         totalUsers, totalPosts, homeCount, mpCount, eventsCount,
-        servicesCount, lfCount, openReports, suspendedCount,
+        servicesCount, lfCount, openReports, resolvedReports, suspendedCount,
       ] = await Promise.all([
         getCountFromServer(collection(db, 'users')),
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false))),
@@ -61,6 +63,7 @@ export default function AdminDashboardScreen() {
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'services'))),
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'lostfound'))),
         getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'open'))),
+        getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'resolved'))),
         getCountFromServer(query(collection(db, 'users'), where('isSuspended', '==', true))),
       ]);
       setStats({
@@ -72,6 +75,7 @@ export default function AdminDashboardScreen() {
         services: servicesCount.data().count,
         lostfound: lfCount.data().count,
         openReports: openReports.data().count,
+        resolvedReports: resolvedReports.data().count,
         suspendedUsers: suspendedCount.data().count,
       });
     } catch (e) { console.error(e); }
@@ -126,6 +130,7 @@ export default function AdminDashboardScreen() {
               await updateDoc(doc(db, 'posts', report.postId), { isRemoved: true });
               await updateDoc(doc(db, 'reports', report.id), { status: 'resolved', resolvedAt: serverTimestamp(), resolvedBy: user.uid });
               setReports(prev => prev.filter(r => r.id !== report.id));
+              fetchStats();
             } catch (e) { Alert.alert('Error', e.message); }
           }
         }
@@ -141,6 +146,7 @@ export default function AdminDashboardScreen() {
           try {
             await updateDoc(doc(db, 'reports', report.id), { status: 'resolved', resolvedAt: serverTimestamp(), resolvedBy: user.uid });
             setReports(prev => prev.filter(r => r.id !== report.id));
+            fetchStats();
           } catch (e) { Alert.alert('Error', e.message); }
         }
       }
@@ -155,6 +161,7 @@ export default function AdminDashboardScreen() {
           try {
             await updateDoc(doc(db, 'reports', report.id), { status: 'open', resolvedAt: null, resolvedBy: null });
             setReports(prev => prev.filter(r => r.id !== report.id));
+            fetchStats();
           } catch (e) { Alert.alert('Error', e.message); }
         }
       }
@@ -203,12 +210,6 @@ export default function AdminDashboardScreen() {
   const submitWarning = async () => {
     if (!warnMessage.trim()) { Alert.alert('Error', 'Please enter a warning message.'); return; }
     const target = getTargetUser(warnTarget);
-    // Defensive backstop — openWarnModal already checks this before the
-    // modal even opens, but re-checking here too means a warning can
-    // never be sent with a missing recipient, which would otherwise
-    // silently succeed (Firestore rules only check isAdmin(), not that
-    // userId is a real user) and create a notification nobody could
-    // ever actually see.
     if (!target.id) { Alert.alert('Error', 'No user was identified for this report.'); setShowWarnModal(false); return; }
     setSendingWarning(true);
     try {
@@ -360,13 +361,17 @@ export default function AdminDashboardScreen() {
                 style={[styles.reportStatusChip, reportStatus === 'open' && styles.reportStatusChipActive]}
                 onPress={() => setReportStatus('open')}
               >
-                <Text style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActive]}>Open</Text>
+                <Text style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActive]}>
+                  Open{stats ? ` (${stats.openReports ?? 0})` : ''}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.reportStatusChip, reportStatus === 'resolved' && styles.reportStatusChipActive]}
                 onPress={() => setReportStatus('resolved')}
               >
-                <Text style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActive]}>Resolved</Text>
+                <Text style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActive]}>
+                  Resolved{stats ? ` (${stats.resolvedReports ?? 0})` : ''}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -422,10 +427,6 @@ export default function AdminDashboardScreen() {
                       </TouchableOpacity>
                     </>
                   ) : report.reportedUserId ? (
-                    // Safety concern / Inappropriate content reported via
-                    // Report a Problem, with a specific person identified —
-                    // no post exists to preview, but there's someone to
-                    // review directly.
                     <View style={styles.reportFieldRow}>
                       <View style={styles.reportFieldLabel}>
                         <Text style={styles.reportFieldLabelText}>ABOUT</Text>
@@ -593,10 +594,6 @@ const styles = StyleSheet.create({
   reportDate: { fontSize: 12, color: Colors.midGrey },
   reportDescription: { fontSize: 14, color: Colors.charcoal, lineHeight: 20 },
 
-  // Each field (Posted By / Reported By) is its own bordered, tinted
-  // panel — same label-badge + value pattern used for Events' detail
-  // rows (EVENT TITLE, DATE & TIME, etc.), just reused here for
-  // consistency with the rest of the app.
   reportFieldRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FAFAFA', borderRadius: 12, borderWidth: 1, borderColor: '#EFEFEF', paddingVertical: 8, paddingHorizontal: 10 },
   reportFieldLabel: { backgroundColor: '#C2D9E8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   reportFieldLabelAlt: { backgroundColor: '#E8EAF6' },
@@ -608,10 +605,6 @@ const styles = StyleSheet.create({
 
   reportPostPreview: { backgroundColor: '#FAFAFA', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#EFEFEF' },
   reportPostPreviewContent: { fontSize: 13, color: Colors.charcoal },
-  // All four actions share the same neutral styling now — the color-coded
-  // version made "Remove" and the red category badge above it look like
-  // they meant the same thing. flex: 1 keeps all four evenly sized so
-  // they reliably fit on one row instead of wrapping.
   reportActions: { flexDirection: 'row', gap: 6, marginTop: 4 },
   reportActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5, backgroundColor: '#F0F0F0', borderColor: Colors.midGrey },
   reportActionText: { fontSize: 12, fontWeight: '700', color: Colors.midGrey },

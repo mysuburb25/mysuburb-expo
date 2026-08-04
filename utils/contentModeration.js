@@ -10,15 +10,17 @@
 //
 // Keep this list conservative — false positives (blocking legitimate
 // posts) create support headaches and erode trust in the app faster
-// than a missed listing does. Err toward whole-word matches over
-// aggressive substring matches.
+// than a missed listing does. Whole-word matching (not substring
+// matching) is what actually delivers on that — a plain .includes()
+// check previously matched "meth" inside the completely ordinary word
+// "something", silently blocking any post that used it.
 
 const PROHIBITED_TERMS = [
   // Drugs / controlled substances
   'cocaine', 'heroin', 'meth', 'methamphetamine', 'mdma', 'ecstasy',
   'cannabis', 'marijuana', 'weed', 'ice pipe', 'bong',
   // Prescription / pharmaceuticals
-  'prescription', 'xanax', 'valium', 'oxycontin', 'oxycodone', 'codeine',
+  'prescription drugs', 'prescription medication', 'prescription medicine', 'prescription pills', 'xanax', 'valium', 'oxycontin', 'oxycodone', 'codeine',
   // Weapons
   'firearm', 'handgun', 'pistol', 'rifle', 'shotgun', 'ammunition', 'ammo',
   'switchblade', 'flick knife', 'taser',
@@ -30,6 +32,14 @@ const PROHIBITED_TERMS = [
   'stolen', 'counterfeit', 'replica designer', 'fake designer',
 ];
 
+// Matches each term as a whole word (or exact multi-word phrase), not as
+// a substring buried inside an unrelated word. \b is a word boundary, so
+// 'meth' now matches "meth" and "meth?" but not "something" or "method".
+const TERM_PATTERNS = PROHIBITED_TERMS.map(term => ({
+  term,
+  regex: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+}));
+
 /**
  * Checks marketplace listing text against the prohibited-items list.
  * @param {string} text - combined title + description to screen.
@@ -37,9 +47,8 @@ const PROHIBITED_TERMS = [
  */
 export function findProhibitedTerm(text) {
   if (!text) return null;
-  const normalised = text.toLowerCase();
-  for (const term of PROHIBITED_TERMS) {
-    if (normalised.includes(term)) {
+  for (const { term, regex } of TERM_PATTERNS) {
+    if (regex.test(text)) {
       return term;
     }
   }
@@ -50,4 +59,4 @@ export const PROHIBITED_ITEMS_MESSAGE =
   "This listing can't be posted because it appears to reference an item that's not allowed on My Suburb " +
   '(such as drugs, weapons, alcohol, tobacco, prescription medicine, or infant formula). ' +
   'See our Community Guidelines for the full list of prohibited items. ' +
-  "If you believe this is a mistake, please contact us at community@mysuburb.com.au.";
+  "If you believe this is a mistake, please contact us at support@mysuburb.app.";

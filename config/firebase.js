@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 export const firebaseConfig = {
@@ -26,6 +26,20 @@ export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage),
 });
 
-export const db = getFirestore(app);
+// initializeFirestore with experimentalForceLongPolling, rather than a
+// plain getFirestore(app) — the default WebSocket-style streaming
+// connection has a well-documented, recurring compatibility issue on
+// React Native (WebChannelConnection "Listen" stream transport errored,
+// sometimes escalating to a native RangeError: String length exceeds
+// limit crash) reported across many Expo/React Native Firebase projects.
+// Forcing long-polling avoids that transport entirely in favour of one
+// that's proven far more reliable in this specific environment.
+// useFetchStreams: false pairs with this, since the fetch-based
+// streaming path has the same underlying compatibility problem.
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+});
+
 export const storage = getStorage(app);
 export default app;
