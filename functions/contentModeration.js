@@ -25,11 +25,22 @@ const PROHIBITED_TERMS = [
   'stolen', 'counterfeit', 'replica designer', 'fake designer',
 ];
 
+// Matches each term as a whole word (or exact multi-word phrase), not as
+// a substring buried inside an unrelated word — a plain .includes('meth')
+// check was matching the "meth" inside "something", silently hiding any
+// post that used that completely ordinary word. \b is a word boundary,
+// so 'meth' now matches "meth" and "meth?" but not "something" or
+// "method". Terms with spaces (like 'ice pipe') still match as an exact
+// phrase, since \b anchors both ends of the whole term either way.
+const TERM_PATTERNS = PROHIBITED_TERMS.map(term => ({
+  term,
+  regex: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+}));
+
 function findProhibitedTerm(text) {
   if (!text) return null;
-  const normalised = text.toLowerCase();
-  for (const term of PROHIBITED_TERMS) {
-    if (normalised.includes(term)) {
+  for (const { term, regex } of TERM_PATTERNS) {
+    if (regex.test(text)) {
       return term;
     }
   }
