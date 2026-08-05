@@ -16,20 +16,34 @@
 // "something", silently blocking any post that used it.
 
 const PROHIBITED_TERMS = [
-  // Drugs / controlled substances
-  'cocaine', 'heroin', 'meth', 'methamphetamine', 'mdma', 'ecstasy',
+  // Drugs / controlled substances — includes the generic terms
+  // ("drugs", "narcotics") alongside specific substance names, since
+  // the generic terms were previously missing entirely (e.g. "I am
+  // selling drugs" matched nothing before this list included the word
+  // "drugs" itself, only specific names like "cocaine").
+  'drugs', 'illegal drugs', 'narcotics',
+  'cocaine', 'crack cocaine', 'heroin', 'meth', 'methamphetamine', 'mdma', 'ecstasy',
   'cannabis', 'marijuana', 'weed', 'ice pipe', 'bong',
   // Prescription / pharmaceuticals
   'prescription drugs', 'prescription medication', 'prescription medicine', 'prescription pills', 'xanax', 'valium', 'oxycontin', 'oxycodone', 'codeine',
-  // Weapons
-  'firearm', 'handgun', 'pistol', 'rifle', 'shotgun', 'ammunition', 'ammo',
-  'switchblade', 'flick knife', 'taser',
-  // Alcohol / tobacco
-  'cigarette', 'vape juice', 'nicotine', 'e-liquid',
+  // Weapons — "weapon" and "explosive" added as broader generic terms.
+  // Deliberately NOT adding bare "gun" or "knife": both match a huge
+  // number of completely legitimate marketplace items (nail gun, glue
+  // gun, staple gun, kitchen knife, pocket knife, craft knife), and the
+  // more specific dangerous variants (handgun, shotgun, switchblade,
+  // flick knife) already cover the genuinely prohibited cases without
+  // that false-positive risk.
+  'firearm', 'firearms', 'handgun', 'pistol', 'rifle', 'shotgun', 'ammunition', 'ammo',
+  'switchblade', 'flick knife', 'taser', 'weapon', 'weapons', 'explosive', 'explosives',
+  // Alcohol / tobacco — plural "cigarettes" added since word-boundary
+  // matching on "cigarette" alone does not also match its plural form.
+  'cigarette', 'cigarettes', 'tobacco', 'vape', 'vaping', 'vape juice', 'nicotine', 'e-liquid',
   // Regulated infant products
   'baby formula', 'infant formula', 'formula milk',
-  // Other
-  'stolen', 'counterfeit', 'replica designer', 'fake designer',
+  // Other — "knockoff" added as a safer alternative to bare "fake",
+  // which is used in far too many ordinary, non-counterfeit contexts to
+  // flag on its own.
+  'stolen', 'counterfeit', 'replica designer', 'fake designer', 'knockoff', 'knock off',
 ];
 
 // Matches each term as a whole word (or exact multi-word phrase), not as
