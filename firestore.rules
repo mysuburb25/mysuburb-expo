@@ -168,6 +168,16 @@ service cloud.firestore {
           && request.resource.data.content == '[This comment was deleted]'
           && request.resource.data.isDeleted == true)
         ||
+        // Admin removing someone ELSE's comment — same soft-delete shape
+        // as the author path above, but with its own distinct placeholder
+        // text so the UI can show "removed by an admin" rather than the
+        // ordinary self-delete message. isAdmin() already implies
+        // isSignedIn(), so no separate check needed here.
+        (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'isDeleted'])
+          && request.resource.data.content == '[Deleted by Admin]'
+          && request.resource.data.isDeleted == true)
+        ||
         (isSignedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['likeCount', 'likedBy'])

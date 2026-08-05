@@ -314,7 +314,14 @@ export default function PostDetailScreen() {
 
   const buildShareText = () => {
     const when = eventDate ? `${eventIsToday ? 'Today' : formatEventDate(eventDate)}, ${formatEventTime(eventDate)}` : '';
-    const deepLink = `mysuburb://post/${id}`;
+    // A regular https:// link, not the raw mysuburb:// scheme — this is
+    // what makes WhatsApp (and everywhere else) actually show and let
+    // people tap/copy it as a real link. The page it points to
+    // (post-redirect.html) immediately hands off into the app via the
+    // custom scheme, so tapping it still opens MySuburb directly, same
+    // as before, just via one small bridge page instead of a raw
+    // custom-scheme link most apps won't recognize.
+    const deepLink = `https://mysuburb.app/post/${id}`;
     const lines = [
       `Event Title: ${post.content}`,
       post.description ? `Description: ${post.description}` : null,
@@ -322,7 +329,7 @@ export default function PostDetailScreen() {
       when ? `Date & Time: ${when}` : null,
       post.eventLocation ? `Location: ${post.eventLocation}` : null,
     ].filter(Boolean);
-    return `${lines.join('\n')}\n\n${deepLink}\n(Tap to open in My Suburb — you'll need the app installed)\n\nShared from My Suburb`;
+    return `${lines.join('\n')}\n\n${deepLink}\n\nShared from My Suburb`;
   };
 
   const handleShareToUser = () => {
@@ -593,19 +600,27 @@ export default function PostDetailScreen() {
   };
 
   const DELETED_COMMENT_TEXT = '[This comment was deleted]';
+  const ADMIN_DELETED_COMMENT_TEXT = '[Deleted by Admin]';
 
-  const handleDeleteComment = (commentId) => {
-    Alert.alert('Delete Comment', 'Are you sure you want to delete this comment? Replies to it will stay visible.', [
+  // Same soft-delete pattern either way (replace content with a
+  // placeholder, never hard-delete, since replies may depend on this
+  // comment still existing) — but the placeholder text differs depending
+  // on who removed it, and Firestore rules distinguish the two paths:
+  // authors can update their own comments, admins can update any comment
+  // via a separate isAdmin() clause (see firestore.rules).
+  const handleDeleteComment = (commentId, isAdminAction = false) => {
+    const title = isAdminAction ? 'Remove Comment (Admin)' : 'Delete Comment';
+    const message = isAdminAction
+      ? 'This removes the comment for everyone and marks it as removed by an admin. Replies to it will stay visible.'
+      : 'Are you sure you want to delete this comment? Replies to it will stay visible.';
+    const placeholderText = isAdminAction ? ADMIN_DELETED_COMMENT_TEXT : DELETED_COMMENT_TEXT;
+    Alert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive', onPress: async () => {
+        text: isAdminAction ? 'Remove' : 'Delete', style: 'destructive', onPress: async () => {
           try {
-            // Soft-delete only — replace the content with a placeholder rather
-            // than hard-deleting, since replies from other users may depend
-            // on this comment still existing (and Firestore rules only allow
-            // authors to modify their own comments, not delete others' replies).
-            await updateDoc(doc(db, 'comments', commentId), { content: DELETED_COMMENT_TEXT, isDeleted: true });
-            setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: DELETED_COMMENT_TEXT, isDeleted: true } : c));
+            await updateDoc(doc(db, 'comments', commentId), { content: placeholderText, isDeleted: true });
+            setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: placeholderText, isDeleted: true } : c));
           } catch (e) { Alert.alert('Error', e.message); }
         }
       }
@@ -1031,8 +1046,8 @@ export default function PostDetailScreen() {
                     )}
                     {FooterRow}
                   </View>
-                  {isMyComment && !item.isDeleted && (
-                    <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
+                  {!item.isDeleted && (isMyComment || profile?.isAdmin) && (
+                    <TouchableOpacity onPress={() => handleDeleteComment(item.id, !isMyComment)} style={styles.deleteCommentBtn}>
                       <Ionicons name="trash-outline" size={15} color="#E53935" />
                     </TouchableOpacity>
                   )}
@@ -1066,8 +1081,8 @@ export default function PostDetailScreen() {
                 </View>
                 {FooterRow}
               </View>
-              {isMyComment && !item.isDeleted && (
-                <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.deleteCommentBtn}>
+              {!item.isDeleted && (isMyComment || profile?.isAdmin) && (
+                <TouchableOpacity onPress={() => handleDeleteComment(item.id, !isMyComment)} style={styles.deleteCommentBtn}>
                   <Ionicons name="trash-outline" size={14} color="#E53935" />
                 </TouchableOpacity>
               )}
