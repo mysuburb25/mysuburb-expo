@@ -62,7 +62,7 @@ export default function TermsOfServiceScreen() {
         <Text style={styles.body}>We may suspend or terminate your account for breach of these terms. Where reasonably practicable and safe to do so, we will provide notice and an opportunity to respond before taking this step. In cases involving safety risks or illegal content, we may act immediately without prior notice.</Text>
 
         <Text style={styles.heading}>10. Dispute Resolution</Text>
-        <Text style={styles.body}>If you have a complaint or dispute about My Suburb, please contact us first at mysuburb-support@mysuburb.app so we can try to resolve it directly. We aim to respond within a reasonable time.</Text>
+        <Text style={styles.body}>If you have a complaint or dispute about My Suburb, please contact us first at support@mysuburb.app so we can try to resolve it directly. We aim to respond within a reasonable time.</Text>
 
         <Text style={styles.heading}>11. Governing Law</Text>
         <Text style={styles.body}>These Terms of Service are governed by the laws of Queensland, Australia. Any disputes not resolved under Section 10 will be resolved in the courts of Queensland.</Text>
@@ -71,7 +71,7 @@ export default function TermsOfServiceScreen() {
         <Text style={styles.body}>We may update these terms from time to time. If we make material changes, we will notify you through the app before they take effect. Your continued use of My Suburb after a change takes effect means you accept the updated terms. If you do not agree to a material change, you should stop using the app and may delete your account.</Text>
 
         <Text style={styles.heading}>13. Contact Us</Text>
-        <Text style={styles.body}>For questions about these terms, contact us at mysuburb-support@mysuburb.app</Text>
+        <Text style={styles.body}>For questions about these terms, contact us at support@mysuburb.app</Text>
 
         <View style={styles.spacer} />
       </ScrollView>

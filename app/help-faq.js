@@ -14,7 +14,7 @@ const FAQS = [
   { q: 'How do I report a post?', a: 'Tap the three-dot menu on any post and choose Report. Our moderation team reviews all reports promptly.' },
   { q: 'How do I block someone?', a: 'Open their profile and tap Block, or use the Block option from the menu on any of their posts. Once blocked, they can\'t message you and their posts are hidden from your feed. You can unblock them any time from Settings > Blocked Users.' },
   { q: 'Is My Suburb free to use?', a: 'Yes, My Suburb is completely free to use. There are no ads or paid features.' },
-  { q: 'How do I delete my account?', a: 'Go to Settings, scroll down to Account Actions and tap Delete Account. You can also email us at mysuburb-support@mysuburb.app' },
+  { q: 'How do I delete my account?', a: 'Go to Settings, scroll down to Account Actions and tap Delete Account. You can also email us at support@mysuburb.app' },
   { q: 'I forgot my password — what do I do?', a: 'On the login screen, tap "Forgot Password?" and enter your email to receive a reset link.' },
   { q: 'What is Buy and Sell?', a: 'Buy and Sell lets you list items for sale, give things away for free, or post what you are looking for. All transactions are between neighbours directly. Once an item is no longer available, mark the listing as Closed.' },
   { q: 'How do Safety Alerts work?', a: 'Safety Alerts are for genuine urgent safety concerns in your suburb such as break-ins or dangerous conditions. For emergencies always call 000 first.' },
@@ -22,7 +22,7 @@ const FAQS = [
   { q: 'Can I add photos to a post?', a: 'Yes, when creating a post you can attach up to 3 photos from your camera or photo library.' },
   { q: 'How do I change my profile photo?', a: 'Go to Profile and tap the camera icon on your avatar. You can take a new photo or choose one from your photo library.' },
   { q: 'How do I turn off notifications?', a: 'Go to Settings > Notification Preferences to manage which notifications you receive, such as likes, comments, and new posts in your suburb.' },
-  { q: 'What happens to my posts and data if I delete my account?', a: 'Deleting your account removes your profile and personal details. Your posts may remain visible to protect ongoing conversations, but they will no longer be linked to your name. Contact mysuburb-support@mysuburb.app if you would like your posts removed as well.' },
+  { q: 'What happens to my posts and data if I delete my account?', a: 'Deleting your account removes your profile and personal details. Your posts may remain visible to protect ongoing conversations, but they will no longer be linked to your name. Contact support@mysuburb.app if you would like your posts removed as well.' },
 ];
 
 export default function HelpFAQScreen() {
@@ -50,7 +50,7 @@ export default function HelpFAQScreen() {
         ))}
         <View style={styles.contact}>
           <Text style={styles.contactTitle}>Still need help?</Text>
-          <Text style={styles.contactText}>Email us at mysuburb-support@mysuburb.app and we will get back to you within 24 hours.</Text>
+          <Text style={styles.contactText}>Email us at support@mysuburb.app and we will get back to you within 24 hours.</Text>
         </View>
       </ScrollView>
     </View>
