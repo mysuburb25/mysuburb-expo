@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { renderTextWithEmail } from '../utils/renderTextWithEmail';
 
 const FAQS = [
   { q: 'How does My Suburb work?', a: 'My Suburb connects you with neighbours in your exact suburb. All posts are only visible to people who live in the same suburb as you.' },
@@ -45,12 +46,12 @@ export default function HelpFAQScreen() {
               <Text style={styles.question}>{faq.q}</Text>
               <Ionicons name={open === i ? 'chevron-up' : 'chevron-down'} size={18} color="#2D6A4F" />
             </View>
-            {open === i && <Text style={styles.answer}>{faq.a}</Text>}
+            {open === i && renderTextWithEmail(faq.a, 'support@mysuburb.app', styles.answer, styles.emailLink)}
           </TouchableOpacity>
         ))}
         <View style={styles.contact}>
           <Text style={styles.contactTitle}>Still need help?</Text>
-          <Text style={styles.contactText}>Email us at support@mysuburb.app and we will get back to you within 24 hours.</Text>
+          {renderTextWithEmail('Email us at support@mysuburb.app and we will get back to you within 24 hours.', 'support@mysuburb.app', styles.contactText, styles.emailLinkOnGreen)}
         </View>
       </ScrollView>
     </View>
@@ -71,4 +72,6 @@ const styles = StyleSheet.create({
   contact: { backgroundColor: '#E8F5E9', borderRadius: 12, padding: 16, marginTop: 8 },
   contactTitle: { fontSize: 16, fontWeight: '700', color: '#2D6A4F', marginBottom: 6 },
   contactText: { fontSize: 14, color: '#2D6A4F', lineHeight: 22 },
+  emailLink: { color: '#1565C0', textDecorationLine: 'underline' },
+  emailLinkOnGreen: { color: '#2D6A4F', textDecorationLine: 'underline', fontWeight: '700' },
 });

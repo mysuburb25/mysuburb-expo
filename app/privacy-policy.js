@@ -1,6 +1,7 @@
 import { ScrollView, Text, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { renderTextWithEmail } from '../utils/renderTextWithEmail';
 
 export default function PrivacyPolicyScreen() {
   return (
@@ -44,24 +45,24 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.heading}>5. Data Retention and Account Deletion</Text>
         <Text style={styles.body}>We retain your personal information for as long as your account is active, or as needed to provide the app to you.</Text>
         <Text style={styles.body}>If you delete your account, we remove your profile information and Firebase authentication record. Posts and comments you've made may remain visible to preserve the integrity of conversations they're part of, but they will no longer be linked to an active account or your personal details beyond the display name already shown at the time of posting.</Text>
-        <Text style={styles.body}>If you would like your posts and comments removed as well as your account, contact us at support@mysuburb.app and we will action this within a reasonable time.</Text>
+        {renderTextWithEmail('If you would like your posts and comments removed as well as your account, contact us at support@mysuburb.app and we will action this within a reasonable time.', 'support@mysuburb.app', styles.body, styles.emailLink)}
 
         <Text style={styles.heading}>6. Your Rights and How to Complain</Text>
         <Text style={styles.body}>Under the Australian Privacy Act 1988 and the Australian Privacy Principles, you have the right to access, correct, or request deletion of your personal information.</Text>
-        <Text style={styles.body}>To exercise these rights, or to make a complaint about how we've handled your personal information, contact us at support@mysuburb.app. We will investigate your complaint and aim to respond within 30 days.</Text>
+        {renderTextWithEmail("To exercise these rights, or to make a complaint about how we've handled your personal information, contact us at support@mysuburb.app. We will investigate your complaint and aim to respond within 30 days.", 'support@mysuburb.app', styles.body, styles.emailLink)}
         <Text style={styles.body}>If you're not satisfied with our response, you can lodge a complaint with the Office of the Australian Information Commissioner (OAIC) at oaic.gov.au.</Text>
 
         <Text style={styles.heading}>7. Automated Decision-Making</Text>
         <Text style={styles.body}>We do not currently use automated systems to make decisions that significantly affect your rights or interests. If this changes in future, we will update this policy to explain how and provide details of the automated processes used.</Text>
 
         <Text style={styles.heading}>8. Age Requirements</Text>
-        <Text style={styles.body}>My Suburb is intended for users aged 18 and over. We do not knowingly collect personal information from anyone under 18. If you believe a user under 18 has provided us with personal information, please contact us at support@mysuburb.app so we can investigate and take appropriate action.</Text>
+        {renderTextWithEmail('My Suburb is intended for users aged 18 and over. We do not knowingly collect personal information from anyone under 18. If you believe a user under 18 has provided us with personal information, please contact us at support@mysuburb.app so we can investigate and take appropriate action.', 'support@mysuburb.app', styles.body, styles.emailLink)}
 
         <Text style={styles.heading}>9. Changes to This Policy</Text>
         <Text style={styles.body}>We may update this policy from time to time to reflect changes in our practices or in the law. If we make material changes, we will notify you through the app before they take effect. Your continued use of My Suburb after a change takes effect means you accept the updated policy.</Text>
 
         <Text style={styles.heading}>10. Contact Us</Text>
-        <Text style={styles.body}>Questions, requests, or complaints about this policy or your personal information can be sent to support@mysuburb.app</Text>
+        {renderTextWithEmail('Questions, requests, or complaints about this policy or your personal information can be sent to support@mysuburb.app', 'support@mysuburb.app', styles.body, styles.emailLink)}
 
         <View style={styles.spacer} />
       </ScrollView>
@@ -80,5 +81,6 @@ const styles = StyleSheet.create({
   intro: { fontSize: 15, color: '#1B1F23', lineHeight: 24, marginBottom: 20 },
   heading: { fontSize: 17, fontWeight: '700', color: '#2D6A4F', marginTop: 20, marginBottom: 8 },
   body: { fontSize: 15, color: '#1B1F23', lineHeight: 24, marginBottom: 8 },
+  emailLink: { color: '#1565C0', textDecorationLine: 'underline' },
   spacer: { height: 40 },
 });
