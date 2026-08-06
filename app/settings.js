@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Application from 'expo-application';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ const VERSION_STRING = BUILD_NUMBER ? `${APP_VERSION} (${BUILD_NUMBER})` : APP_V
 
 export default function SettingsScreen() {
   const { profile } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const MenuItem = ({ icon, label, onPress, danger }) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -36,7 +38,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -48,7 +50,14 @@ export default function SettingsScreen() {
         <Text style={styles.pageTitle}>Settings</Text>
       </View>
 
-      <ScrollView style={styles.scrollBody}>
+      {/* paddingBottom includes the device's safe-area inset (on top of a
+          40px base) so the last menu item — Delete Account — always sits
+          fully above any on-screen system navigation bar, the same fix
+          applied to dashboard.js's Continue button. Without this, older
+          Android devices using traditional 3-button navigation (rather
+          than gesture navigation) can end up with the bottom of the
+          scrollable content partially hidden underneath that bar. */}
+      <ScrollView style={styles.scrollBody} contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
       <Text style={[styles.sectionLabel, { marginTop: 10 }]}>Account</Text>
       <View style={styles.section}>
         <MenuItem icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
