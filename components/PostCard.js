@@ -113,11 +113,11 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
           <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
             {isNew && (
               <View style={styles.newBadge}>
-                <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>NEW</Text>
               </View>
             )}
             <View style={[styles.badge, { backgroundColor: catConf.bg }]}>
-              <Text style={styles.badgeText}>{catConf.label}</Text>
+              <Text style={styles.badgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{catConf.label}</Text>
             </View>
           </View>
         </View>
