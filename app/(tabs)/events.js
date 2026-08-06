@@ -755,7 +755,7 @@ export default function EventsScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
@@ -774,7 +774,7 @@ export default function EventsScreen() {
           <View style={styles.pageHeaderIconBadge}>
             <Ionicons name="calendar" size={22} color={Colors.brandGreen} />
           </View>
-          <Text style={styles.pageTitle}>Events</Text>
+          <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Events</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
           <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
@@ -1087,7 +1087,7 @@ export default function EventsScreen() {
               <View style={styles.pageHeaderIconBadge}>
                 <Ionicons name={editingEventId ? 'create' : 'calendar'} size={22} color={Colors.brandGreen} />
               </View>
-              <Text style={styles.pageTitle}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
+              <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
             </View>
           </View>
           <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>

@@ -15,9 +15,17 @@ import { Text } from 'react-native';
 // holds for plain-string Text — so this trades the subtle bold M/S
 // flourish for guaranteed correct shrink-to-fit behavior everywhere
 // this component is used.
+//
+// textAlign: 'center' is explicit, not inherited — on Android,
+// adjustsFontSizeToFit can leave the text's own bounding box at its
+// originally-measured (pre-shrink) width while the shrunk glyphs default
+// to left-aligned inside that box, unless textAlign is set directly.
+// Without this, the word can render visibly off-center under the
+// suburb/state subtitle beneath it, even though the parent View is
+// centering the box correctly.
 export default function AppName({ style }) {
   return (
-    <Text style={style} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+    <Text style={[style, { textAlign: 'center' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
       MySuburb
     </Text>
   );

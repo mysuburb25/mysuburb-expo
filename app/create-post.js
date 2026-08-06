@@ -564,7 +564,7 @@ export default function CreatePostScreen() {
         <View style={styles.pageHeaderIconBadge}>
           <Ionicons name={pageIcon} size={22} color={Colors.brandGreen} />
         </View>
-        <Text style={styles.pageTitle}>{pageTitle}</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{pageTitle}</Text>
       </View>
       {/* Primary suburb notice */}
       <View style={styles.primarySuburbBanner}>

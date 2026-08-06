@@ -302,7 +302,7 @@ export default function BuySellScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
@@ -321,7 +321,7 @@ export default function BuySellScreen() {
           <View style={styles.pageHeaderIconBadge}>
             <Ionicons name="pricetag" size={22} color={Colors.brandGreen} />
           </View>
-          <Text style={styles.pageTitle}>Buy & Sell</Text>
+          <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Buy & Sell</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
           <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />

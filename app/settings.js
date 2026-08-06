@@ -38,7 +38,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -47,7 +47,7 @@ export default function SettingsScreen() {
         <View style={styles.pageHeaderIconBadge}>
           <Ionicons name="settings" size={22} color={Colors.brandGreen} />
         </View>
-        <Text style={styles.pageTitle}>Settings</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Settings</Text>
       </View>
 
       {/* paddingBottom includes the device's safe-area inset (on top of a

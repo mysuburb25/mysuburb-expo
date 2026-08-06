@@ -289,7 +289,7 @@ export default function ServicesScreen() {
           <View style={styles.pageHeaderIconBadge}>
             <Ionicons name="briefcase" size={22} color={Colors.brandGreen} />
           </View>
-          <Text style={styles.pageTitle}>Services</Text>
+          <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Services</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
           <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
