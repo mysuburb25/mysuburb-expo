@@ -467,7 +467,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F2F2' },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },

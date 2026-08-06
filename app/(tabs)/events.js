@@ -1095,6 +1095,12 @@ export default function EventsScreen() {
               <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{editingEventId ? 'Edit Event' : 'New Event'}</Text>
             </View>
           </View>
+          <View style={styles.primarySuburbBanner}>
+            <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
+            <Text style={styles.primarySuburbText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              {`Posting to ${profile?.suburb}, ${profile?.state}`}
+            </Text>
+          </View>
           <ScrollView ref={scrollRef} style={styles.modalBody} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
             <View style={styles.sectionBar}><Text style={styles.sectionBarText}>Event Title</Text></View>
             <View style={styles.fieldPad}>
@@ -1202,7 +1208,7 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
@@ -1215,6 +1221,8 @@ const styles = StyleSheet.create({
   dashboardShortcut: { padding: 4 },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
+  primarySuburbBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  primarySuburbText: { fontSize: 14, color: Colors.brandGreen },
   tabRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   filterBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   filterSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },

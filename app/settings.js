@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   scrollBody: { flex: 1 },
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },

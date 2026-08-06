@@ -244,7 +244,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F2F2' },
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 20, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },

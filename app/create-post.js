@@ -27,8 +27,8 @@ const MARKETPLACE_TABS = [
 ];
 
 const SERVICE_TABS = [
-  { key: 'offering', label: 'I Offer' },
-  { key: 'looking',  label: 'I Need' },
+  { key: 'offering', label: 'I  Offer' },
+  { key: 'looking',  label: 'I  Need' },
 ];
 
 const SERVICE_CATEGORIES = [
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   header: { backgroundColor: Colors.brandGreen, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16 },
   closeBtn: { width: 36, justifyContent: 'center' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   primarySuburbBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
