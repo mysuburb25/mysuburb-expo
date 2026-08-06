@@ -38,7 +38,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>

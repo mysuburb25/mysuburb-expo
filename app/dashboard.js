@@ -130,7 +130,7 @@ export default function DashboardScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
           <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
@@ -234,7 +234,7 @@ export default function DashboardScreen() {
           <Text style={styles.checkboxLabel}>Don't show this dashboard again</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.continueBtn, continuing && { opacity: 0.7 }]} onPress={handleContinue} disabled={continuing}>
-          {continuing ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.continueBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Continue to Hub</Text>}
+          {continuing ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.continueBtnText}>Continue to Hub</Text>}
         </TouchableOpacity>
       </View>
     </View>

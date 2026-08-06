@@ -285,14 +285,7 @@ export default function AdminDashboardScreen() {
       <View style={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
-            <Text
-              style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {t.label}
-            </Text>
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -368,12 +361,7 @@ export default function AdminDashboardScreen() {
                 style={[styles.reportStatusChip, reportStatus === 'open' && styles.reportStatusChipActive]}
                 onPress={() => setReportStatus('open')}
               >
-                <Text
-                  style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
+                <Text style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActive]}>
                   Open{stats ? ` (${stats.openReports ?? 0})` : ''}
                 </Text>
               </TouchableOpacity>
@@ -381,12 +369,7 @@ export default function AdminDashboardScreen() {
                 style={[styles.reportStatusChip, reportStatus === 'resolved' && styles.reportStatusChipActive]}
                 onPress={() => setReportStatus('resolved')}
               >
-                <Text
-                  style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
+                <Text style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActive]}>
                   Resolved{stats ? ` (${stats.resolvedReports ?? 0})` : ''}
                 </Text>
               </TouchableOpacity>
@@ -403,7 +386,7 @@ export default function AdminDashboardScreen() {
               reports.map(report => (
                 <View key={report.id} style={styles.reportCard}>
                   <View style={styles.reportCardHeader}>
-                    <Text style={styles.reasonHeading} numberOfLines={1}>{report.reason || report.category || 'Other'}</Text>
+                    <Text style={styles.reasonHeading}>{report.reason || report.category || 'Other'}</Text>
                     <Text style={styles.reportDate}>{formatDate(report.createdAt)}</Text>
                   </View>
 
@@ -475,31 +458,31 @@ export default function AdminDashboardScreen() {
                       {report.postId ? (
                         <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleRemovePost(report)}>
                           <Ionicons name="trash-outline" size={15} color={Colors.midGrey} />
-                          <Text style={styles.reportActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Remove</Text>
+                          <Text style={styles.reportActionText}>Remove</Text>
                         </TouchableOpacity>
                       ) : null}
                       {(report.postId || report.reportedUserId) ? (
                         <>
                           <TouchableOpacity style={styles.reportActionBtn} onPress={() => openWarnModal(report)}>
                             <Ionicons name="warning-outline" size={15} color={Colors.midGrey} />
-                            <Text style={styles.reportActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Warn</Text>
+                            <Text style={styles.reportActionText}>Warn</Text>
                           </TouchableOpacity>
                           <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleSuspendUser(report)}>
                             <Ionicons name="ban-outline" size={15} color={Colors.midGrey} />
-                            <Text style={styles.reportActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Suspend</Text>
+                            <Text style={styles.reportActionText}>Suspend</Text>
                           </TouchableOpacity>
                         </>
                       ) : null}
                       <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleDismissReport(report)}>
                         <Ionicons name="close-circle-outline" size={15} color={Colors.midGrey} />
-                        <Text style={styles.reportActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Dismiss</Text>
+                        <Text style={styles.reportActionText}>Dismiss</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.reportActions}>
                       <TouchableOpacity style={styles.reportActionBtn} onPress={() => handleReopenReport(report)}>
                         <Ionicons name="refresh-outline" size={15} color={Colors.midGrey} />
-                        <Text style={styles.reportActionText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Reopen</Text>
+                        <Text style={styles.reportActionText}>Reopen</Text>
                       </TouchableOpacity>
                     </View>
                   )}
