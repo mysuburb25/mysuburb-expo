@@ -378,7 +378,7 @@ export default function HomeScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>

@@ -392,7 +392,7 @@ export default function BuySellScreen() {
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     {isNew && (
                       <View style={styles.newBadge}>
-                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1}>NEW</Text>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>NEW</Text>
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
@@ -456,7 +456,7 @@ export default function BuySellScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
@@ -496,7 +496,7 @@ export default function BuySellScreen() {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowSortModal(false)}>
           <View style={styles.filterSheet}>
             <View style={styles.filterHeaderBar}>
-              <Text style={styles.filterHeaderText} numberOfLines={1}>Sort By</Text>
+              <Text style={styles.filterHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sort By</Text>
             </View>
             <View style={styles.filterPad}>
               {SORT_OPTIONS.map(opt => (

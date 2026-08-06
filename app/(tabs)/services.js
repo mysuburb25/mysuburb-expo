@@ -366,7 +366,7 @@ export default function ServicesScreen() {
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     {isNew && (
                       <View style={styles.newBadge}>
-                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1}>NEW</Text>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>NEW</Text>
                       </View>
                     )}
                     <View style={styles.serviceBadgeStack}>
@@ -426,7 +426,7 @@ export default function ServicesScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>

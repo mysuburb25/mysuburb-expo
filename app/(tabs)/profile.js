@@ -383,7 +383,7 @@ export default function ProfileScreen() {
                       <Text style={styles.suburbNumberText}>{index + 1}</Text>
                     </View>
                     <Text style={styles.suburbRowText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.suburb}, {s.state}</Text>
-                    <Text style={styles.primaryLabel} numberOfLines={1}>Primary</Text>
+                    <Text style={styles.primaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Primary</Text>
                   </View>
                   <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
                 </TouchableOpacity>

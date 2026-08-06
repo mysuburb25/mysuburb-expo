@@ -876,12 +876,12 @@ export default function EventsScreen() {
                   </View>
                   {isNew && (
                     <View style={styles.newBadge}>
-                      <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1}>NEW</Text>
+                      <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>NEW</Text>
                     </View>
                   )}
                   {tab === 'past' && (
                     <View style={styles.completedBadge}>
-                      <Text style={styles.completedText} numberOfLines={1}>Done</Text>
+                      <Text style={styles.completedText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
                     </View>
                   )}
                   {ed && (
@@ -1022,7 +1022,7 @@ export default function EventsScreen() {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowDateFilterModal(false)}>
           <View style={styles.filterSheet}>
             <View style={styles.filterHeaderBar}>
-              <Text style={styles.filterHeaderText} numberOfLines={1}>When</Text>
+              <Text style={styles.filterHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>When</Text>
             </View>
             <View style={styles.filterPad}>
               {DATE_FILTERS.map(opt => (
@@ -1044,7 +1044,7 @@ export default function EventsScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
@@ -1117,13 +1117,13 @@ export default function EventsScreen() {
                   style={[styles.priceToggleBtn, priceType === 'free' && styles.priceToggleBtnActive]}
                   onPress={() => setPriceType('free')}
                 >
-                  <Text style={[styles.priceToggleText, priceType === 'free' && styles.priceToggleTextActive]} numberOfLines={1}>Free</Text>
+                  <Text style={[styles.priceToggleText, priceType === 'free' && styles.priceToggleTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Free</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.priceToggleBtn, priceType === 'paid' && styles.priceToggleBtnActive]}
                   onPress={() => setPriceType('paid')}
                 >
-                  <Text style={[styles.priceToggleText, priceType === 'paid' && styles.priceToggleTextActive]} numberOfLines={1}>Paid</Text>
+                  <Text style={[styles.priceToggleText, priceType === 'paid' && styles.priceToggleTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Paid</Text>
                 </TouchableOpacity>
               </View>
               {priceType === 'paid' && (
@@ -1142,11 +1142,11 @@ export default function EventsScreen() {
               <View style={styles.dateTimeRow}>
                 <TouchableOpacity style={[styles.pickerBtn, styles.pickerBtnHalf]} onPress={openDatePicker}>
                   <Ionicons name="calendar-outline" size={18} color={Colors.brandGreen} />
-                  <Text style={styles.pickerText} numberOfLines={1}>{formatDateFull(eventDate)}</Text>
+                  <Text style={styles.pickerText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatDateFull(eventDate)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.pickerBtn, styles.pickerBtnHalf]} onPress={openTimePicker}>
                   <Ionicons name="time-outline" size={18} color={Colors.brandGreen} />
-                  <Text style={styles.pickerText} numberOfLines={1}>{formatTime(eventDate)}</Text>
+                  <Text style={styles.pickerText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatTime(eventDate)}</Text>
                 </TouchableOpacity>
               </View>
               {showDatePicker && (

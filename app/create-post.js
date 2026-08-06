@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, Alert, ActivityIndicator, Modal, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
@@ -104,6 +105,7 @@ function MediaPickerSection({ media, onAddMedia, onRemoveMedia }) {
 export default function CreatePostScreen() {
   const { category: paramCategory, preselect, editPostId } = useLocalSearchParams();
   const { user, profile } = useAuth();
+  const insets = useSafeAreaInsets();
   const isEditMode = !!editPostId;
 
   const [editPost, setEditPost] = useState(null);
@@ -696,7 +698,7 @@ export default function CreatePostScreen() {
                       );
                     }}
                   />
-                  <View style={styles.modalFooter}>
+                  <View style={[styles.modalFooter, { paddingBottom: 16 + insets.bottom }]}>
                     <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowServiceModal(false)}>
                       <Text style={styles.modalCloseBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Close</Text>
                     </TouchableOpacity>
