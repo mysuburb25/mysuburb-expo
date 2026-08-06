@@ -261,7 +261,7 @@ export default function ProfileScreen() {
 
       {/* Fixed page header */}
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Profile</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Profile</Text>
       </View>
 
       {/* Fixed profile section */}
@@ -290,7 +290,7 @@ export default function ProfileScreen() {
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.iconBtn, styles.iconBtnRed]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={14} color="#E53935" />
-            <Text style={[styles.iconBtnText, styles.iconBtnTextRed]}>Sign Out</Text>
+            <Text style={[styles.iconBtnText, styles.iconBtnTextRed]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -298,9 +298,9 @@ export default function ProfileScreen() {
       <View style={styles.dashboardRow}>
         <View style={styles.dashboardRowLeft}>
           <Ionicons name="grid-outline" size={20} color={Colors.brandGreen} />
-          <Text style={styles.dashboardRowLabel}>Dashboard</Text>
+          <Text style={styles.dashboardRowLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Dashboard</Text>
           <TouchableOpacity style={styles.dashboardViewBtn} onPress={() => router.push('/dashboard')}>
-            <Text style={styles.dashboardViewBtnText}>View Now</Text>
+            <Text style={styles.dashboardViewBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>View Now</Text>
           </TouchableOpacity>
         </View>
         <Switch
@@ -319,7 +319,7 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.adminRow} onPress={() => router.push('/admin-dashboard')}>
           <View style={styles.dashboardRowLeft}>
             <Ionicons name="shield-checkmark-outline" size={20} color="#1B4F72" />
-            <Text style={styles.adminRowLabel}>Admin Dashboard</Text>
+            <Text style={styles.adminRowLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Admin Dashboard</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#1B4F72" />
         </TouchableOpacity>
@@ -382,8 +382,8 @@ export default function ProfileScreen() {
                     <View style={styles.suburbNumberBadge}>
                       <Text style={styles.suburbNumberText}>{index + 1}</Text>
                     </View>
-                    <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
-                    <Text style={styles.primaryLabel}>Primary</Text>
+                    <Text style={styles.suburbRowText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.suburb}, {s.state}</Text>
+                    <Text style={styles.primaryLabel} numberOfLines={1}>Primary</Text>
                   </View>
                   <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
                 </TouchableOpacity>
@@ -393,7 +393,7 @@ export default function ProfileScreen() {
                     <View style={styles.suburbNumberBadge}>
                       <Text style={styles.suburbNumberText}>{index + 1}</Text>
                     </View>
-                    <Text style={styles.suburbRowText}>{s.suburb}, {s.state}</Text>
+                    <Text style={styles.suburbRowText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.suburb}, {s.state}</Text>
                   </View>
                   <Switch
                     value={s.active}
