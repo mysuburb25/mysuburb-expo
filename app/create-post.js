@@ -92,7 +92,7 @@ function MediaPickerSection({ media, onAddMedia, onRemoveMedia }) {
           {!atLimit && (
             <TouchableOpacity style={styles.addImageBtn} onPress={onAddMedia}>
               <Ionicons name="images-outline" size={24} color={Colors.brandGreen} />
-              <Text style={styles.addImageText}>Add Media</Text>
+              <Text style={styles.addImageText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Add Media</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -555,7 +555,7 @@ export default function CreatePostScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>Bringing suburbs together</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
         </View>
         <View style={{ width: 60 }} />
       </View>
@@ -569,8 +569,8 @@ export default function CreatePostScreen() {
       {/* Primary suburb notice */}
       <View style={styles.primarySuburbBanner}>
         <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
-        <Text style={styles.primarySuburbText}>
-          Posting to <Text style={{ fontWeight: '700' }}>{profile?.suburb}, {profile?.state}</Text>
+        <Text style={styles.primarySuburbText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          {`Posting to ${profile?.suburb}, ${profile?.state}`}
         </Text>
       </View>
 
@@ -631,7 +631,7 @@ export default function CreatePostScreen() {
                     <View style={styles.serviceSelectorIcon}>
                       <Ionicons name={SERVICE_CATEGORIES.find(s => s.key === selectedService.key)?.icon || 'briefcase-outline'} size={20} color={Colors.white} />
                     </View>
-                    <Text style={styles.serviceSelectorText}>{selectedService.label}</Text>
+                    <Text style={styles.serviceSelectorText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{selectedService.label}</Text>
                     <Ionicons name="chevron-down" size={18} color={Colors.brandGreen} />
                   </View>
                 ) : (
@@ -660,7 +660,7 @@ export default function CreatePostScreen() {
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
             <Modal visible={showServiceModal} transparent animationType="slide">
@@ -668,7 +668,7 @@ export default function CreatePostScreen() {
                 <TouchableOpacity activeOpacity={1} style={styles.modalSheet} onPress={() => {}}>
                   <View style={styles.modalHeaderBar}>
                     <View style={styles.modalHandle} />
-                    <Text style={styles.modalHeaderBarText}>Select a Service</Text>
+                    <Text style={styles.modalHeaderBarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select a Service</Text>
                   </View>
                   <FlatList
                     data={SERVICE_CATEGORIES}
@@ -698,7 +698,7 @@ export default function CreatePostScreen() {
                   />
                   <View style={styles.modalFooter}>
                     <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowServiceModal(false)}>
-                      <Text style={styles.modalCloseBtnText}>Close</Text>
+                      <Text style={styles.modalCloseBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Close</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -721,7 +721,7 @@ export default function CreatePostScreen() {
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
           </>
@@ -751,7 +751,7 @@ export default function CreatePostScreen() {
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
           </>
@@ -804,7 +804,7 @@ export default function CreatePostScreen() {
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isEditMode ? 'Save Changes' : 'Post'}</Text>}
               </TouchableOpacity>
             </View>
           </>

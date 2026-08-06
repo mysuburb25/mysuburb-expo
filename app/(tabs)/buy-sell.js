@@ -392,7 +392,7 @@ export default function BuySellScreen() {
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     {isNew && (
                       <View style={styles.newBadge}>
-                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1}>NEW</Text>
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
@@ -400,7 +400,7 @@ export default function BuySellScreen() {
                     </View>
                     {item.isSold && (
                       <View style={styles.soldTag}>
-                        <Text style={styles.soldTagText}>{soldBadgeWord()}</Text>
+                        <Text style={styles.soldTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{soldBadgeWord()}</Text>
                       </View>
                     )}
                   </View>
@@ -445,7 +445,7 @@ export default function BuySellScreen() {
           ListFooterComponent={
             hasMore && sortedListings.length > 0 ? (
               <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
-                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Load More</Text>}
               </TouchableOpacity>
             ) : null
           }
@@ -456,7 +456,7 @@ export default function BuySellScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
@@ -480,7 +480,7 @@ export default function BuySellScreen() {
                 <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareModal(false)}>
-                <Text style={styles.shareCancelText}>Cancel</Text>
+                <Text style={styles.shareCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -489,14 +489,14 @@ export default function BuySellScreen() {
 
       <TouchableOpacity style={styles.fab} onPress={() => router.push({ pathname: '/create-post', params: { category: 'marketplace', preselect: activeFilter.key === 'all' ? 'forsale' : activeFilter.key } })}>
         <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
-        <Text style={styles.fabText}>New Post</Text>
+        <Text style={styles.fabText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>New Post</Text>
       </TouchableOpacity>
 
       <Modal visible={showSortModal} transparent animationType="slide">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowSortModal(false)}>
           <View style={styles.filterSheet}>
             <View style={styles.filterHeaderBar}>
-              <Text style={styles.filterHeaderText}>Sort By</Text>
+              <Text style={styles.filterHeaderText} numberOfLines={1}>Sort By</Text>
             </View>
             <View style={styles.filterPad}>
               {SORT_OPTIONS.map(opt => (

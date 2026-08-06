@@ -102,7 +102,7 @@ function MediaPickerSection({ media, onAddMedia, onRemoveMedia }) {
           {!atLimit && (
             <TouchableOpacity style={styles.addImageBtn} onPress={onAddMedia}>
               <Ionicons name="images-outline" size={24} color={Colors.brandGreen} />
-              <Text style={styles.addImageText}>Add Media</Text>
+              <Text style={styles.addImageText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Add Media</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -855,7 +855,7 @@ export default function EventsScreen() {
                   {ed && (
                     eventIsToday ? (
                       <View style={styles.todayBadge}>
-                        <Text style={styles.todayBadgeText}>TODAY</Text>
+                        <Text style={styles.todayBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>TODAY</Text>
                       </View>
                     ) : (
                       <View style={styles.dateBadge}>
@@ -876,12 +876,12 @@ export default function EventsScreen() {
                   </View>
                   {isNew && (
                     <View style={styles.newBadge}>
-                      <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                      <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1}>NEW</Text>
                     </View>
                   )}
                   {tab === 'past' && (
                     <View style={styles.completedBadge}>
-                      <Text style={styles.completedText}>Done</Text>
+                      <Text style={styles.completedText} numberOfLines={1}>Done</Text>
                     </View>
                   )}
                   {ed && (
@@ -899,7 +899,7 @@ export default function EventsScreen() {
                   <View style={styles.detailField}>
                     <View style={styles.labelBadgeWrap}>
                       <View style={[styles.labelBadge, styles.titleBadge]}>
-                        <Text style={styles.labelBadgeText}>EVENT TITLE</Text>
+                        <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>EVENT TITLE</Text>
                       </View>
                     </View>
                     <Text style={styles.fieldValue} numberOfLines={2}>{item.content}</Text>
@@ -908,7 +908,7 @@ export default function EventsScreen() {
                     <View style={styles.detailField}>
                       <View style={styles.labelBadgeWrap}>
                         <View style={[styles.labelBadge, styles.priceBadge]}>
-                          <Text style={styles.labelBadgeText}>PRICE</Text>
+                          <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>PRICE</Text>
                         </View>
                       </View>
                       <Text style={styles.fieldValue}>
@@ -920,7 +920,7 @@ export default function EventsScreen() {
                     <View style={styles.detailField}>
                       <View style={styles.labelBadgeWrap}>
                         <View style={[styles.labelBadge, styles.dateBadgeLabel]}>
-                          <Text style={styles.labelBadgeText}>DATE & TIME</Text>
+                          <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>DATE & TIME</Text>
                         </View>
                       </View>
                       <Text style={styles.fieldValue}>
@@ -931,7 +931,7 @@ export default function EventsScreen() {
                   <View style={styles.detailField}>
                     <View style={styles.labelBadgeWrap}>
                       <View style={[styles.labelBadge, styles.attendingBadge]}>
-                        <Text style={styles.labelBadgeText}>ATTENDING</Text>
+                        <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>ATTENDING</Text>
                       </View>
                     </View>
                     <Text style={styles.fieldValue}>{item.attendeeCount || 0} interested</Text>
@@ -943,7 +943,7 @@ export default function EventsScreen() {
                     >
                       <View style={styles.labelBadgeWrap}>
                         <View style={[styles.labelBadge, styles.locationBadge]}>
-                          <Text style={styles.labelBadgeText}>LOCATION</Text>
+                          <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>LOCATION</Text>
                         </View>
                       </View>
                       <View style={styles.locationValueRow}>
@@ -972,7 +972,12 @@ export default function EventsScreen() {
                   <View style={{ flex: 1 }} />
                   <TouchableOpacity style={[styles.interestedPill, attending && styles.interestedPillActive]} onPress={() => handleToggleAttending(item)}>
                     <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={16} color={attending ? Colors.white : '#1B4F72'} />
-                    <Text style={[styles.interestedPillText, attending && styles.interestedPillTextActive]}>
+                    <Text
+                      style={[styles.interestedPillText, attending && styles.interestedPillTextActive]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
                       Interested
                     </Text>
                   </TouchableOpacity>
@@ -999,7 +1004,7 @@ export default function EventsScreen() {
           ListFooterComponent={
             hasMore && events.length > 0 ? (
               <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
-                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Load More</Text>}
               </TouchableOpacity>
             ) : null
           }
@@ -1009,7 +1014,7 @@ export default function EventsScreen() {
       {tab === 'upcoming' && (
         <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
           <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
-          <Text style={styles.fabText}>New Event</Text>
+          <Text style={styles.fabText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>New Event</Text>
         </TouchableOpacity>
       )}
 
@@ -1017,7 +1022,7 @@ export default function EventsScreen() {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowDateFilterModal(false)}>
           <View style={styles.filterSheet}>
             <View style={styles.filterHeaderBar}>
-              <Text style={styles.filterHeaderText}>When</Text>
+              <Text style={styles.filterHeaderText} numberOfLines={1}>When</Text>
             </View>
             <View style={styles.filterPad}>
               {DATE_FILTERS.map(opt => (
@@ -1039,7 +1044,7 @@ export default function EventsScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
@@ -1063,7 +1068,7 @@ export default function EventsScreen() {
                 <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareModal(false)}>
-                <Text style={styles.shareCancelText}>Cancel</Text>
+                <Text style={styles.shareCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -1078,7 +1083,7 @@ export default function EventsScreen() {
             </TouchableOpacity>
             <View style={styles.headerCenter}>
               <AppName style={styles.mySuburb} />
-              <Text style={styles.suburbName}>Bringing suburbs together</Text>
+              <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
             </View>
             <View style={{ width: 60 }} />
           </View>
@@ -1106,13 +1111,13 @@ export default function EventsScreen() {
                   style={[styles.priceToggleBtn, priceType === 'free' && styles.priceToggleBtnActive]}
                   onPress={() => setPriceType('free')}
                 >
-                  <Text style={[styles.priceToggleText, priceType === 'free' && styles.priceToggleTextActive]}>Free</Text>
+                  <Text style={[styles.priceToggleText, priceType === 'free' && styles.priceToggleTextActive]} numberOfLines={1}>Free</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.priceToggleBtn, priceType === 'paid' && styles.priceToggleBtnActive]}
                   onPress={() => setPriceType('paid')}
                 >
-                  <Text style={[styles.priceToggleText, priceType === 'paid' && styles.priceToggleTextActive]}>Paid</Text>
+                  <Text style={[styles.priceToggleText, priceType === 'paid' && styles.priceToggleTextActive]} numberOfLines={1}>Paid</Text>
                 </TouchableOpacity>
               </View>
               {priceType === 'paid' && (
@@ -1184,7 +1189,7 @@ export default function EventsScreen() {
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
               <TouchableOpacity style={[styles.postBtnBottom, posting && { opacity: 0.7 }]} onPress={handlePost} disabled={posting}>
-                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText}>{editingEventId ? 'Save Changes' : 'Post Event'}</Text>}
+                {posting ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.postBtnBottomText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{editingEventId ? 'Save Changes' : 'Post Event'}</Text>}
               </TouchableOpacity>
             </View>
           </ScrollView>

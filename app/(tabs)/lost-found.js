@@ -360,7 +360,7 @@ export default function LostFoundScreen() {
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
                     {isNew && (
                       <View style={styles.newBadge}>
-                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText}>NEW</Text>
+                        <Ionicons name="sparkles" size={10} color={Colors.brandGreen} /><Text style={styles.newBadgeText} numberOfLines={1}>NEW</Text>
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
@@ -368,7 +368,7 @@ export default function LostFoundScreen() {
                     </View>
                     {item.isResolved && (
                       <View style={styles.soldTag}>
-                        <Text style={styles.soldTagText}>{resolvedBadgeWord()}</Text>
+                        <Text style={styles.soldTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{resolvedBadgeWord()}</Text>
                       </View>
                     )}
                   </View>
@@ -419,7 +419,7 @@ export default function LostFoundScreen() {
           ListFooterComponent={
             hasMore && items.length > 0 ? (
               <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
-                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText}>Load More</Text>}
+                {loadingMore ? <ActivityIndicator color={Colors.brandGreen} size="small" /> : <Text style={styles.loadMoreBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Load More</Text>}
               </TouchableOpacity>
             ) : null
           }
@@ -430,7 +430,7 @@ export default function LostFoundScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
             </View>
             <View style={styles.sharePad}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
@@ -454,7 +454,7 @@ export default function LostFoundScreen() {
                 <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareModal(false)}>
-                <Text style={styles.shareCancelText}>Cancel</Text>
+                <Text style={styles.shareCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -467,14 +467,14 @@ export default function LostFoundScreen() {
         onPress={() => router.push({ pathname: '/create-post', params: { category: 'lostfound', preselect: activeTab === 'all' ? 'lost' : activeTab } })}
       >
         <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
-        <Text style={styles.fabText}>New Post</Text>
+        <Text style={styles.fabText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>New Post</Text>
       </TouchableOpacity>
 
       <Modal visible={showStatusModal} transparent animationType="slide">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowStatusModal(false)}>
           <View style={styles.filterSheet}>
             <View style={styles.filterHeaderBar}>
-              <Text style={styles.filterHeaderText}>Status</Text>
+              <Text style={styles.filterHeaderText} numberOfLines={1}>Status</Text>
             </View>
             <View style={styles.filterPad}>
               {STATUS_FILTERS.map(opt => (
