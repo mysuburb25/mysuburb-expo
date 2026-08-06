@@ -330,7 +330,14 @@ export default function BuySellScreen() {
       <View style={styles.tabRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => setActiveFilter(f)}>
-            <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}>{f.label}</Text>
+            <Text
+              style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {f.label}
+            </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
@@ -389,7 +396,7 @@ export default function BuySellScreen() {
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: typeConf.bg }]}>
-                      <Text style={[styles.typeText, item.isSold && styles.closedText]}>{typeConf.label}</Text>
+                      <Text style={[styles.typeText, item.isSold && styles.closedText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{typeConf.label}</Text>
                     </View>
                     {item.isSold && (
                       <View style={styles.soldTag}>
@@ -558,7 +565,7 @@ const styles = StyleSheet.create({
   closedText: { textDecorationLine: 'line-through' },
   newBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD700', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: Colors.brandGreen, marginBottom: 4 },
   newBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.5 },
-  typeBadge: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
+  typeBadge: { minWidth: 86, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   typeText: { fontSize: 13, fontWeight: '800', color: Colors.white },
   price: { fontSize: 17, fontWeight: '800', color: Colors.brandGreen },
   soldTag: { width: 86, paddingVertical: 5, borderRadius: 20, alignItems: 'center', backgroundColor: '#757575' },

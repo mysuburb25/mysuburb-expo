@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -39,6 +40,7 @@ function formatDate(date) {
 
 export default function DashboardScreen() {
   const { user, profile, updateUserProfile, unreadCount, unreadMessageCount } = useAuth();
+  const insets = useSafeAreaInsets();
   const badgeCounts = useTabBadgeCounts(user, profile);
   const [grouped, setGrouped] = useState({});
   const [loading, setLoading] = useState(true);
@@ -218,7 +220,15 @@ export default function DashboardScreen() {
         </ScrollView>
       )}
 
-      <View style={styles.footer}>
+      {/* paddingBottom includes the device's safe-area inset (on top of
+          the base 16) so this footer — and the Continue button inside it
+          — always sits fully above any on-screen system navigation bar.
+          Without this, older Android devices using traditional 3-button
+          navigation (rather than gesture navigation) can end up with
+          this button partially or fully hidden underneath that bar,
+          since insets.bottom is 0 on iOS/gesture-nav Android but can be
+          40-50px+ on devices with a persistent on-screen nav bar. */}
+      <View style={[styles.footer, { paddingBottom: 16 + insets.bottom }]}>
         <TouchableOpacity style={styles.checkboxRow} onPress={() => setDontShowAgain(v => !v)}>
           <Ionicons name={dontShowAgain ? 'checkbox' : 'square-outline'} size={22} color={Colors.brandGreen} />
           <Text style={styles.checkboxLabel}>Don't show this dashboard again</Text>

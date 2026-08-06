@@ -298,7 +298,14 @@ export default function LostFoundScreen() {
       <View style={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
-            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Text
+              style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {t.label}
+            </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
@@ -357,7 +364,7 @@ export default function LostFoundScreen() {
                       </View>
                     )}
                     <View style={[styles.typeBadge, { backgroundColor: isLost ? '#C62828' : Colors.brandGreen }]}>
-                      <Text style={[styles.typeText, item.isResolved && styles.closedText]}>{isLost ? 'Lost' : 'Found'}</Text>
+                      <Text style={[styles.typeText, item.isResolved && styles.closedText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isLost ? 'Lost' : 'Found'}</Text>
                     </View>
                     {item.isResolved && (
                       <View style={styles.soldTag}>

@@ -299,7 +299,14 @@ export default function ServicesScreen() {
       <View style={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => { setLoading(true); setActiveTab(t.key); }}>
-            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Text
+              style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {t.label}
+            </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
@@ -364,10 +371,10 @@ export default function ServicesScreen() {
                     )}
                     <View style={styles.serviceBadgeStack}>
                       <View style={[styles.tabBadge, { backgroundColor: item.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
-                        <Text style={styles.tabBadgeText}>{item.serviceTab === 'offering' ? 'I  Offer' : 'I  Need'}</Text>
+                        <Text style={styles.tabBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.serviceTab === 'offering' ? 'I  Offer' : 'I  Need'}</Text>
                       </View>
                       <View style={styles.serviceLabelBadge}>
-                        <Text style={styles.serviceLabelBadgeText}>{serviceLabel}</Text>
+                        <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{serviceLabel}</Text>
                       </View>
                     </View>
                   </View>

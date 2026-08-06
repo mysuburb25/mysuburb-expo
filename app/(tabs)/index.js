@@ -304,7 +304,14 @@ export default function HomeScreen() {
       <View style={styles.tabRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => setActiveFilter(f)}>
-            <Text style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]} numberOfLines={1}>{f.label}</Text>
+            <Text
+              style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {f.label}
+            </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>

@@ -782,10 +782,24 @@ export default function EventsScreen() {
       </View>
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, tab === 'upcoming' && styles.tabBtnActive]} onPress={() => setTab('upcoming')}>
-          <Text style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}>Upcoming</Text>
+          <Text
+            style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            Upcoming
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, tab === 'past' && styles.tabBtnActive]} onPress={() => setTab('past')}>
-          <Text style={[styles.tabText, tab === 'past' && styles.tabTextActive]}>Past Events</Text>
+          <Text
+            style={[styles.tabText, tab === 'past' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            Past Events
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.filterBtn} onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}>
           <Ionicons name="search-outline" size={20} color={Colors.brandGreen} />

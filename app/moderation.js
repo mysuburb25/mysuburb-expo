@@ -110,7 +110,14 @@ export default function ModerationScreen() {
       <View style={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]} onPress={() => setTab(t.key)}>
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Text
+              style={[styles.tabText, tab === t.key && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {t.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -128,7 +135,7 @@ export default function ModerationScreen() {
               <View style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={[styles.catBadge, { backgroundColor: badgeColor }]}>
-                    <Text style={styles.catBadgeText}>{item.category}</Text>
+                    <Text style={styles.catBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{item.category}</Text>
                   </View>
                   <Text style={styles.cardTime}>{formatDateTime(item.createdAt)}</Text>
                 </View>

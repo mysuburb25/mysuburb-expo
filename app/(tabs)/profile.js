@@ -206,7 +206,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.cardHeader}>
           <View style={[styles.catBadge, { backgroundColor: catStyle.bg }]}>
-            <Text style={[styles.catBadgeText, { color: catStyle.text }]}>{catStyle.label}</Text>
+            <Text style={[styles.catBadgeText, { color: catStyle.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{catStyle.label}</Text>
           </View>
           <View style={{ flex: 1 }} />
           {onDelete && (
@@ -328,13 +328,34 @@ export default function ProfileScreen() {
       {/* 3-way tab bar — only the selected tab's content shows below */}
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'suburbs' && styles.tabBtnActive]} onPress={() => setActiveTab('suburbs')}>
-          <Text style={[styles.tabText, activeTab === 'suburbs' && styles.tabTextActive]}>Suburbs</Text>
+          <Text
+            style={[styles.tabText, activeTab === 'suburbs' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            Suburbs
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'posts' && styles.tabBtnActive]} onPress={() => setActiveTab('posts')}>
-          <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>My Posts</Text>
+          <Text
+            style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            My Posts
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, activeTab === 'saved' && styles.tabBtnActive]} onPress={() => setActiveTab('saved')}>
-          <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>Saved</Text>
+          <Text
+            style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            Saved
+          </Text>
         </TouchableOpacity>
       </View>
 

@@ -27,8 +27,8 @@ const MARKETPLACE_TABS = [
 ];
 
 const SERVICE_TABS = [
-  { key: 'offering', label: 'I am Offering' },
-  { key: 'looking',  label: 'I am Looking For' },
+  { key: 'offering', label: 'I Offer' },
+  { key: 'looking',  label: 'I Need' },
 ];
 
 const SERVICE_CATEGORIES = [
@@ -580,7 +580,14 @@ export default function CreatePostScreen() {
           <View style={styles.tabRow}>
             {tabs.map(t => (
               <TouchableOpacity key={t.key} style={[styles.tabBtn, selectedCategory === t.key && styles.tabBtnActive]} onPress={() => setSelectedCategory(t.key)}>
-                <Text style={[styles.tabText, selectedCategory === t.key && styles.tabTextActive]}>{t.label}</Text>
+                <Text
+                  style={[styles.tabText, selectedCategory === t.key && styles.tabTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {t.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -589,10 +596,24 @@ export default function CreatePostScreen() {
         {isLostFound && (
           <View style={styles.tabRow}>
             <TouchableOpacity style={[styles.tabBtn, selectedCategory === 'lost' && styles.tabBtnActive]} onPress={() => setSelectedCategory('lost')}>
-              <Text style={[styles.tabText, selectedCategory === 'lost' && styles.tabTextActive]}>Lost</Text>
+              <Text
+                style={[styles.tabText, selectedCategory === 'lost' && styles.tabTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                Lost
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tabBtn, selectedCategory === 'found' && styles.tabBtnActive]} onPress={() => setSelectedCategory('found')}>
-              <Text style={[styles.tabText, selectedCategory === 'found' && styles.tabTextActive]}>Found</Text>
+              <Text
+                style={[styles.tabText, selectedCategory === 'found' && styles.tabTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                Found
+              </Text>
             </TouchableOpacity>
           </View>
         )}
