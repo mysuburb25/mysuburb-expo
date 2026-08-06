@@ -474,7 +474,7 @@ export default function ServicesScreen() {
                 onPress={() => { setCategoryFilter('all'); setShowCategoryModal(false); }}
               >
                 <Ionicons name={categoryFilter === 'all' ? 'radio-button-on' : 'radio-button-off'} size={18} color={categoryFilter === 'all' ? Colors.brandGreen : Colors.midGrey} />
-                <Text style={[styles.filterOptionText, categoryFilter === 'all' && styles.filterOptionTextActive]}>All Categories</Text>
+                <Text style={[styles.filterOptionText, categoryFilter === 'all' && styles.filterOptionTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>All Categories</Text>
               </TouchableOpacity>
               {Object.entries(SERVICE_LABELS).map(([key, label]) => (
                 <TouchableOpacity
@@ -483,7 +483,7 @@ export default function ServicesScreen() {
                   onPress={() => { setCategoryFilter(key); setShowCategoryModal(false); }}
                 >
                   <Ionicons name={categoryFilter === key ? 'radio-button-on' : 'radio-button-off'} size={18} color={categoryFilter === key ? Colors.brandGreen : Colors.midGrey} />
-                  <Text style={[styles.filterOptionText, categoryFilter === key && styles.filterOptionTextActive]}>{label}</Text>
+                  <Text style={[styles.filterOptionText, categoryFilter === key && styles.filterOptionTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>

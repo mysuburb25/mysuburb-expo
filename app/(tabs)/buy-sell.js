@@ -506,7 +506,7 @@ export default function BuySellScreen() {
                   onPress={() => { setSortBy(opt.key); setShowSortModal(false); }}
                 >
                   <Ionicons name={sortBy === opt.key ? 'radio-button-on' : 'radio-button-off'} size={18} color={sortBy === opt.key ? Colors.brandGreen : Colors.midGrey} />
-                  <Text style={[styles.filterOptionText, sortBy === opt.key && styles.filterOptionTextActive]}>{opt.label}</Text>
+                  <Text style={[styles.filterOptionText, sortBy === opt.key && styles.filterOptionTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>

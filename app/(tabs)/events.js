@@ -1032,7 +1032,7 @@ export default function EventsScreen() {
                   onPress={() => { setDateFilter(opt.key); setShowDateFilterModal(false); }}
                 >
                   <Ionicons name={dateFilter === opt.key ? 'radio-button-on' : 'radio-button-off'} size={18} color={dateFilter === opt.key ? Colors.brandGreen : Colors.midGrey} />
-                  <Text style={[styles.filterOptionText, dateFilter === opt.key && styles.filterOptionTextActive]}>{opt.label}</Text>
+                  <Text style={[styles.filterOptionText, dateFilter === opt.key && styles.filterOptionTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
