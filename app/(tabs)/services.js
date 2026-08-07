@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Share, Alert, Modal, Platform, ScrollView, TextInput } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, limit, startAfter, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
@@ -54,6 +55,7 @@ function formatTime(date) {
 
 export default function ServicesScreen() {
   const { profile, user, unreadMessageCount, updateUserProfile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [newCutoff, setNewCutoff] = useState(null);
   const [posts, setPosts] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -468,7 +470,7 @@ export default function ServicesScreen() {
             <View style={styles.filterHeaderBar}>
               <Text style={styles.filterHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Category</Text>
             </View>
-            <ScrollView style={styles.filterScrollPad} contentContainerStyle={{ paddingBottom: 32 }}>
+            <ScrollView style={styles.filterScrollPad} contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}>
               <TouchableOpacity
                 style={[styles.filterOption, categoryFilter === 'all' && styles.filterOptionActive]}
                 onPress={() => { setCategoryFilter('all'); setShowCategoryModal(false); }}

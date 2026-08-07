@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getOrderedMedia } from '../../utils/mediaOrder';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, limit, startAfter, getDocs, addDoc, serverTimestamp, updateDoc, increment, doc, getDoc } from 'firebase/firestore';
@@ -122,6 +123,7 @@ const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
 
 export default function EventsScreen() {
   const { profile, user, unreadMessageCount, updateUserProfile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [newCutoff, setNewCutoff] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1024,7 +1026,7 @@ export default function EventsScreen() {
             <View style={styles.filterHeaderBar}>
               <Text style={styles.filterHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>When</Text>
             </View>
-            <View style={styles.filterPad}>
+            <View style={[styles.filterPad, { paddingBottom: 32 + insets.bottom }]}>
               {DATE_FILTERS.map(opt => (
                 <TouchableOpacity
                   key={opt.key}

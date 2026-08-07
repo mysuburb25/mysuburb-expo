@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image, Linking, Share, Alert, Modal, Platform, TextInput } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, limit, startAfter, getDocs, updateDoc, increment, addDoc, serverTimestamp, doc } from 'firebase/firestore';
@@ -50,6 +51,7 @@ const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
 
 export default function LostFoundScreen() {
   const { profile, user, unreadMessageCount, updateUserProfile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [newCutoff, setNewCutoff] = useState(null);
   const [items, setItems] = useState([]);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -476,7 +478,7 @@ export default function LostFoundScreen() {
             <View style={styles.filterHeaderBar}>
               <Text style={styles.filterHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Status</Text>
             </View>
-            <View style={styles.filterPad}>
+            <View style={[styles.filterPad, { paddingBottom: 32 + insets.bottom }]}>
               {STATUS_FILTERS.map(opt => (
                 <TouchableOpacity
                   key={opt.key}
