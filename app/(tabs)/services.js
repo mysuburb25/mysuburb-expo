@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   serviceBadgeStack: { alignItems: 'stretch', gap: 6 },
   serviceLabelBadge: { backgroundColor: '#C2D9E8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignItems: 'center' },
   serviceLabelBadgeText: { fontSize: 12, color: '#1B4F72', fontWeight: '800' },
-  cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  cardContent: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, fontWeight: '700' },
   metaRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   metaText: { fontSize: 11, color: Colors.midGrey },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },

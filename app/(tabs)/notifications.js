@@ -62,7 +62,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
           <Ionicons name="notifications-outline" size={26} color="#fff" />
@@ -74,7 +74,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Notifications</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Notifications</Text>
       </View>
       {loading ? (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
@@ -87,19 +87,24 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               style={[styles.item, !item.isRead && styles.itemUnread]}
               onPress={() => {
-                // postId covers like/comment/new_post notifications; message
-                // notifications carry fromUserId instead (there's no post to
-                // go to — the destination is a chat with whoever sent it).
+                // Admin warnings go to their own dedicated screen, not a
+                // post or chat — this is the one notification type that
+                // isn't "go see the thing," it's "read this carefully."
+                if (item.type === 'admin_warning') return router.push({ pathname: '/warning-detail', params: { message: item.message } });
+                // postId covers like/comment/new_post/mention notifications;
+                // message notifications carry fromUserId instead (there's no
+                // post to go to — the destination is a chat with whoever
+                // sent it).
                 if (item.type === 'message' && item.fromUserId) return router.push('/chat/' + item.fromUserId);
                 if (item.postId) return router.push('/post/' + item.postId);
               }}
-              activeOpacity={(item.postId || (item.type === 'message' && item.fromUserId)) ? 0.7 : 1}
+              activeOpacity={(item.type === 'admin_warning' || item.postId || (item.type === 'message' && item.fromUserId)) ? 0.7 : 1}
             >
-              <View style={[styles.iconBox, { backgroundColor: item.type === 'like' ? '#FFF0F0' : item.type === 'new_post' ? '#FFF9E6' : item.type === 'mention' ? '#E3F2FD' : Colors.brandGreenPale }]}>
+              <View style={[styles.iconBox, { backgroundColor: item.type === 'admin_warning' ? '#FFEBEE' : item.type === 'like' ? '#FFF0F0' : item.type === 'new_post' ? '#FFF9E6' : item.type === 'mention' ? '#E3F2FD' : Colors.brandGreenPale }]}>
                 <Ionicons
-                  name={item.type === 'like' ? 'heart' : item.type === 'new_post' ? 'newspaper-outline' : item.type === 'mention' ? 'at' : 'chatbubble'}
+                  name={item.type === 'admin_warning' ? 'warning' : item.type === 'like' ? 'heart' : item.type === 'new_post' ? 'newspaper-outline' : item.type === 'mention' ? 'at' : 'chatbubble'}
                   size={20}
-                  color={item.type === 'like' ? '#E53935' : item.type === 'new_post' ? '#F5A623' : item.type === 'mention' ? '#1976D2' : Colors.brandGreen}
+                  color={item.type === 'admin_warning' ? '#E53935' : item.type === 'like' ? '#E53935' : item.type === 'new_post' ? '#F5A623' : item.type === 'mention' ? '#1976D2' : Colors.brandGreen}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -125,7 +130,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },

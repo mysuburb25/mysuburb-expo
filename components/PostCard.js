@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   cardPlayOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
-  content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
+  content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, fontWeight: '700' },
   contentLink: { color: '#1565C0', textDecorationLine: 'underline' },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
