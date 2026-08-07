@@ -403,7 +403,7 @@ export default function AdminDashboardScreen() {
               reports.map(report => (
                 <View key={report.id} style={styles.reportCard}>
                   <View style={styles.reportCardHeader}>
-                    <Text style={styles.reasonHeading} numberOfLines={1}>{report.reason || report.category || 'Other'}</Text>
+                    <Text style={styles.reasonHeading} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{report.reason || report.category || 'Other'}</Text>
                     <Text style={styles.reportDate}>{formatDate(report.createdAt)}</Text>
                   </View>
 

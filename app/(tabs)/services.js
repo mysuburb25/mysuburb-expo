@@ -362,7 +362,7 @@ export default function ServicesScreen() {
                 <View style={styles.cardHeader}>
                   <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.authorName} numberOfLines={1}>{item.authorName}</Text>
+                    <Text style={styles.authorName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.authorName}</Text>
                     <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>

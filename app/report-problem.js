@@ -178,7 +178,7 @@ export default function ReportProblemScreen() {
               <View style={styles.userResultsBox}>
                 {userResults.map(u => (
                   <TouchableOpacity key={u.uid} style={styles.userResultItem} onPress={() => handleSelectReportedUser(u)}>
-                    <Text style={styles.userResultText} numberOfLines={1}>{u.displayName}</Text>
+                    <Text style={styles.userResultText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{u.displayName}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

@@ -208,7 +208,7 @@ export default function DashboardScreen() {
                       )}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>{item.content}</Text>
+                      <Text style={styles.cardTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{item.content}</Text>
                       <Text style={styles.cardMeta}>{item.authorName} · {formatDate(item.createdAt)}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />

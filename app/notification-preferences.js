@@ -65,12 +65,12 @@ export default function NotificationPreferencesScreen() {
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 20 + insets.bottom }}>
-        <Text style={styles.sectionLabel} numberOfLines={1}>Activity</Text>
+        <Text style={styles.sectionLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Activity</Text>
         <View style={styles.section}>
           <NotificationItem label="Likes" desc="When someone likes your post" value={prefs.likes} onToggle={() => toggle('likes')} />
           <NotificationItem label="Comments" desc="When someone comments on your post" value={prefs.comments} onToggle={() => toggle('comments')} />
         </View>
-        <Text style={styles.sectionLabel} numberOfLines={1}>Community</Text>
+        <Text style={styles.sectionLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Community</Text>
         <View style={styles.section}>
           <NotificationItem label="Safety Alerts" desc="Urgent safety alerts in your suburb" value={prefs.safety} onToggle={() => toggle('safety')} />
           <NotificationItem label="Events" desc="New events posted in your suburb" value={prefs.events} onToggle={() => toggle('events')} />

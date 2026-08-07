@@ -283,8 +283,8 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <View style={styles.profileInfo}>
-          <Text style={styles.name} numberOfLines={1}>{profile?.displayName}</Text>
-          <Text style={styles.email} numberOfLines={1}>{profile?.email}</Text>
+          <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{profile?.displayName}</Text>
+          <Text style={styles.email} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{profile?.email}</Text>
         </View>
 
         <View style={styles.actions}>

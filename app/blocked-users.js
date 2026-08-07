@@ -46,7 +46,7 @@ export default function BlockedUsersScreen() {
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{item.displayName?.[0]?.toUpperCase() || '?'}</Text>
             </View>
-            <Text style={styles.name} numberOfLines={1}>{item.displayName}</Text>
+            <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.displayName}</Text>
             <TouchableOpacity style={styles.unblockBtn} onPress={() => handleUnblock(item)}>
               <Text style={styles.unblockBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Unblock</Text>
             </TouchableOpacity>

@@ -404,8 +404,8 @@ export default function ChatScreen() {
           >
             {item.replyTo && (
               <View style={[styles.replyQuote, isMe && styles.replyQuoteMe]}>
-                <Text style={[styles.replyQuoteSender, isMe && styles.replyQuoteSenderMe]} numberOfLines={1}>{item.replyTo.senderName}</Text>
-                <Text style={[styles.replyQuoteText, isMe && styles.replyQuoteTextMe]} numberOfLines={1}>{item.replyTo.text}</Text>
+                <Text style={[styles.replyQuoteSender, isMe && styles.replyQuoteSenderMe]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.replyTo.senderName}</Text>
+                <Text style={[styles.replyQuoteText, isMe && styles.replyQuoteTextMe]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.replyTo.text}</Text>
               </View>
             )}
             {item.imageUrl && (
@@ -455,7 +455,7 @@ export default function ChatScreen() {
             )}
             {isOtherUserOnline && <View style={styles.onlineDot} />}
           </View>
-          <Text style={styles.headerName} numberOfLines={1}>{userName}</Text>
+          <Text style={styles.headerName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{userName}</Text>
         </View>
         <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuBtn}>
           <Ionicons name="ellipsis-vertical" size={22} color={Colors.brandGreen} />
@@ -492,7 +492,7 @@ export default function ChatScreen() {
           </Text>
           {iBlockedThem && (
             <TouchableOpacity onPress={handleToggleBlock}>
-              <Text style={styles.unblockLink} numberOfLines={1}>Unblock</Text>
+              <Text style={styles.unblockLink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Unblock</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -507,9 +507,9 @@ export default function ChatScreen() {
               <View style={{ flex: 1 }}>
                 <View style={styles.replyBarHeader}>
                   <Ionicons name="arrow-undo" size={13} color={Colors.brandGreen} />
-                  <Text style={styles.replyBarSender} numberOfLines={1}>{replyingTo.senderName}</Text>
+                  <Text style={styles.replyBarSender} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{replyingTo.senderName}</Text>
                 </View>
-                <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.text}</Text>
+                <Text style={styles.replyBarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{replyingTo.text}</Text>
               </View>
               <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.replyBarCloseBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="close" size={15} color={Colors.white} />
@@ -576,7 +576,7 @@ export default function ChatScreen() {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={styles.menuSheet}>
             <View style={styles.menuHeaderBar}>
-              <Text style={styles.menuHeaderText} numberOfLines={1}>Select</Text>
+              <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
             </View>
             <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
               <TouchableOpacity style={styles.menuItem} onPress={handleTogglePin}>
@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
   menuHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
   menuHeaderText: { fontSize: 18, fontWeight: '800', color: Colors.white },
   menuPad: { padding: 16, paddingBottom: 32 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
   menuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   menuItemIconDanger: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
   menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },

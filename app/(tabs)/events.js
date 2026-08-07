@@ -871,7 +871,7 @@ export default function EventsScreen() {
                     <View style={styles.authorRow}>
                       <AvatarWithOnlineDot authorId={item.authorId} photoURL={item.authorPhotoURL} name={item.authorName} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.cardAuthor} numberOfLines={1}>{item.authorName}</Text>
+                        <Text style={styles.cardAuthor} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.authorName}</Text>
                         <Text style={styles.postedText}>{formatDate(item.createdAt)}</Text>
                       </View>
                     </View>
@@ -950,7 +950,7 @@ export default function EventsScreen() {
                       </View>
                       <View style={styles.locationValueRow}>
                         <Ionicons name="location-outline" size={14} color={Colors.midGrey} />
-                        <Text style={[styles.fieldValue, styles.whereLink]} numberOfLines={1}>{shortLoc}</Text>
+                        <Text style={[styles.fieldValue, styles.whereLink]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{shortLoc}</Text>
                       </View>
                     </TouchableOpacity>
                   ) : null}
