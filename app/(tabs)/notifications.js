@@ -87,24 +87,19 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               style={[styles.item, !item.isRead && styles.itemUnread]}
               onPress={() => {
-                // Admin warnings go to their own dedicated screen, not a
-                // post or chat — this is the one notification type that
-                // isn't "go see the thing," it's "read this carefully."
-                if (item.type === 'admin_warning') return router.push({ pathname: '/warning-detail', params: { message: item.message } });
-                // postId covers like/comment/new_post/mention notifications;
-                // message notifications carry fromUserId instead (there's no
-                // post to go to — the destination is a chat with whoever
-                // sent it).
+                // postId covers like/comment/new_post notifications; message
+                // notifications carry fromUserId instead (there's no post to
+                // go to — the destination is a chat with whoever sent it).
                 if (item.type === 'message' && item.fromUserId) return router.push('/chat/' + item.fromUserId);
                 if (item.postId) return router.push('/post/' + item.postId);
               }}
-              activeOpacity={(item.type === 'admin_warning' || item.postId || (item.type === 'message' && item.fromUserId)) ? 0.7 : 1}
+              activeOpacity={(item.postId || (item.type === 'message' && item.fromUserId)) ? 0.7 : 1}
             >
-              <View style={[styles.iconBox, { backgroundColor: item.type === 'admin_warning' ? '#FFEBEE' : item.type === 'like' ? '#FFF0F0' : item.type === 'new_post' ? '#FFF9E6' : item.type === 'mention' ? '#E3F2FD' : Colors.brandGreenPale }]}>
+              <View style={[styles.iconBox, { backgroundColor: item.type === 'like' ? '#FFF0F0' : item.type === 'new_post' ? '#FFF9E6' : item.type === 'mention' ? '#E3F2FD' : Colors.brandGreenPale }]}>
                 <Ionicons
-                  name={item.type === 'admin_warning' ? 'warning' : item.type === 'like' ? 'heart' : item.type === 'new_post' ? 'newspaper-outline' : item.type === 'mention' ? 'at' : 'chatbubble'}
+                  name={item.type === 'like' ? 'heart' : item.type === 'new_post' ? 'newspaper-outline' : item.type === 'mention' ? 'at' : 'chatbubble'}
                   size={20}
-                  color={item.type === 'admin_warning' ? '#E53935' : item.type === 'like' ? '#E53935' : item.type === 'new_post' ? '#F5A623' : item.type === 'mention' ? '#1976D2' : Colors.brandGreen}
+                  color={item.type === 'like' ? '#E53935' : item.type === 'new_post' ? '#F5A623' : item.type === 'mention' ? '#1976D2' : Colors.brandGreen}
                 />
               </View>
               <View style={{ flex: 1 }}>
