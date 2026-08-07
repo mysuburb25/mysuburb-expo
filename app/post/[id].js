@@ -742,13 +742,13 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{post.suburb}, {post.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{post.suburb}, {post.state}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>{pageTitle}</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{pageTitle}</Text>
       </View>
 
       {post.isRemoved && profile?.isAdmin && (
@@ -775,7 +775,7 @@ export default function PostDetailScreen() {
                     {isEvent && eventDate && (
                       eventIsToday ? (
                         <View style={styles.eventTodayBadge}>
-                          <Text style={styles.eventTodayBadgeText}>TODAY</Text>
+                          <Text style={styles.eventTodayBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>TODAY</Text>
                         </View>
                       ) : (
                         <View style={styles.eventDateBox}>
@@ -789,8 +789,8 @@ export default function PostDetailScreen() {
                       <AvatarWithOnlineDot authorId={post.authorId} photoURL={post.authorPhotoURL} name={post.authorName} />
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 1 }} onPress={goToUserProfile}>
-                      <Text style={styles.authorName}>{post.authorName}</Text>
-                      <Text style={styles.dateTime}>{formatDateTime(post.createdAt)}</Text>
+                      <Text style={styles.authorName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.authorName}</Text>
+                      <Text style={styles.dateTime} numberOfLines={1}>{formatDateTime(post.createdAt)}</Text>
                     </TouchableOpacity>
                     {!isOwner && (
                       <TouchableOpacity style={styles.messageBtn} onPress={goToChat}>
@@ -800,27 +800,27 @@ export default function PostDetailScreen() {
                     <View style={styles.headerBadgeStack}>
                       {isLostFound && post.lostFoundType && (
                         <View style={[styles.pillTag, { backgroundColor: post.lostFoundType === 'lost' ? '#C62828' : Colors.brandGreen }]}>
-                          <Text style={[styles.pillTagText, post.isResolved && styles.closedText]}>{post.lostFoundType === 'lost' ? 'Lost' : 'Found'}</Text>
+                          <Text style={[styles.pillTagText, post.isResolved && styles.closedText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.lostFoundType === 'lost' ? 'Lost' : 'Found'}</Text>
                         </View>
                       )}
                       {isLostFound && post.isResolved && (
                         <View style={styles.soldTag}>
-                          <Text style={styles.soldTagText}>{getStatusLabels().badge}</Text>
+                          <Text style={styles.soldTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{getStatusLabels().badge}</Text>
                         </View>
                       )}
                       {post.category === 'marketplace' && post.marketplaceType && (
                         <View style={[styles.pillTag, { backgroundColor: MARKETPLACE_TYPE_CONFIG[post.marketplaceType]?.bg || Colors.brandGreen }]}>
-                          <Text style={[styles.pillTagText, post.isSold && styles.closedText]}>{MARKETPLACE_TYPE_CONFIG[post.marketplaceType]?.label || categoryLabel}</Text>
+                          <Text style={[styles.pillTagText, post.isSold && styles.closedText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{MARKETPLACE_TYPE_CONFIG[post.marketplaceType]?.label || categoryLabel}</Text>
                         </View>
                       )}
                       {post.category === 'marketplace' && post.isSold && (
                         <View style={styles.soldTag}>
-                          <Text style={styles.soldTagText}>{getStatusLabels().badge}</Text>
+                          <Text style={styles.soldTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{getStatusLabels().badge}</Text>
                         </View>
                       )}
                       {!isLostFound && !isEvent && post.category !== 'marketplace' && categoryLabel && (
                         <View style={styles.pillTag}>
-                          <Text style={styles.pillTagText}>{categoryLabel}</Text>
+                          <Text style={styles.pillTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{categoryLabel}</Text>
                         </View>
                       )}
                     </View>
@@ -841,7 +841,7 @@ export default function PostDetailScreen() {
 
                   {isServices && (
                     <View style={styles.serviceLabelBadge}>
-                      <Text style={styles.serviceLabelBadgeText}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
+                      <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
                     </View>
                   )}
                   {!isEvent && (
@@ -857,7 +857,7 @@ export default function PostDetailScreen() {
                       <View style={styles.detailField}>
                         <View style={styles.labelBadgeWrap}>
                           <View style={[styles.labelBadge, styles.titleBadge]}>
-                            <Text style={styles.labelBadgeText}>EVENT TITLE</Text>
+                            <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>EVENT TITLE</Text>
                           </View>
                         </View>
                         <Text style={styles.fieldValue}>{post.content}</Text>
@@ -866,7 +866,7 @@ export default function PostDetailScreen() {
                         <View style={styles.detailField}>
                           <View style={styles.labelBadgeWrap}>
                             <View style={[styles.labelBadge, styles.aboutBadge]}>
-                              <Text style={[styles.labelBadgeText, styles.aboutBadgeText]}>DESCRIPTION</Text>
+                              <Text style={[styles.labelBadgeText, styles.aboutBadgeText]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>DESCRIPTION</Text>
                             </View>
                           </View>
                           <LinkifiedText text={post.description} style={styles.fieldValue} linkStyle={styles.contentLink} />
@@ -876,7 +876,7 @@ export default function PostDetailScreen() {
                         <View style={styles.detailField}>
                           <View style={styles.labelBadgeWrap}>
                             <View style={[styles.labelBadge, styles.priceBadge]}>
-                              <Text style={styles.labelBadgeText}>PRICE</Text>
+                              <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>PRICE</Text>
                             </View>
                           </View>
                           <Text style={styles.fieldValue}>{post.isFree === false ? `$${post.eventPrice?.toFixed(2)}` : 'Free'}</Text>
@@ -885,7 +885,7 @@ export default function PostDetailScreen() {
                       <View style={styles.detailField}>
                         <View style={styles.labelBadgeWrap}>
                           <View style={[styles.labelBadge, styles.dateBadgeLabel]}>
-                            <Text style={styles.labelBadgeText}>DATE & TIME</Text>
+                            <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>DATE & TIME</Text>
                           </View>
                         </View>
                         <Text style={styles.fieldValue}>{eventIsToday ? 'Today' : formatEventDate(eventDate)}, {formatEventTime(eventDate)}</Text>
@@ -893,7 +893,7 @@ export default function PostDetailScreen() {
                       <View style={styles.detailField}>
                         <View style={styles.labelBadgeWrap}>
                           <View style={[styles.labelBadge, styles.attendingBadge]}>
-                            <Text style={styles.labelBadgeText}>ATTENDING</Text>
+                            <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>ATTENDING</Text>
                           </View>
                         </View>
                         <Text style={styles.fieldValue}>{post.attendeeCount || 0} interested</Text>
@@ -902,7 +902,7 @@ export default function PostDetailScreen() {
                         <TouchableOpacity style={styles.detailField} onPress={handleGetDirections}>
                           <View style={styles.labelBadgeWrap}>
                             <View style={[styles.labelBadge, styles.locationBadge]}>
-                              <Text style={styles.labelBadgeText}>LOCATION</Text>
+                              <Text style={styles.labelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>LOCATION</Text>
                             </View>
                           </View>
                           <View style={styles.locationValueRow}>
@@ -971,7 +971,12 @@ export default function PostDetailScreen() {
                       <>
                         <TouchableOpacity style={[styles.interestedPill, attending && styles.interestedPillActive]} onPress={handleToggleAttending}>
                           <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={16} color={attending ? Colors.white : '#1B4F72'} />
-                          <Text style={[styles.interestedPillText, attending && styles.interestedPillTextActive]} numberOfLines={1}>
+                          <Text
+                            style={[styles.interestedPillText, attending && styles.interestedPillTextActive]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.8}
+                          >
                             Interested
                           </Text>
                         </TouchableOpacity>
@@ -990,7 +995,7 @@ export default function PostDetailScreen() {
                 </View>
                 </View>
 
-                <Text style={styles.commentsTitle}>Comments ({topLevelCount})</Text>
+                <Text style={styles.commentsTitle} numberOfLines={1}>Comments ({topLevelCount})</Text>
                 {comments.length === 0 && (
                   <View style={styles.noComments}>
                     <Ionicons name="chatbubble-outline" size={32} color={Colors.lightGrey} />
@@ -1019,7 +1024,7 @@ export default function PostDetailScreen() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => startReply(item)}>
-                <Text style={styles.replyBtnText}>Reply</Text>
+                <Text style={styles.replyBtnText} numberOfLines={1}>Reply</Text>
               </TouchableOpacity>
             </View>
           );
@@ -1037,7 +1042,7 @@ export default function PostDetailScreen() {
                   </TouchableOpacity>
                   <View style={{ flex: 1 }}>
                     <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
-                      <Text style={styles.commentAuthor}>{item.authorName}</Text>
+                      <Text style={styles.commentAuthor} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.authorName}</Text>
                     </TouchableOpacity>
                     {item.isDeleted ? (
                       <Text style={[styles.commentContent, styles.deletedText]}>{item.content}</Text>
@@ -1071,7 +1076,7 @@ export default function PostDetailScreen() {
               <View style={{ flex: 1 }}>
                 <View style={styles.replyBubble}>
                   <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
-                    <Text style={styles.replyAuthorInline}>{item.authorName}</Text>
+                    <Text style={styles.replyAuthorInline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.authorName}</Text>
                   </TouchableOpacity>
                   {item.isDeleted ? (
                     <Text style={[styles.replyText, styles.deletedText]}>{item.content}</Text>
@@ -1094,7 +1099,7 @@ export default function PostDetailScreen() {
       {/* Reply banner */}
       {replyTarget && (
         <View style={styles.replyBanner}>
-          <Text style={styles.replyBannerText}>Replying to {replyTarget.authorName}</Text>
+          <Text style={styles.replyBannerText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Replying to {replyTarget.authorName}</Text>
           <TouchableOpacity onPress={cancelReply}>
             <Ionicons name="close-circle" size={18} color={Colors.midGrey} />
           </TouchableOpacity>
@@ -1131,9 +1136,9 @@ export default function PostDetailScreen() {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowPostMenu(false)}>
           <View style={styles.menuSheet}>
             <View style={styles.menuHeaderBar}>
-              <Text style={styles.menuHeaderText}>Select</Text>
+              <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
             </View>
-            <View style={styles.menuPad}>
+            <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
             {isOwner ? (
               <>
                 {(post.category === 'marketplace' || post.category === 'lostfound') && (
@@ -1141,20 +1146,20 @@ export default function PostDetailScreen() {
                     <View style={styles.menuItemIcon}>
                       <Ionicons name={(post.category === 'lostfound' ? post.isResolved : post.isSold) ? 'refresh-outline' : 'checkmark-circle-outline'} size={20} color={Colors.brandGreen} />
                     </View>
-                    <Text style={styles.menuItemText}>{(post.category === 'lostfound' ? post.isResolved : post.isSold) ? getStatusLabels(post).undo : getStatusLabels(post).action}</Text>
+                    <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{(post.category === 'lostfound' ? post.isResolved : post.isSold) ? getStatusLabels(post).undo : getStatusLabels(post).action}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.menuItem} onPress={openEditPost}>
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="create-outline" size={20} color={Colors.brandGreen} />
                   </View>
-                  <Text style={styles.menuItemText}>Edit Post</Text>
+                  <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Edit Post</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={handleDeletePost} disabled={deletingPost}>
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="trash-outline" size={20} color="#E53935" />
                   </View>
-                  <Text style={styles.menuItemTextDanger}>Delete Post</Text>
+                  <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Delete Post</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -1163,26 +1168,26 @@ export default function PostDetailScreen() {
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="flag-outline" size={20} color="#E65100" />
                   </View>
-                  <Text style={styles.menuItemTextWarn}>Report Post</Text>
+                  <Text style={styles.menuItemTextWarn} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Report Post</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="ban-outline" size={20} color="#E53935" />
                   </View>
-                  <Text style={styles.menuItemTextDanger}>Block {post.authorName}</Text>
+                  <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Block {post.authorName}</Text>
                 </TouchableOpacity>
                 {profile?.isAdmin && (
                   <TouchableOpacity style={styles.menuItem} onPress={handleAdminRemovePost} disabled={deletingPost}>
                     <View style={styles.menuItemIcon}>
                       <Ionicons name="shield-outline" size={20} color="#E53935" />
                     </View>
-                    <Text style={styles.menuItemTextDanger}>Remove Post (Admin)</Text>
+                    <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Remove Post (Admin)</Text>
                   </TouchableOpacity>
                 )}
               </>
             )}
             <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowPostMenu(false)}>
-              <Text style={styles.menuCancelText}>Cancel</Text>
+              <Text style={styles.menuCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
             </TouchableOpacity>
             </View>
           </View>
@@ -1196,9 +1201,9 @@ export default function PostDetailScreen() {
         <TouchableOpacity style={styles.shareOverlay} activeOpacity={1} onPress={() => setShowShareModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.shareSheet} onPress={() => {}}>
             <View style={styles.shareHeaderBar}>
-              <Text style={styles.shareHeaderText}>Share</Text>
+              <Text style={styles.shareHeaderText} numberOfLines={1}>Share</Text>
             </View>
-            <View style={styles.sharePad}>
+            <View style={[styles.sharePad, { paddingBottom: 32 + insets.bottom }]}>
               <TouchableOpacity style={styles.shareOption} onPress={handleShareToUser}>
                 <View style={[styles.shareOptionIcon, { backgroundColor: Colors.brandGreenPale }]}>
                   <Ionicons name="people-outline" size={20} color={Colors.brandGreen} />
@@ -1220,7 +1225,7 @@ export default function PostDetailScreen() {
                 <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareModal(false)}>
-                <Text style={styles.shareCancelText}>Cancel</Text>
+                <Text style={styles.shareCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -1234,11 +1239,11 @@ export default function PostDetailScreen() {
             <TouchableOpacity activeOpacity={1} style={styles.reportSheet} onPress={() => {}}>
             <View style={styles.reportHeaderBar}>
               <View style={styles.shareHandle} />
-              <Text style={styles.reportTitle}>Report this post</Text>
+              <Text style={styles.reportTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report this post</Text>
               <Text style={styles.reportSubtitle}>Why are you reporting this post?</Text>
             </View>
 
-            <View style={styles.reportPad}>
+            <View style={[styles.reportPad, { paddingBottom: 32 + insets.bottom }]}>
               {REPORT_REASONS.map(reason => (
                 <TouchableOpacity
                   key={reason}
@@ -1250,7 +1255,14 @@ export default function PostDetailScreen() {
                     size={18}
                     color={reportReason === reason ? Colors.brandGreen : Colors.midGrey}
                   />
-                  <Text style={[styles.reasonChipText, reportReason === reason && styles.reasonChipTextActive]}>{reason}</Text>
+                  <Text
+                    style={[styles.reasonChipText, reportReason === reason && styles.reasonChipTextActive]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
+                    {reason}
+                  </Text>
                 </TouchableOpacity>
               ))}
 
@@ -1272,11 +1284,11 @@ export default function PostDetailScreen() {
               >
                 {submittingReport
                   ? <ActivityIndicator color={Colors.white} size="small" />
-                  : <Text style={styles.reportSubmitBtnText}>Submit Report</Text>
+                  : <Text style={styles.reportSubmitBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Submit Report</Text>
                 }
               </TouchableOpacity>
               <TouchableOpacity style={styles.reportCancelBtn} onPress={() => setShowReportModal(false)} disabled={submittingReport}>
-                <Text style={styles.reportCancelBtnText}>Cancel</Text>
+                <Text style={styles.reportCancelBtnText} numberOfLines={1}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -1291,7 +1303,7 @@ export default function PostDetailScreen() {
             <View style={styles.successIconCircle}>
               <Ionicons name="checkmark" size={32} color={Colors.white} />
             </View>
-            <Text style={styles.successTitle}>Report Submitted</Text>
+            <Text style={styles.successTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report Submitted</Text>
             <Text style={styles.successMessage}>Thank you for reporting this post. Our team will review it within 24 hours.</Text>
             <TouchableOpacity style={styles.successOkBtn} onPress={() => setShowReportSuccess(false)}>
               <Text style={styles.successOkBtnText}>OK</Text>
@@ -1307,7 +1319,7 @@ export default function PostDetailScreen() {
             <View style={[styles.successIconCircle, { backgroundColor: '#E53935' }]}>
               <Ionicons name="alert" size={30} color={Colors.white} />
             </View>
-            <Text style={styles.successTitle}>Something Went Wrong</Text>
+            <Text style={styles.successTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Something Went Wrong</Text>
             <Text style={styles.successMessage}>{errorModalMessage}</Text>
             <TouchableOpacity style={[styles.successOkBtn, { backgroundColor: '#E53935' }]} onPress={() => setErrorModalMessage(null)}>
               <Text style={styles.successOkBtnText}>OK</Text>
@@ -1323,7 +1335,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.white },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
@@ -1424,7 +1436,7 @@ const styles = StyleSheet.create({
   deleteCommentBtn: { padding: 6, justifyContent: 'flex-start' },
 
   replyBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.brandGreenPale, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
-  replyBannerText: { fontSize: 13, color: Colors.brandGreen, fontWeight: '600' },
+  replyBannerText: { fontSize: 13, color: Colors.brandGreen, fontWeight: '600', flex: 1, marginRight: 8 },
   commentInputRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.brandGreen, borderTopWidth: 1, borderTopColor: Colors.brandGreen, alignItems: 'flex-end' },
   input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
@@ -1455,11 +1467,11 @@ const styles = StyleSheet.create({
   shareOptionSubtitle: { fontSize: 12, color: Colors.midGrey, marginTop: 2 },
   shareCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   shareCancelText: { fontSize: 15, fontWeight: '700', color: Colors.brandGreen },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
   menuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
-  menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
-  menuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100' },
-  menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
+  menuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935', flexShrink: 1 },
+  menuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100', flexShrink: 1 },
+  menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal, flexShrink: 1 },
   menuCancelBtn: { backgroundColor: Colors.brandGreenPale, borderRadius: 14, justifyContent: 'center', marginTop: 8, borderWidth: 0 },
   menuCancelText: { fontSize: 16, fontWeight: '700', color: Colors.brandGreen, textAlign: 'center', flex: 1 },
   reportSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
@@ -1469,7 +1481,7 @@ const styles = StyleSheet.create({
   reportPad: { padding: 16, paddingBottom: 32 },
   reasonChip: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 9, borderLeftWidth: 4, borderLeftColor: 'transparent' },
   reasonChipActive: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen, borderLeftColor: Colors.brandGreen },
-  reasonChipText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600' },
+  reasonChipText: { fontSize: 15, color: Colors.charcoal, fontWeight: '600', flex: 1 },
   reasonChipTextActive: { color: Colors.brandGreen, fontWeight: '700' },
   reportDetailsInput: { borderWidth: 1, borderColor: Colors.lightGrey, borderRadius: 12, padding: 12, fontSize: 14, color: Colors.charcoal, minHeight: 70, marginTop: 4, marginBottom: 16 },
   reportSubmitBtn: { backgroundColor: Colors.brandGreen, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },

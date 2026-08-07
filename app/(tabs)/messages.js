@@ -77,12 +77,12 @@ function ConversationRow({ item, user, shareText }) {
         <View style={styles.rowTop}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
             {isPinned && <Ionicons name="bookmark" size={13} color={Colors.brandGreen} />}
-            <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>{otherUserName}</Text>
+            <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{otherUserName}</Text>
           </View>
           <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
         </View>
         <View style={styles.rowBottom}>
-          <Text style={[styles.preview, unread > 0 && styles.previewUnread]} numberOfLines={1}>
+          <Text style={[styles.preview, unread > 0 && styles.previewUnread]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
             {isLastFromMe ? 'You: ' : ''}{item.lastMessage || 'Start a conversation'}
           </Text>
           {unread > 0 && (
@@ -98,29 +98,29 @@ function ConversationRow({ item, user, shareText }) {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowActionSheet(false)}>
           <View style={styles.menuSheet}>
             <View style={styles.menuHeaderBar}>
-              <Text style={styles.menuHeaderText}>Select</Text>
+              <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
             </View>
             <View style={styles.menuPad}>
               <TouchableOpacity style={styles.menuItem} onPress={handleTogglePin}>
                 <View style={styles.menuItemIcon}>
                   <Ionicons name={isPinned ? 'bookmark' : 'bookmark-outline'} size={20} color={Colors.brandGreen} />
                 </View>
-                <Text style={styles.menuItemText}>{isPinned ? 'Unpin' : 'Pin'}</Text>
+                <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isPinned ? 'Unpin' : 'Pin'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={handleToggleBlock}>
                 <View style={styles.menuItemIconDanger}>
                   <Ionicons name="ban-outline" size={20} color="#E53935" />
                 </View>
-                <Text style={styles.menuItemTextDanger}>{isBlocked ? 'Unblock' : 'Block'}</Text>
+                <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isBlocked ? 'Unblock' : 'Block'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={() => { setShowActionSheet(false); setShowDeleteConfirm(true); }}>
                 <View style={styles.menuItemIconDanger}>
                   <Ionicons name="trash-outline" size={20} color="#E53935" />
                 </View>
-                <Text style={styles.menuItemTextDanger}>Delete</Text>
+                <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowActionSheet(false)}>
-                <Text style={styles.menuCancelText}>Cancel</Text>
+                <Text style={styles.menuCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -133,14 +133,14 @@ function ConversationRow({ item, user, shareText }) {
             <View style={styles.confirmIconCircle}>
               <Ionicons name="trash-outline" size={26} color="#E53935" />
             </View>
-            <Text style={styles.confirmTitle}>Delete Conversation</Text>
+            <Text style={styles.confirmTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete Conversation</Text>
             <Text style={styles.confirmMessage}>This removes the conversation with {otherUserName} from your list. It comes back if either of you sends a new message.</Text>
             <View style={styles.confirmBtnRow}>
               <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setShowDeleteConfirm(false)}>
-                <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+                <Text style={styles.confirmCancelBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={handleDelete}>
-                <Text style={styles.confirmDeleteBtnText}>Delete</Text>
+                <Text style={styles.confirmDeleteBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -199,7 +199,7 @@ export default function MessagesScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative', width: 42, alignItems: 'flex-end' }}>
           <Ionicons name="notifications-outline" size={26} color="#fff" />
@@ -211,7 +211,7 @@ export default function MessagesScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Messages</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Messages</Text>
       </View>
 
       {shareText && (
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   menuHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
   menuHeaderText: { fontSize: 18, fontWeight: '800', color: Colors.white },
   menuPad: { padding: 16, paddingBottom: 32 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
   menuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   menuItemIconDanger: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
   menuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   confirmDeleteBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
   container: { flex: 1, backgroundColor: Colors.white },
   topHeader: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerCenter: { alignItems: 'center' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
   mySuburb: { fontSize: 27, fontWeight: '800', color: Colors.white },
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
