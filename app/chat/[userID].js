@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
@@ -70,6 +71,7 @@ function renderMessageText(text, isMe, styles) {
 export default function ChatScreen() {
   const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
   const { user, profile, blockUser, unblockUser, unreadCount } = useAuth();
+  const insets = useSafeAreaInsets();
   const isOtherUserOnline = useOnlineStatus(userId);
   const [resolvedUserName, setResolvedUserName] = useState(userNameParam || null);
   const [messages, setMessages] = useState([]);
@@ -432,7 +434,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
-          <Text style={styles.suburbName}>{profile?.suburb}, {profile?.state}</Text>
+          <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative', width: 40, alignItems: 'flex-end' }}>
           <Ionicons name="notifications-outline" size={26} color={Colors.white} />
@@ -453,7 +455,7 @@ export default function ChatScreen() {
             )}
             {isOtherUserOnline && <View style={styles.onlineDot} />}
           </View>
-          <Text style={styles.headerName}>{userName}</Text>
+          <Text style={styles.headerName} numberOfLines={1}>{userName}</Text>
         </View>
         <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuBtn}>
           <Ionicons name="ellipsis-vertical" size={22} color={Colors.brandGreen} />
@@ -483,14 +485,14 @@ export default function ChatScreen() {
       )}
 
       {isBlocked ? (
-        <View style={styles.blockedBanner}>
+        <View style={[styles.blockedBanner, { paddingBottom: 16 + insets.bottom }]}>
           <Ionicons name="ban-outline" size={18} color={Colors.midGrey} />
           <Text style={styles.blockedBannerText}>
             {iBlockedThem ? 'You blocked this person.' : "You can't message this person right now."}
           </Text>
           {iBlockedThem && (
             <TouchableOpacity onPress={handleToggleBlock}>
-              <Text style={styles.unblockLink}>Unblock</Text>
+              <Text style={styles.unblockLink} numberOfLines={1}>Unblock</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -505,7 +507,7 @@ export default function ChatScreen() {
               <View style={{ flex: 1 }}>
                 <View style={styles.replyBarHeader}>
                   <Ionicons name="arrow-undo" size={13} color={Colors.brandGreen} />
-                  <Text style={styles.replyBarSender}>{replyingTo.senderName}</Text>
+                  <Text style={styles.replyBarSender} numberOfLines={1}>{replyingTo.senderName}</Text>
                 </View>
                 <Text style={styles.replyBarText} numberOfLines={1}>{replyingTo.text}</Text>
               </View>
@@ -529,7 +531,13 @@ export default function ChatScreen() {
               <Text style={styles.pendingImageCount}>{pendingImages.length}</Text>
             </View>
           )}
-          <View style={styles.inputRow}>
+          {/* paddingBottom includes the safe-area inset (on top of the
+              base 12) so the send button and camera button always sit
+              fully above any on-screen Android navigation bar — without
+              this, the input row's own edge lands right at the screen
+              boundary and can end up partially covered by the system
+              nav bar, which is what made the send button look "overlaid". */}
+          <View style={[styles.inputRow, { paddingBottom: 12 + insets.bottom }]}>
             <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={pendingImages.length >= MAX_PENDING_IMAGES}>
               <Ionicons name="camera-outline" size={24} color={pendingImages.length >= MAX_PENDING_IMAGES ? Colors.lightGrey : Colors.brandGreen} />
             </TouchableOpacity>
@@ -568,29 +576,29 @@ export default function ChatScreen() {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={styles.menuSheet}>
             <View style={styles.menuHeaderBar}>
-              <Text style={styles.menuHeaderText}>Select</Text>
+              <Text style={styles.menuHeaderText} numberOfLines={1}>Select</Text>
             </View>
-            <View style={styles.menuPad}>
+            <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
               <TouchableOpacity style={styles.menuItem} onPress={handleTogglePin}>
                 <View style={styles.menuItemIcon}>
                   <Ionicons name={isConvoPinned ? 'bookmark' : 'bookmark-outline'} size={20} color={Colors.brandGreen} />
                 </View>
-                <Text style={styles.menuItemText}>{isConvoPinned ? 'Unpin' : 'Pin'}</Text>
+                <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isConvoPinned ? 'Unpin' : 'Pin'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={handleToggleBlock}>
                 <View style={styles.menuItemIconDanger}>
                   <Ionicons name="ban-outline" size={20} color="#E53935" />
                 </View>
-                <Text style={styles.menuItemTextDanger}>{iBlockedThem ? 'Unblock' : 'Block'}</Text>
+                <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{iBlockedThem ? 'Unblock' : 'Block'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={handleDeleteConversation}>
                 <View style={styles.menuItemIconDanger}>
                   <Ionicons name="trash-outline" size={20} color="#E53935" />
                 </View>
-                <Text style={styles.menuItemTextDanger}>Delete</Text>
+                <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setShowMenu(false)}>
-                <Text style={styles.menuCancelText}>Cancel</Text>
+                <Text style={styles.menuCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
