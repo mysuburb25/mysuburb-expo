@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,7 +19,7 @@ function NotificationItem({ label, desc, value, onToggle, disabled }) {
   return (
     <View style={styles.item}>
       <View style={styles.itemText}>
-        <Text style={styles.itemLabel}>{label}</Text>
+        <Text style={styles.itemLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
         <Text style={styles.itemDesc}>{desc}</Text>
       </View>
       <Switch
@@ -34,6 +35,7 @@ function NotificationItem({ label, desc, value, onToggle, disabled }) {
 
 export default function NotificationPreferencesScreen() {
   const { profile, updateUserProfile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [prefs, setPrefs] = useState({ ...DEFAULT_PREFS, ...(profile?.notificationPrefs || {}) });
   const [saving, setSaving] = useState(false);
 
@@ -57,18 +59,18 @@ export default function NotificationPreferencesScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Notifications</Text>
         <View style={{ width: 40, alignItems: 'flex-end' }}>
           {saving && <ActivityIndicator size="small" color="#fff" />}
         </View>
       </View>
-      <ScrollView>
-        <Text style={styles.sectionLabel}>Activity</Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: 20 + insets.bottom }}>
+        <Text style={styles.sectionLabel} numberOfLines={1}>Activity</Text>
         <View style={styles.section}>
           <NotificationItem label="Likes" desc="When someone likes your post" value={prefs.likes} onToggle={() => toggle('likes')} />
           <NotificationItem label="Comments" desc="When someone comments on your post" value={prefs.comments} onToggle={() => toggle('comments')} />
         </View>
-        <Text style={styles.sectionLabel}>Community</Text>
+        <Text style={styles.sectionLabel} numberOfLines={1}>Community</Text>
         <View style={styles.section}>
           <NotificationItem label="Safety Alerts" desc="Urgent safety alerts in your suburb" value={prefs.safety} onToggle={() => toggle('safety')} />
           <NotificationItem label="Events" desc="New events posted in your suburb" value={prefs.events} onToggle={() => toggle('events')} />
