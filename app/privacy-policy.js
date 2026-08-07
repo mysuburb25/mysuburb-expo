@@ -10,7 +10,7 @@ export default function PrivacyPolicyScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy Policy</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Privacy Policy</Text>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>

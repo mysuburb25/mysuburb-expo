@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
 export default function ChangePasswordScreen() {
+  const insets = useSafeAreaInsets();
   const [current, setCurrent] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -61,16 +63,23 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Change Password</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Change Password</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.body}>
+      {/* Was a plain View before — on a small screen, or with the keyboard
+          open, the Update Password button could end up unreachable with
+          no way to scroll to it. Switched to ScrollView so the content
+          always remains reachable, matching every other form screen in
+          the app. contentContainerStyle's paddingBottom includes the
+          safe-area inset so the button also clears an on-screen Android
+          nav bar, the same fix applied elsewhere this session. */}
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 24 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>Current Password</Text>
         <View style={styles.inputRow}>
           <TextInput style={styles.input} value={current} onChangeText={setCurrent} secureTextEntry={!showCurrent} placeholder="Enter current password" placeholderTextColor="#9CA3AF" />
@@ -98,10 +107,10 @@ export default function ChangePasswordScreen() {
         <Text style={styles.hint}>Password must be at least 6 characters.</Text>
 
         <TouchableOpacity style={[styles.btn, loading && { opacity: 0.7 }]} onPress={handleUpdate} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Update Password</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Update Password</Text>}
         </TouchableOpacity>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

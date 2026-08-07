@@ -35,7 +35,7 @@ export default function HelpFAQScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help and FAQ</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Help and FAQ</Text>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>

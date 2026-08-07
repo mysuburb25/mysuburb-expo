@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EmailAuthProvider, reauthenticateWithCredential, updateEmail } from 'firebase/auth';
 import { auth } from '../config/firebase';
@@ -9,6 +10,7 @@ import { Colors } from '../constants/theme';
 
 export default function EditProfileScreen() {
   const { profile, updateUserProfile } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const parseName = (fullName) => {
     const trimmed = (fullName || '').trim();
@@ -84,11 +86,11 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Edit Profile</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>First Name</Text>
         <View style={styles.inputRow}>
           <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="First name" placeholderTextColor="#9CA3AF" autoCapitalize="words" />
@@ -119,7 +121,7 @@ export default function EditProfileScreen() {
         )}
 
         <TouchableOpacity style={[styles.btn, loading && { opacity: 0.7 }]} onPress={handleSave} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Changes</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Save Changes</Text>}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

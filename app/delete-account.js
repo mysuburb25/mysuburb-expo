@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
 import { doc, deleteDoc } from 'firebase/firestore';
@@ -9,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function DeleteAccountScreen() {
   const { logout } = useAuth();
+  const insets = useSafeAreaInsets();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
@@ -81,11 +83,11 @@ export default function DeleteAccountScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Delete Account</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete Account</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 60 + insets.bottom }]}>
         <View style={styles.warningBox}>
           <Ionicons name="warning-outline" size={22} color="#E53935" />
           <Text style={styles.warningText}>
@@ -116,11 +118,11 @@ export default function DeleteAccountScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.deleteBtn, loading && { opacity: 0.7 }]} onPress={handleDelete} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.deleteBtnText}>Permanently Delete Account</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.deleteBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Permanently Delete Account</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()} disabled={loading}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
+          <Text style={styles.cancelBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

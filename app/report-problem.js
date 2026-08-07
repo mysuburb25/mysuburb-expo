@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
@@ -11,6 +12,7 @@ const CATEGORIES = ['Bug or technical issue', 'Inappropriate content', 'Account 
 
 export default function ReportProblemScreen() {
   const { user, profile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [issueLocation, setIssueLocation] = useState('');
@@ -117,10 +119,10 @@ export default function ReportProblemScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Report a Problem</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Report a Problem</Text>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 60 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>Category</Text>
         <View style={styles.categories}>
           {CATEGORIES.map(cat => (
@@ -129,7 +131,14 @@ export default function ReportProblemScreen() {
               style={[styles.catChip, category === cat && styles.catChipActive]}
               onPress={() => setCategory(cat)}
             >
-              <Text style={[styles.catText, category === cat && styles.catTextActive]}>{cat}</Text>
+              <Text
+                style={[styles.catText, category === cat && styles.catTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {cat}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -169,7 +178,7 @@ export default function ReportProblemScreen() {
               <View style={styles.userResultsBox}>
                 {userResults.map(u => (
                   <TouchableOpacity key={u.uid} style={styles.userResultItem} onPress={() => handleSelectReportedUser(u)}>
-                    <Text style={styles.userResultText}>{u.displayName}</Text>
+                    <Text style={styles.userResultText} numberOfLines={1}>{u.displayName}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -206,7 +215,7 @@ export default function ReportProblemScreen() {
         <Text style={styles.hint}>We aim to review all reports within 24 hours. For urgent safety issues please call 000.</Text>
 
         <TouchableOpacity style={[styles.btn, loading && { opacity: 0.7 }]} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Submit Report</Text>}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Submit Report</Text>}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

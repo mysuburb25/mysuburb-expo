@@ -33,7 +33,7 @@ export default function BlockedUsersScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Blocked Users</Text>
+        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Blocked Users</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -46,9 +46,9 @@ export default function BlockedUsersScreen() {
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{item.displayName?.[0]?.toUpperCase() || '?'}</Text>
             </View>
-            <Text style={styles.name}>{item.displayName}</Text>
+            <Text style={styles.name} numberOfLines={1}>{item.displayName}</Text>
             <TouchableOpacity style={styles.unblockBtn} onPress={() => handleUnblock(item)}>
-              <Text style={styles.unblockBtnText}>Unblock</Text>
+              <Text style={styles.unblockBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Unblock</Text>
             </TouchableOpacity>
           </View>
         )}
