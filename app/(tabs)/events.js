@@ -950,7 +950,7 @@ export default function EventsScreen() {
                       </View>
                       <View style={styles.locationValueRow}>
                         <Ionicons name="location-outline" size={14} color={Colors.midGrey} />
-                        <Text style={[styles.fieldValue, styles.whereLink]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{shortLoc}</Text>
+                        <Text style={[styles.fieldValue, styles.whereLink]} numberOfLines={1}>{shortLoc}</Text>
                       </View>
                     </TouchableOpacity>
                   ) : null}
@@ -972,18 +972,22 @@ export default function EventsScreen() {
                     </View>
                   </View>
                   <View style={{ flex: 1 }} />
-                  <TouchableOpacity style={[styles.interestedPill, attending && styles.interestedPillActive]} onPress={() => handleToggleAttending(item)}>
-                    <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={16} color={attending ? Colors.white : '#1B4F72'} />
-                    <Text
-                      style={[styles.interestedPillText, attending && styles.interestedPillTextActive]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.8}
-                    >
-                      Interested
-                    </Text>
-                  </TouchableOpacity>
-                  <View style={{ flex: 1 }} />
+                  {tab === 'upcoming' && (
+                    <>
+                      <TouchableOpacity style={[styles.interestedPill, attending && styles.interestedPillActive]} onPress={() => handleToggleAttending(item)}>
+                        <Ionicons name={attending ? 'checkmark-circle' : 'checkmark-circle-outline'} size={16} color={attending ? Colors.white : '#1B4F72'} />
+                        <Text
+                          style={[styles.interestedPillText, attending && styles.interestedPillTextActive]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                        >
+                          Interested
+                        </Text>
+                      </TouchableOpacity>
+                      <View style={{ flex: 1 }} />
+                    </>
+                  )}
                   <View style={styles.footerSideGroup}>
                     <TouchableOpacity onPress={() => handleToggleSave(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                       <Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={20} color={saved ? Colors.brandGreen : Colors.charcoal} />
