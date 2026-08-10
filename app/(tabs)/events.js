@@ -861,9 +861,9 @@ export default function EventsScreen() {
                       </View>
                     ) : (
                       <View style={styles.dateBadge}>
-                        <Text style={styles.dateWeekday}>{ed.toLocaleString('en-AU', { weekday: 'short' }).toUpperCase()}</Text>
-                        <Text style={styles.dateDay}>{ed.getDate()}</Text>
-                        <Text style={styles.dateMonth}>{ed.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
+                        <Text style={styles.dateWeekday} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{ed.toLocaleString('en-AU', { weekday: 'short' }).toUpperCase()}</Text>
+                        <Text style={styles.dateDay} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{ed.getDate()}</Text>
+                        <Text style={styles.dateMonth} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{ed.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
                       </View>
                     )
                   )}

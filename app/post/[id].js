@@ -779,9 +779,9 @@ export default function PostDetailScreen() {
                         </View>
                       ) : (
                         <View style={styles.eventDateBox}>
-                          <Text style={styles.eventWeekday}>{eventDate.toLocaleString('en-AU', { weekday: 'short' }).toUpperCase()}</Text>
-                          <Text style={styles.eventDay}>{eventDate.getDate()}</Text>
-                          <Text style={styles.eventMonth}>{eventDate.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
+                          <Text style={styles.eventWeekday} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{eventDate.toLocaleString('en-AU', { weekday: 'short' }).toUpperCase()}</Text>
+                          <Text style={styles.eventDay} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{eventDate.getDate()}</Text>
+                          <Text style={styles.eventMonth} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{eventDate.toLocaleString('en-AU', { month: 'short' }).toUpperCase()}</Text>
                         </View>
                       )
                     )}
@@ -1024,7 +1024,7 @@ export default function PostDetailScreen() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => startReply(item)}>
-                <Text style={styles.replyBtnText} numberOfLines={1}>Reply</Text>
+                <Text style={styles.replyBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Reply</Text>
               </TouchableOpacity>
             </View>
           );
