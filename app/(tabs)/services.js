@@ -308,7 +308,7 @@ export default function ServicesScreen() {
 
       <View style={styles.tabRow}>
         {TABS.map(t => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
+          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => { setActiveTab(t.key); setShowSearch(false); setSearchQuery(''); }}>
             <Text
               style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}
               numberOfLines={1}
@@ -486,7 +486,7 @@ export default function ServicesScreen() {
             <ScrollView style={styles.filterScrollPad} contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}>
               <TouchableOpacity
                 style={[styles.filterOption, categoryFilter === 'all' && styles.filterOptionActive]}
-                onPress={() => { setCategoryFilter('all'); setShowCategoryModal(false); }}
+                onPress={() => { setCategoryFilter('all'); setShowCategoryModal(false); setShowSearch(false); setSearchQuery(''); }}
               >
                 <Ionicons name={categoryFilter === 'all' ? 'radio-button-on' : 'radio-button-off'} size={18} color={categoryFilter === 'all' ? Colors.brandGreen : Colors.midGrey} />
                 <Text style={[styles.filterOptionText, categoryFilter === 'all' && styles.filterOptionTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>All Categories</Text>
@@ -495,7 +495,7 @@ export default function ServicesScreen() {
                 <TouchableOpacity
                   key={key}
                   style={[styles.filterOption, categoryFilter === key && styles.filterOptionActive]}
-                  onPress={() => { setCategoryFilter(key); setShowCategoryModal(false); }}
+                  onPress={() => { setCategoryFilter(key); setShowCategoryModal(false); setShowSearch(false); setSearchQuery(''); }}
                 >
                   <Ionicons name={categoryFilter === key ? 'radio-button-on' : 'radio-button-off'} size={18} color={categoryFilter === key ? Colors.brandGreen : Colors.midGrey} />
                   <Text style={[styles.filterOptionText, categoryFilter === key && styles.filterOptionTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Text>
