@@ -181,6 +181,12 @@ export default function BuySellScreen() {
 
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), marketplace: new Date() } });
+      // Close search when leaving the screen — otherwise it silently
+      // stays open in the background (this tab doesn't unmount when
+      // switching bottom tabs), so coming back later still shows the
+      // search bar even though the person never intended to search again.
+      setShowSearch(false);
+      setSearchQuery('');
     };
   }, [fetchListings]));
 
@@ -331,7 +337,7 @@ export default function BuySellScreen() {
       </View>
       <View style={styles.tabRow}>
         {FILTERS.map(f => (
-          <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => setActiveFilter(f)}>
+          <TouchableOpacity key={f.key} style={[styles.tabBtn, activeFilter.key === f.key && styles.tabBtnActive]} onPress={() => { setActiveFilter(f); setShowSearch(false); setSearchQuery(''); }}>
             <Text
               style={[styles.tabText, activeFilter.key === f.key && styles.tabTextActive]}
               numberOfLines={1}

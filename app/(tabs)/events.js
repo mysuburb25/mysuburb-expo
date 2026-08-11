@@ -373,6 +373,12 @@ export default function EventsScreen() {
 
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), events: new Date() } });
+      // Close search when leaving the screen — otherwise it silently
+      // stays open in the background (this tab doesn't unmount when
+      // switching bottom tabs), so coming back later still shows the
+      // search bar even though the person never intended to search again.
+      setShowSearch(false);
+      setSearchQuery('');
     };
   }, [fetchEvents]));
 
@@ -783,7 +789,7 @@ export default function EventsScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.tabRow}>
-        <TouchableOpacity style={[styles.tabBtn, tab === 'upcoming' && styles.tabBtnActive]} onPress={() => setTab('upcoming')}>
+        <TouchableOpacity style={[styles.tabBtn, tab === 'upcoming' && styles.tabBtnActive]} onPress={() => { setTab('upcoming'); setShowSearch(false); setSearchQuery(''); }}>
           <Text
             style={[styles.tabText, tab === 'upcoming' && styles.tabTextActive]}
             numberOfLines={1}
@@ -793,7 +799,7 @@ export default function EventsScreen() {
             Upcoming
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, tab === 'past' && styles.tabBtnActive]} onPress={() => setTab('past')}>
+        <TouchableOpacity style={[styles.tabBtn, tab === 'past' && styles.tabBtnActive]} onPress={() => { setTab('past'); setShowSearch(false); setSearchQuery(''); }}>
           <Text
             style={[styles.tabText, tab === 'past' && styles.tabTextActive]}
             numberOfLines={1}

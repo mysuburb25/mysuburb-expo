@@ -174,6 +174,12 @@ export default function ServicesScreen() {
 
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), services: new Date() } });
+      // Close search when leaving the screen — otherwise it silently
+      // stays open in the background (this tab doesn't unmount when
+      // switching bottom tabs), so coming back later still shows the
+      // search bar even though the person never intended to search again.
+      setShowSearch(false);
+      setSearchQuery('');
     };
   }, [fetchPosts]));
 
