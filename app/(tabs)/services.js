@@ -308,7 +308,7 @@ export default function ServicesScreen() {
 
       <View style={styles.tabRow}>
         {TABS.map(t => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => { setLoading(true); setActiveTab(t.key); }}>
+          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
             <Text
               style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}
               numberOfLines={1}
