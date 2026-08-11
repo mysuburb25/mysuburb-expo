@@ -733,14 +733,22 @@ export default function EventsScreen() {
     // today shouldn't flip to "past" the moment its clock time passes if
     // the day itself hasn't ended yet.
     const edDateOnly = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    // Upcoming/Past is always respected, even while searching — mixing
+    // already-happened events into an Upcoming search (or vice versa)
+    // would be genuinely confusing, not just a narrower view someone
+    // might want bypassed. The Today/Weekend/Later sub-filter, on the
+    // other hand, is bypassed while searching, same as every other
+    // screen's category-style filters.
     if (tab === 'past') return edDateOnly < todayStart;
     if (edDateOnly < todayStart) return false;
-    if (dateFilter === 'today') return edDateOnly.getTime() === todayStart.getTime();
-    if (dateFilter === 'weekend') {
-      return edDateOnly.getTime() === upcomingSaturday.getTime() || edDateOnly.getTime() === upcomingSunday.getTime();
+    if (!searchQ) {
+      if (dateFilter === 'today') return edDateOnly.getTime() === todayStart.getTime();
+      if (dateFilter === 'weekend') {
+        return edDateOnly.getTime() === upcomingSaturday.getTime() || edDateOnly.getTime() === upcomingSunday.getTime();
+      }
+      // Everything from the Monday after this coming weekend onward.
+      if (dateFilter === 'later') return edDateOnly.getTime() > upcomingSunday.getTime();
     }
-    // Everything from the Monday after this coming weekend onward.
-    if (dateFilter === 'later') return edDateOnly.getTime() > upcomingSunday.getTime();
     return true;
   });
 

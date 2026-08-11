@@ -173,13 +173,17 @@ export default function LostFoundScreen() {
   }, [fetchItems]));
 
   const q = searchQuery.trim().toLowerCase();
+  // While actively searching, ignore the Lost/Found pill and the Open/Closed
+  // filter entirely — search is meant to cut across the whole category, not
+  // whatever narrower view happened to be selected. Someone typing a specific
+  // search term almost always wants every matching post, not silent zero
+  // results because an invisible filter excluded the one that matched.
   const filteredItems = items.filter(p => {
-    if (activeTab !== 'all' && p.lostFoundType !== activeTab) return false;
-    // 'all' shows everything regardless of isResolved — matching Buy & Sell,
-    // which has no concept of hiding closed listings at all. 'open'/'resolved'
-    // remain available as explicit, opt-in filters for anyone who wants them.
-    if (statusFilter === 'open' && p.isResolved) return false;
-    if (statusFilter === 'resolved' && !p.isResolved) return false;
+    if (!q) {
+      if (activeTab !== 'all' && p.lostFoundType !== activeTab) return false;
+      if (statusFilter === 'open' && p.isResolved) return false;
+      if (statusFilter === 'resolved' && !p.isResolved) return false;
+    }
     if (q && !(p.content?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))) return false;
     return true;
   });

@@ -351,7 +351,10 @@ export default function ServicesScreen() {
         <FlatList
           data={(() => {
             const q = searchQuery.trim().toLowerCase();
-            let result = categoryFilter === 'all' ? posts : posts.filter(p => p.serviceType === categoryFilter);
+            // While actively searching, ignore the category filter entirely —
+            // search should cut across every service type, not just whichever
+            // category pill happened to be selected.
+            let result = (q || categoryFilter === 'all') ? posts : posts.filter(p => p.serviceType === categoryFilter);
             if (q) result = result.filter(p => p.content?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
             return result;
           })()}

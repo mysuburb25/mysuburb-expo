@@ -95,12 +95,12 @@ export default function HomeScreen() {
           collection(db, 'posts'),
           where('suburb', '==', suburb),
           where('state', '==', state),
-          // "All" combines General/Notices/Safety Alerts in one query
-          // rather than a separate query per category, since Firestore's
-          // 'in' operator handles that cleanly without extra reads.
-          activeFilter.key === 'all'
-            ? where('category', 'in', ['updates', 'notices', 'safety'])
-            : where('category', '==', activeFilter.key),
+          // Always fetches every Community Hub category (General/Notices/
+          // Safety Alerts) in one query, regardless of which pill is
+          // selected — the split now happens client-side below, so search
+          // can cut across every category instead of being silently scoped
+          // to one, and tapping a different pill is instant with no refetch.
+          where('category', 'in', ['updates', 'notices', 'safety']),
           where('isRemoved', '==', false),
           orderBy('createdAt', 'desc'),
         ];
@@ -142,7 +142,7 @@ export default function HomeScreen() {
       setHasMore(anyMore);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
-  }, [activeFilter, profile?.suburb, profile?.state, profile?.suburbs, profile?.blockedUsers]);
+  }, [profile?.suburb, profile?.state, profile?.suburbs, profile?.blockedUsers]);
 
   const handleLoadMore = () => {
     if (loadingMore || !hasMore) return;
@@ -349,7 +349,15 @@ export default function HomeScreen() {
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.brandGreen} size="large" />
       ) : (
         <FlatList
-          data={searchQuery.trim() ? posts.filter(p => p.content?.toLowerCase().includes(searchQuery.trim().toLowerCase())) : posts}
+          data={(() => {
+            const q = searchQuery.trim().toLowerCase();
+            // While actively searching, ignore the General/Notices/Alerts
+            // pill — search should cut across every category, not just
+            // whichever pill happened to be selected.
+            let result = (q || activeFilter.key === 'all') ? posts : posts.filter(p => p.category === activeFilter.key);
+            if (q) result = result.filter(p => p.content?.toLowerCase().includes(q));
+            return result;
+          })()}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPosts(); }} tintColor={Colors.brandGreen} />}

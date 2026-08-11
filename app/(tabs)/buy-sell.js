@@ -112,15 +112,19 @@ export default function BuySellScreen() {
       // continues from its own cursor if one exists.
       const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
         const key = `${suburb}|${state}`;
+        // Always fetches the whole marketplace category, regardless of which
+        // pill is selected — the For Sale/Give Away/Seeking split now happens
+        // client-side below (same pattern as Lost & Found's Lost/Found split
+        // and Services' category filter), so that: (1) search can cut across
+        // every type instead of being silently scoped to one, and (2) tapping
+        // a different pill is instant, no refetch needed, since the data is
+        // already loaded.
         const filters = [
           where('suburb', '==', suburb),
           where('state', '==', state),
           where('category', '==', 'marketplace'),
+          where('isRemoved', '==', false),
         ];
-        if (activeFilter.key !== 'all') {
-          filters.push(where('marketplaceType', '==', activeFilter.key));
-        }
-        filters.push(where('isRemoved', '==', false));
         const constraints = [collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc')];
         const cursor = cursorsRef.current[key];
         if (cursor) constraints.push(startAfter(cursor));
@@ -154,7 +158,7 @@ export default function BuySellScreen() {
       setHasMore(anyMore);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
-  }, [activeFilter]);
+  }, []);
 
   const handleLoadMore = () => {
     if (loadingMore || !hasMore) return;
@@ -277,9 +281,15 @@ export default function BuySellScreen() {
   // combination. Items missing a price (Give Away/Seeking without one set)
   // sort as if priced at $0.
   const q = searchQuery.trim().toLowerCase();
+  // While actively searching, ignore the For Sale/Give Away/Seeking pill —
+  // search should cut across every type, not just whichever pill happened
+  // to be selected.
+  const typeFilteredListings = (q || activeFilter.key === 'all')
+    ? listings
+    : listings.filter(l => l.marketplaceType === activeFilter.key);
   const searchedListings = q
-    ? listings.filter(l => l.content?.toLowerCase().includes(q) || l.description?.toLowerCase().includes(q))
-    : listings;
+    ? typeFilteredListings.filter(l => l.content?.toLowerCase().includes(q) || l.description?.toLowerCase().includes(q))
+    : typeFilteredListings;
   // "Closed" behaves differently from the other four — instead of just
   // reordering the full list, it filters down to only closed listings
   // (sorted newest-first within that set), since there's no meaningful
