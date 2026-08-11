@@ -156,13 +156,10 @@ function PostVideoPlayer({ url, onExpand }) {
           <Ionicons name="play-circle" size={54} color="rgba(255,255,255,0.92)" />
         </View>
       )}
-      <TouchableOpacity
-        style={styles.videoFullscreenBtn}
-        onPress={onExpand}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name="expand" size={18} color="#fff" />
-      </TouchableOpacity>
+      {/* Custom expand-to-app-viewer button removed — expo-video's own
+          native fullscreen control (top-left, enabled via allowsFullscreen
+          below) already covers this and works correctly, unlike the app's
+          MediaViewerModal which has a separate playback bug. */}
     </View>
   );
 }

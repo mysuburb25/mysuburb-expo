@@ -121,6 +121,14 @@ function MediaPage({ item, isActive, onClose }) {
     return () => sub.remove();
   }, [player, isVideo]);
 
+  // Autoplay the moment this page becomes the active one (scrolled fully
+  // into view) — matches the request that swiping onto a video should
+  // just start playing it, not require an extra tap on a play button.
+  useEffect(() => {
+    if (!isVideo || !isActive) return;
+    player.play();
+  }, [isActive, isVideo, player]);
+
   // Pause and rewind to the start the moment this page scrolls out of
   // view — without this, a video kept playing invisibly in the
   // background after swiping away, audio and all.
@@ -133,19 +141,27 @@ function MediaPage({ item, isActive, onClose }) {
   if (isVideo) {
     return (
       <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.page}>
-        <VideoView
-          ref={videoViewRef}
-          style={styles.video}
-          player={player}
-          nativeControls
-          allowsFullscreen
-          contentFit="contain"
-        />
-        {!isPlaying && (
-          <View style={styles.playOverlay} pointerEvents="none">
-            <Ionicons name="play-circle" size={64} color="rgba(255,255,255,0.92)" />
-          </View>
-        )}
+        {/* Inner no-op TouchableOpacity absorbs taps on the video itself —
+            same pattern as the photo page below. Without this, tapping
+            anywhere on the video (including its own native play button)
+            also triggered the outer TouchableOpacity's onClose, which is
+            why pressing play appeared to close the viewer and navigate
+            back to the post instead of actually playing. */}
+        <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+          <VideoView
+            ref={videoViewRef}
+            style={styles.video}
+            player={player}
+            nativeControls
+            allowsFullscreen
+            contentFit="contain"
+          />
+          {!isPlaying && (
+            <View style={styles.playOverlay} pointerEvents="none">
+              <Ionicons name="play-circle" size={64} color="rgba(255,255,255,0.92)" />
+            </View>
+          )}
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   }
