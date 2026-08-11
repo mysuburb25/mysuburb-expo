@@ -309,7 +309,7 @@ export default function LostFoundScreen() {
       </View>
       <View style={styles.tabRow}>
         {TABS.map(t => (
-          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
+          <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => { setActiveTab(t.key); setShowSearch(false); setSearchQuery(''); }}>
             <Text
               style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}
               numberOfLines={1}

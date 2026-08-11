@@ -106,15 +106,17 @@ export default function ServicesScreen() {
       // continues from its own cursor if one exists.
       const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
         const key = `${suburb}|${state}`;
+        // Always fetches the whole services category, regardless of the
+        // I Offer/I Need tab — that split now happens client-side below,
+        // matching categoryFilter's existing pattern, so search can cut
+        // across both instead of being silently scoped to whichever tab
+        // was selected, and tapping the other tab is instant with no refetch.
         const filters = [
           where('suburb', '==', suburb),
           where('state', '==', state),
           where('category', '==', 'services'),
+          where('isRemoved', '==', false),
         ];
-        if (activeTab !== 'all') {
-          filters.push(where('serviceTab', '==', activeTab));
-        }
-        filters.push(where('isRemoved', '==', false));
         const constraints = [collection(db, 'posts'), ...filters, orderBy('createdAt', 'desc')];
         const cursor = cursorsRef.current[key];
         if (cursor) constraints.push(startAfter(cursor));
@@ -148,7 +150,7 @@ export default function ServicesScreen() {
       setHasMore(anyMore);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); setLoadingMore(false); }
-  }, [activeTab]);
+  }, []);
 
   const handleLoadMore = () => {
     if (loadingMore || !hasMore) return;
@@ -351,10 +353,12 @@ export default function ServicesScreen() {
         <FlatList
           data={(() => {
             const q = searchQuery.trim().toLowerCase();
-            // While actively searching, ignore the category filter entirely —
-            // search should cut across every service type, not just whichever
-            // category pill happened to be selected.
-            let result = (q || categoryFilter === 'all') ? posts : posts.filter(p => p.serviceType === categoryFilter);
+            // While actively searching, ignore both the I Offer/I Need tab
+            // and the category filter — search should cut across everything
+            // in Services, not just whichever tab/category happened to be
+            // selected.
+            let result = (q || activeTab === 'all') ? posts : posts.filter(p => p.serviceTab === activeTab);
+            result = (q || categoryFilter === 'all') ? result : result.filter(p => p.serviceType === categoryFilter);
             if (q) result = result.filter(p => p.content?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
             return result;
           })()}
