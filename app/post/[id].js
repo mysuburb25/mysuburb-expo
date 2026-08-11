@@ -1108,7 +1108,7 @@ export default function PostDetailScreen() {
 
       {/* Comment Input — @mention autocomplete works in both a fresh
           comment and a reply, since they share this same input. */}
-      <View style={[styles.commentInputRow, { paddingBottom: Math.max(12, insets.bottom) }]}>
+      <View style={[styles.commentInputRow, { paddingBottom: 12 + insets.bottom }]}>
         <MentionInput
           ref={inputRef}
           style={styles.input}
