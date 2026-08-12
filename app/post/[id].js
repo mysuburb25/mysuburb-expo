@@ -826,6 +826,16 @@ export default function PostDetailScreen() {
                           <Text style={styles.pillTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{categoryLabel}</Text>
                         </View>
                       )}
+                      {isServices && SERVICE_TAB_LABELS[post.serviceTab] && (
+                        <View style={[styles.tabBadge, { backgroundColor: post.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
+                          <Text style={styles.tabBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{SERVICE_TAB_LABELS[post.serviceTab]}</Text>
+                        </View>
+                      )}
+                      {isServices && (
+                        <View style={styles.serviceLabelBadge}>
+                          <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
+                        </View>
+                      )}
                     </View>
                     {isEvent && eventDate && (
                       <TouchableOpacity style={styles.calendarBtn} onPress={handleAddToCalendar} disabled={addingToCalendar}>
@@ -842,18 +852,6 @@ export default function PostDetailScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {isServices && (
-                    <View style={styles.serviceBadgeStack}>
-                      {SERVICE_TAB_LABELS[post.serviceTab] && (
-                        <View style={[styles.tabBadge, { backgroundColor: post.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
-                          <Text style={styles.tabBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{SERVICE_TAB_LABELS[post.serviceTab]}</Text>
-                        </View>
-                      )}
-                      <View style={styles.serviceLabelBadge}>
-                        <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
-                      </View>
-                    </View>
-                  )}
                   {!isEvent && (
                     <LinkifiedText
                       text={post.content}
