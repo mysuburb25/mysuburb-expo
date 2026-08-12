@@ -66,7 +66,12 @@ export default function WheelPicker({ data, selectedValue, onValueChange }) {
               : { opacity: 0.28, transform: [{ scale: 0.85 }] };
           return (
             <View style={styles.item}>
-              <Text style={[styles.itemText, isCentered && styles.itemTextSelected, fadeStyle]}>
+              <Text
+                style={[styles.itemText, isCentered && styles.itemTextSelected, fadeStyle]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 {item.label}
               </Text>
             </View>
