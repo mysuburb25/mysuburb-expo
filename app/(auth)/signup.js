@@ -294,7 +294,7 @@ export default function SignupScreen() {
               />
             </View>
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowMonthPicker(false)}>
-              <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
+              <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Select Month</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -315,7 +315,7 @@ export default function SignupScreen() {
               />
             </View>
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowYearPicker(false)}>
-              <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
+              <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Select Year</Text>
             </TouchableOpacity>
           </View>
         </View>
