@@ -129,11 +129,11 @@ export default function SignupScreen() {
         {/* Header */}
         <View style={styles.header}>
           <AppName style={styles.appName} />
-          <Text style={styles.tagline}>Bringing suburbs together</Text>
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Create Account</Text>
           <Text style={styles.subtitle}>Join your suburb community</Text>
 
           {/* First name */}
@@ -216,13 +216,13 @@ export default function SignupScreen() {
           <View style={styles.dobRow}>
             <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowMonthPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
-              <Text style={[styles.input, !birthMonth && { color: Colors.midGrey }]}>
+              <Text style={[styles.input, !birthMonth && { color: Colors.midGrey }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {birthMonth ? MONTHS[birthMonth - 1] : 'Month'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowYearPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
-              <Text style={[styles.input, !birthYear && { color: Colors.midGrey }]}>
+              <Text style={[styles.input, !birthYear && { color: Colors.midGrey }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {birthYear || 'Year'}
               </Text>
             </TouchableOpacity>
@@ -238,20 +238,20 @@ export default function SignupScreen() {
             </TouchableOpacity>
             <Text style={styles.tcText}>I agree to the </Text>
             <TouchableOpacity onPress={() => setShowTC(true)}>
-              <Text style={styles.tcLink}>Terms & Conditions</Text>
+              <Text style={styles.tcLink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Terms & Conditions</Text>
             </TouchableOpacity>
           </View>
 
           {/* Sign Up Button */}
           <TouchableOpacity style={[styles.signupBtn, loading && { opacity: 0.7 }]} onPress={handleSignup} disabled={loading}>
-            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.signupBtnText}>Create Account</Text>}
+            {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.signupBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Create Account</Text>}
           </TouchableOpacity>
 
           {/* Login link */}
           <View style={styles.loginRow}>
             <Text style={styles.loginText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-              <Text style={styles.loginLink}>Sign In</Text>
+              <Text style={styles.loginLink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sign In</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -261,7 +261,7 @@ export default function SignupScreen() {
       <Modal visible={showTC} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.tcModal}>
           <View style={styles.tcHeader}>
-            <Text style={styles.tcTitle}>Terms & Conditions</Text>
+            <Text style={styles.tcTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Terms & Conditions</Text>
             <TouchableOpacity onPress={() => setShowTC(false)} style={styles.tcCloseBtn}>
               <Ionicons name="close" size={24} color={Colors.white} />
             </TouchableOpacity>
@@ -271,7 +271,7 @@ export default function SignupScreen() {
           </ScrollView>
           <View style={styles.tcFooter}>
             <TouchableOpacity style={styles.tcAgreeBtn} onPress={() => { setAgreedToTC(true); setShowTC(false); }}>
-              <Text style={styles.tcAgreeBtnText}>I Agree</Text>
+              <Text style={styles.tcAgreeBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>I Agree</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -282,7 +282,7 @@ export default function SignupScreen() {
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerSheet}>
             <View style={styles.wheelHeaderBar}>
-              <Text style={styles.wheelHeaderText}>Month</Text>
+              <Text style={styles.wheelHeaderText} numberOfLines={1}>Month</Text>
             </View>
             <View style={styles.wheelRow}>
               <WheelPicker
@@ -292,7 +292,7 @@ export default function SignupScreen() {
               />
             </View>
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowMonthPicker(false)}>
-              <Text style={styles.dobDoneBtnText}>Done</Text>
+              <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -303,7 +303,7 @@ export default function SignupScreen() {
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerSheet}>
             <View style={styles.wheelHeaderBar}>
-              <Text style={styles.wheelHeaderText}>Year</Text>
+              <Text style={styles.wheelHeaderText} numberOfLines={1}>Year</Text>
             </View>
             <View style={styles.wheelRow}>
               <WheelPicker
@@ -313,7 +313,7 @@ export default function SignupScreen() {
               />
             </View>
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowYearPicker(false)}>
-              <Text style={styles.dobDoneBtnText}>Done</Text>
+              <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>

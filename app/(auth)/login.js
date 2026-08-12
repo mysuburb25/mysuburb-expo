@@ -85,7 +85,7 @@ export default function LoginScreen() {
         {/* Header */}
         <View style={styles.header}>
           <AppName style={styles.appName} />
-          <Text style={styles.tagline}>Bringing suburbs together</Text>
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
         </View>
 
         {/* Fields */}
@@ -121,18 +121,18 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity style={[styles.loginBtn, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
-            {loading ? <ActivityIndicator color={Colors.brandGreen} /> : <Text style={styles.loginBtnText}>Sign In</Text>}
+            {loading ? <ActivityIndicator color={Colors.brandGreen} /> : <Text style={styles.loginBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sign In</Text>}
           </TouchableOpacity>
 
           <View style={styles.signupRow}>
             <Text style={styles.signupText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-              <Text style={styles.signupLink}>Sign Up</Text>
+              <Text style={styles.signupLink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sign Up</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity onPress={openForgotModal} style={styles.forgotBtn}>
-            <Text style={styles.forgotText}>Forgot Password?</Text>
+            <Text style={styles.forgotText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Forgot Password?</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -140,7 +140,7 @@ export default function LoginScreen() {
       <Modal visible={showForgotModal} transparent animationType="fade">
         <View style={styles.forgotOverlay}>
           <View style={styles.forgotCard}>
-            <Text style={styles.forgotTitle}>Reset Password</Text>
+            <Text style={styles.forgotTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Reset Password</Text>
             <Text style={styles.forgotSubtitle}>Enter your email and we'll send you a link to reset your password.</Text>
             <View style={styles.forgotInputWrap}>
               <Ionicons name="mail-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
@@ -157,10 +157,10 @@ export default function LoginScreen() {
               />
             </View>
             <TouchableOpacity style={[styles.forgotSendBtn, sendingReset && { opacity: 0.7 }]} onPress={handleSendReset} disabled={sendingReset}>
-              {sendingReset ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.forgotSendBtnText}>Send Reset Link</Text>}
+              {sendingReset ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.forgotSendBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Send Reset Link</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.forgotCancelBtn} onPress={() => setShowForgotModal(false)}>
-              <Text style={styles.forgotCancelBtnText}>Cancel</Text>
+              <Text style={styles.forgotCancelBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
