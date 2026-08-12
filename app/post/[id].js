@@ -844,7 +844,7 @@ export default function PostDetailScreen() {
 
                   {isServices && (
                     <View style={styles.serviceLabelBadge}>
-                      <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                      <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
                         {SERVICE_TAB_LABELS[post.serviceTab]
                           ? `${SERVICE_TAB_LABELS[post.serviceTab]} · ${SERVICE_LABELS[post.serviceType] || 'Service'}`
                           : (SERVICE_LABELS[post.serviceType] || 'Service')}
