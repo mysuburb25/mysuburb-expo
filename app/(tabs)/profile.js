@@ -447,14 +447,14 @@ export default function ProfileScreen() {
             <View style={styles.confirmIconCircle}>
               <Ionicons name="log-out-outline" size={28} color="#E53935" />
             </View>
-            <Text style={styles.confirmTitle}>Sign Out</Text>
+            <Text style={styles.confirmTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sign Out</Text>
             <Text style={styles.confirmMessage}>Are you sure you want to sign out?</Text>
             <View style={styles.confirmBtnRow}>
               <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setShowSignOutModal(false)}>
-                <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+                <Text style={styles.confirmCancelBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmSignOutBtn} onPress={confirmLogout}>
-                <Text style={styles.confirmSignOutBtnText}>Sign Out</Text>
+                <Text style={styles.confirmSignOutBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Sign Out</Text>
               </TouchableOpacity>
             </View>
           </View>

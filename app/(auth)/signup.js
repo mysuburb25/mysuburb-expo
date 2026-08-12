@@ -126,7 +126,24 @@ export default function SignupScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 24 + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          // Stopgap: insets.bottom appears unreliable here on Android
+          // without expo-navigation-bar/edge-to-edge properly configured
+          // (a native-level fix queued for a future build) — the OS can
+          // report insets.bottom as too small even while visually
+          // drawing a transparent bar over content. Math.max forces a
+          // real minimum regardless of what that value reports, so the
+          // Create Account button clears the bar either way. Safe to
+          // revert to the simpler insets-only version once the native
+          // fix ships.
+          { paddingBottom: Math.max(24 + insets.bottom, 110) },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={true}
+      >
 
         {/* Header */}
         <View style={styles.header}>

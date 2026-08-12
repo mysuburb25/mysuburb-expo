@@ -843,12 +843,15 @@ export default function PostDetailScreen() {
                   </View>
 
                   {isServices && (
-                    <View style={styles.serviceLabelBadge}>
-                      <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
-                        {SERVICE_TAB_LABELS[post.serviceTab]
-                          ? `${SERVICE_TAB_LABELS[post.serviceTab]} · ${SERVICE_LABELS[post.serviceType] || 'Service'}`
-                          : (SERVICE_LABELS[post.serviceType] || 'Service')}
-                      </Text>
+                    <View style={styles.serviceBadgeStack}>
+                      {SERVICE_TAB_LABELS[post.serviceTab] && (
+                        <View style={[styles.tabBadge, { backgroundColor: post.serviceTab === 'offering' ? Colors.brandGreen : '#1565C0' }]}>
+                          <Text style={styles.tabBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{SERVICE_TAB_LABELS[post.serviceTab]}</Text>
+                        </View>
+                      )}
+                      <View style={styles.serviceLabelBadge}>
+                        <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
+                      </View>
                     </View>
                   )}
                   {!isEvent && (
@@ -1171,6 +1174,12 @@ export default function PostDetailScreen() {
               </>
             ) : (
               <>
+                <TouchableOpacity style={styles.menuItem} onPress={() => { setShowPostMenu(false); goToChat(); }}>
+                  <View style={styles.menuItemIcon}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.brandGreen} />
+                  </View>
+                  <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Message {post.authorName}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.menuItem} onPress={handleReportPost}>
                   <View style={styles.menuItemIcon}>
                     <Ionicons name="flag-outline" size={20} color="#E65100" />
@@ -1389,8 +1398,11 @@ const styles = StyleSheet.create({
   messageBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   menuBtn: { padding: 4 },
   contentBold: { fontSize: 17, color: Colors.charcoal, lineHeight: 26, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 6 },
-  serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: Colors.brandGreenPale, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginHorizontal: 16, marginBottom: 6 },
-  serviceLabelBadgeText: { fontSize: 15, color: Colors.brandGreen, fontWeight: '800' },
+  serviceBadgeStack: { alignItems: 'flex-start', gap: 6, marginHorizontal: 16, marginBottom: 6 },
+  tabBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, alignItems: 'center' },
+  tabBadgeText: { fontSize: 12, fontWeight: '800', color: Colors.white },
+  serviceLabelBadge: { alignSelf: 'flex-start', backgroundColor: '#C2D9E8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  serviceLabelBadgeText: { fontSize: 12, color: '#1B4F72', fontWeight: '800' },
   description: { fontSize: 14, color: Colors.charcoal, lineHeight: 22, paddingHorizontal: 16, paddingBottom: 6 },
   contentLink: { color: '#1565C0', textDecorationLine: 'underline' },
   mentionLink: { color: Colors.brandGreen, fontWeight: '700' },
