@@ -98,6 +98,12 @@ const SERVICE_LABELS = {
   gardening: 'Gardening', petcare: 'Pet Care', childcare: 'Child & Aged Care', tutoring: 'Tutoring', others: 'Others',
 };
 
+// Matches services.js's own TABS labels — combined with SERVICE_LABELS
+// below so a service post shows 'I Offer · Tutoring' as one label,
+// instead of a generic 'Service' pill and a separate 'Tutoring' badge
+// that used to sit on different lines with no visual connection.
+const SERVICE_TAB_LABELS = { offering: 'I Offer', looking: 'I Need' };
+
 // One generic "Closed" status across Buy & Sell and Lost & Found, rather
 // than type-specific wording (SOLD/TAKEN/FOUND/RETURNED/etc.) — simpler,
 // and avoids any two categories ever landing on the same word for
@@ -815,7 +821,7 @@ export default function PostDetailScreen() {
                           <Text style={styles.soldTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{getStatusLabels().badge}</Text>
                         </View>
                       )}
-                      {!isLostFound && !isEvent && post.category !== 'marketplace' && categoryLabel && (
+                      {!isLostFound && !isEvent && !isServices && post.category !== 'marketplace' && categoryLabel && (
                         <View style={styles.pillTag}>
                           <Text style={styles.pillTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{categoryLabel}</Text>
                         </View>
@@ -838,7 +844,11 @@ export default function PostDetailScreen() {
 
                   {isServices && (
                     <View style={styles.serviceLabelBadge}>
-                      <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{SERVICE_LABELS[post.serviceType] || 'Service'}</Text>
+                      <Text style={styles.serviceLabelBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        {SERVICE_TAB_LABELS[post.serviceTab]
+                          ? `${SERVICE_TAB_LABELS[post.serviceTab]} · ${SERVICE_LABELS[post.serviceType] || 'Service'}`
+                          : (SERVICE_LABELS[post.serviceType] || 'Service')}
+                      </Text>
                     </View>
                   )}
                   {!isEvent && (
