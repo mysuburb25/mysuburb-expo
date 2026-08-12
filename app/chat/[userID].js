@@ -111,7 +111,20 @@ export default function ChatScreen() {
         } else {
           setClearedAt(null);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        // Without this, a failed read here (e.g. a permission error while
+        // route params are still settling right after navigation) leaves
+        // clearedAt stuck at undefined forever — which blocks the messages
+        // listener below from ever starting, which means loading never
+        // turns off. The visible result is a spinner that never resolves
+        // and, since the FlatList never mounts to fill the remaining
+        // space, the composer ends up sitting awkwardly mid-screen instead
+        // of anchored to the bottom. Falling back to null here guarantees
+        // the rest of the screen can always finish loading regardless of
+        // what happened with this specific fetch.
+        setClearedAt(null);
+      }
     })();
   }, [conversationId, user.uid]);
 
