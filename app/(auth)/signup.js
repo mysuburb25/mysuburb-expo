@@ -219,13 +219,13 @@ export default function SignupScreen() {
             <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowMonthPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
               <Text style={[styles.input, !birthMonth && { color: Colors.midGrey }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                {birthMonth ? MONTHS[birthMonth - 1] : 'Select Month'}
+                {birthMonth ? MONTHS[birthMonth - 1] : 'Month'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.inputWrap, styles.dobField]} onPress={() => setShowYearPicker(true)}>
               <Ionicons name="calendar-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
               <Text style={[styles.input, !birthYear && { color: Colors.midGrey }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                {birthYear || 'Select Year'}
+                {birthYear || 'Year'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -284,7 +284,7 @@ export default function SignupScreen() {
         <View style={styles.pickerOverlay}>
           <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
             <View style={styles.wheelHeaderBar}>
-              <Text style={styles.wheelHeaderText} numberOfLines={1}>Month</Text>
+              <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Month</Text>
             </View>
             <View style={styles.wheelRow}>
               <WheelPicker
@@ -305,7 +305,7 @@ export default function SignupScreen() {
         <View style={styles.pickerOverlay}>
           <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
             <View style={styles.wheelHeaderBar}>
-              <Text style={styles.wheelHeaderText} numberOfLines={1}>Year</Text>
+              <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Year</Text>
             </View>
             <View style={styles.wheelRow}>
               <WheelPicker
