@@ -127,6 +127,17 @@ export default function EventsScreen() {
   const [newCutoff, setNewCutoff] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Only actually shows the spinner if loading takes longer than 200ms —
+  // fast loads (the common case) never flash a spinner at all, which
+  // reads as noticeably smoother than a spinner that flickers on for a
+  // fraction of a second before content replaces it. Genuinely slow
+  // loads still show the spinner normally once they cross the threshold.
+  const [showSpinner, setShowSpinner] = useState(false);
+  useEffect(() => {
+    if (!loading) { setShowSpinner(false); return; }
+    const t = setTimeout(() => setShowSpinner(true), 200);
+    return () => clearTimeout(t);
+  }, [loading]);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('upcoming');
   const [dateFilter, setDateFilter] = useState('all'); // 'all' | 'today' | 'weekend' — only applies to the Upcoming tab
@@ -844,9 +855,9 @@ export default function EventsScreen() {
         </View>
       )}
 
-      {loading ? (
+      {loading ? (showSpinner && (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
-      ) : (
+      )) : (
         <FlatList
           data={filteredEvents}
           keyExtractor={item => item.id}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -23,6 +23,17 @@ export default function NotificationsScreen() {
   const { user, profile, setUnreadCount, unreadCount } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Only actually shows the spinner if loading takes longer than 200ms —
+  // fast loads (the common case) never flash a spinner at all, which
+  // reads as noticeably smoother than a spinner that flickers on for a
+  // fraction of a second before content replaces it. Genuinely slow
+  // loads still show the spinner normally once they cross the threshold.
+  const [showSpinner, setShowSpinner] = useState(false);
+  useEffect(() => {
+    if (!loading) { setShowSpinner(false); return; }
+    const t = setTimeout(() => setShowSpinner(true), 200);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   const fetchAndMarkRead = useCallback(async () => {
     if (!user) return;
@@ -76,9 +87,9 @@ export default function NotificationsScreen() {
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Notifications</Text>
       </View>
-      {loading ? (
+      {loading ? (showSpinner && (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
-      ) : (
+      )) : (
         <FlatList
           data={notifications}
           keyExtractor={item => item.id}

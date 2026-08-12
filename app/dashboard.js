@@ -44,6 +44,17 @@ export default function DashboardScreen() {
   const badgeCounts = useTabBadgeCounts(user, profile);
   const [grouped, setGrouped] = useState({});
   const [loading, setLoading] = useState(true);
+  // Only actually shows the spinner if loading takes longer than 200ms —
+  // fast loads (the common case) never flash a spinner at all, which
+  // reads as noticeably smoother than a spinner that flickers on for a
+  // fraction of a second before content replaces it. Genuinely slow
+  // loads still show the spinner normally once they cross the threshold.
+  const [showSpinner, setShowSpinner] = useState(false);
+  useEffect(() => {
+    if (!loading) { setShowSpinner(false); return; }
+    const t = setTimeout(() => setShowSpinner(true), 200);
+    return () => clearTimeout(t);
+  }, [loading]);
   const [dontShowAgain, setDontShowAgain] = useState(profile?.skipDashboard || false);
   const [continuing, setContinuing] = useState(false);
 
@@ -156,9 +167,9 @@ export default function DashboardScreen() {
         <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.displayName?.split(' ')[0] || 'Your'}'s Dashboard</Text>
       </View>
 
-      {loading ? (
+      {loading ? (showSpinner && (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
-      ) : (
+      )) : (
         <ScrollView contentContainerStyle={styles.scroll}>
           {!hasAnyHighlights && (
             <View style={styles.empty}>
