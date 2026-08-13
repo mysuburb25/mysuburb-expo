@@ -795,11 +795,6 @@ export default function PostDetailScreen() {
                       <Text style={styles.authorName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.authorName}</Text>
                       <Text style={styles.dateTime} numberOfLines={1}>{formatDateTime(post.createdAt)}</Text>
                     </TouchableOpacity>
-                    {!isOwner && (
-                      <TouchableOpacity style={styles.messageBtn} onPress={goToChat}>
-                        <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.brandGreen} />
-                      </TouchableOpacity>
-                    )}
                     <View style={styles.headerBadgeStack}>
                       {isLostFound && post.lostFoundType && (
                         <View style={[styles.pillTag, { backgroundColor: post.lostFoundType === 'lost' ? '#C62828' : Colors.brandGreen }]}>
@@ -850,6 +845,11 @@ export default function PostDetailScreen() {
                     <TouchableOpacity style={styles.menuBtn} onPress={() => setShowPostMenu(true)}>
                       <Ionicons name="ellipsis-vertical" size={20} color={Colors.midGrey} />
                     </TouchableOpacity>
+                    {!isOwner && (
+                      <TouchableOpacity style={styles.messageBtn} onPress={goToChat}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.brandGreen} />
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   {!isEvent && (
@@ -1385,14 +1385,14 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
   postCardInner: { borderRadius: 16, overflow: 'hidden' },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, paddingBottom: 8 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, paddingBottom: 40, position: 'relative' },
   headerBadgeStack: { alignItems: 'stretch', gap: 4 },
   authorRowEvent: { backgroundColor: '#EDF7EF', paddingBottom: 8, borderTopLeftRadius: 16, borderTopRightRadius: 16, alignItems: 'center' },
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   dateTime: { fontSize: 12, color: Colors.midGrey, marginTop: 2, fontStyle: 'italic' },
   pillTag: { backgroundColor: Colors.brandGreen, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   pillTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
-  messageBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
+  messageBtn: { position: 'absolute', bottom: 8, right: 16, width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2 },
   messageBtnText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   menuBtn: { padding: 4 },
   contentBold: { fontSize: 17, color: Colors.charcoal, lineHeight: 26, fontWeight: '700', paddingHorizontal: 16, paddingBottom: 6 },
