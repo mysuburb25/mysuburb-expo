@@ -388,7 +388,7 @@ export default function ProfileScreen() {
                       <Text style={styles.suburbNumberText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{index + 1}</Text>
                     </View>
                     <Text style={styles.suburbRowText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.suburb}, {s.state}</Text>
-                    <Text style={styles.primaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Primary</Text>
+                    <Text style={styles.primaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Primary</Text>
                   </View>
                   <Ionicons name="lock-closed" size={20} color={Colors.midGrey} />
                 </TouchableOpacity>
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
   suburbNumberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   suburbNumberText: { fontSize: 12, fontWeight: '900', color: Colors.brandGreen },
   suburbRowText: { flexShrink: 1, fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
-  primaryLabel: { flexShrink: 0, minWidth: 52, textAlign: 'center', fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  primaryLabel: { flexShrink: 0, minWidth: 66, textAlign: 'center', fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
 
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16, gap: 12 },
   card: {
