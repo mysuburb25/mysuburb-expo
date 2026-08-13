@@ -442,16 +442,16 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      // On Android, letting KeyboardAvoidingView also animate the
-      // container's height on top of the OS's own native window resize
-      // (adjustSizeMode="resize" is already set by default) double-handles
-      // the keyboard opening — the container visibly shrinks in its own
-      // slower JS-driven animation, on top of the native one, which is
-      // what made the composer look like it was being "pushed up slowly".
-      // Leaving behavior undefined on Android lets the native resize
-      // alone handle it, which is instant and matches every other app's
-      // keyboard behavior.
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      // Reverted: setting behavior to undefined on Android was based on
+      // an assumption that the OS's native window resize was already
+      // active here — it wasn't, and the result was the composer getting
+      // completely hidden behind the keyboard instead of just animating
+      // slowly. 'height' is back, since a working-but-slightly-slow
+      // composer beats a fully hidden one. The slow-animation complaint
+      // is real but needs a different fix (e.g. confirming/adding
+      // android.softwareKeyboardLayoutMode in app.json) rather than
+      // removing KeyboardAvoidingView's own handling outright.
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>

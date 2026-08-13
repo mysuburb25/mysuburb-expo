@@ -222,7 +222,7 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.cardOneLineRow}>
           <Text style={styles.cardOneLine} numberOfLines={1} ellipsizeMode="tail">{item.content}</Text>
-          <Text style={styles.cardMetaInline}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
+          <Text style={styles.cardMetaInline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{formatDate(item.createdAt)}, {formatTime(item.createdAt)}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -244,7 +244,7 @@ export default function ProfileScreen() {
             <Ionicons name="chatbubbles-outline" size={26} color="#fff" />
             {unreadMessageCount > 0 && (
               <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+                <Text style={styles.bellBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -252,7 +252,7 @@ export default function ProfileScreen() {
             <Ionicons name="notifications-outline" size={26} color="#fff" />
             {unreadCount > 0 && (
               <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                <Text style={styles.bellBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -276,7 +276,7 @@ export default function ProfileScreen() {
             <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
           ) : (
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
+              <Text style={styles.avatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
             </View>
           )}
           <View style={styles.cameraBtn}>
@@ -372,7 +372,7 @@ export default function ProfileScreen() {
         {activeTab === 'suburbs' && profile?.suburbs && profile.suburbs.length > 0 && (
           <View style={styles.tabContent}>
             <View style={styles.tabContentHeader}>
-              <Text style={styles.tabContentSubtitle}>Toggle suburbs to control your feed.</Text>
+              <Text style={styles.tabContentSubtitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>Toggle suburbs to control your feed.</Text>
               <TouchableOpacity
                 onPress={() => router.push('/(auth)/select-suburb')}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -385,7 +385,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity key={index} style={styles.suburbRow} onPress={() => handleToggleSuburb(index)} activeOpacity={0.6}>
                   <View style={styles.suburbRowLeft}>
                     <View style={styles.suburbNumberBadge}>
-                      <Text style={styles.suburbNumberText}>{index + 1}</Text>
+                      <Text style={styles.suburbNumberText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{index + 1}</Text>
                     </View>
                     <Text style={styles.suburbRowText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.suburb}, {s.state}</Text>
                     <Text style={styles.primaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Primary</Text>
@@ -396,7 +396,7 @@ export default function ProfileScreen() {
                 <View key={index} style={styles.suburbRow}>
                   <View style={styles.suburbRowLeft}>
                     <View style={styles.suburbNumberBadge}>
-                      <Text style={styles.suburbNumberText}>{index + 1}</Text>
+                      <Text style={styles.suburbNumberText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{index + 1}</Text>
                     </View>
                     <Text style={styles.suburbRowText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.suburb}, {s.state}</Text>
                   </View>
@@ -421,7 +421,7 @@ export default function ProfileScreen() {
             ) : posts.length === 0 ? (
               <View style={styles.empty}>
                 <Ionicons name="document-outline" size={48} color={Colors.lightGrey} />
-                <Text style={styles.emptyText}>No posts yet</Text>
+                <Text style={styles.emptyText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>No posts yet</Text>
               </View>
             ) : (
               posts.map(item => renderPostCard(item, { onDelete: () => handleDeletePost(item.id) }))
@@ -437,7 +437,7 @@ export default function ProfileScreen() {
             ) : savedPosts.length === 0 ? (
               <View style={styles.empty}>
                 <Ionicons name="bookmark-outline" size={48} color={Colors.lightGrey} />
-                <Text style={styles.emptyText}>No saved posts yet</Text>
+                <Text style={styles.emptyText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>No saved posts yet</Text>
               </View>
             ) : (
               savedPosts.map(item => renderPostCard(item, { onUnsave: () => handleUnsave(item) }))
