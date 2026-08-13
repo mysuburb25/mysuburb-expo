@@ -456,7 +456,7 @@ export default function EventsScreen() {
   const buildShareText = (item) => {
     const ed = item.eventDate ? (item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate)) : null;
     const when = ed ? `${isToday(ed) ? 'Today' : formatDate(ed)}, ${formatTime(ed)}` : '';
-    const deepLink = `mysuburb://post/${item.id}`;
+    const deepLink = `https://mysuburb.app/post/${item.id}`;
     const lines = [
       `Event Title: ${item.content}`,
       item.description ? `Description: ${item.description}` : null,

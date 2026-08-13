@@ -240,7 +240,7 @@ export default function LostFoundScreen() {
     }
   };
 
-  const buildShareText = (item) => `${item.content}\n\nmysuburb://post/${item.id}\n(Tap to open in My Suburb — you'll need the app installed)\n\nShared from My Suburb`;
+  const buildShareText = (item) => `${item.content}\n\nhttps://mysuburb.app/post/${item.id}\n(Tap to open in My Suburb — you'll need the app installed)\n\nShared from My Suburb`;
 
   const handleShare = (item) => {
     setShareTarget(item);
