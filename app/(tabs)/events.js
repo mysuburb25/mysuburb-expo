@@ -795,7 +795,7 @@ export default function EventsScreen() {
       </View>
       <View style={styles.pageHeader}>
         <TouchableOpacity onPress={() => router.push('/settings')} style={styles.settingsShortcut}>
-          <Ionicons name="settings-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="settings" size={23} color={Colors.brandGreen} />
         </TouchableOpacity>
         <View style={styles.pageHeaderCenterGroup}>
           <View style={styles.pageHeaderIconBadge}>
@@ -804,7 +804,7 @@ export default function EventsScreen() {
           <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Events</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
-          <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="grid" size={23} color={Colors.brandGreen} />
         </TouchableOpacity>
       </View>
       <View style={styles.tabRow}>

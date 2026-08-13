@@ -85,7 +85,18 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Notifications</Text>
+        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.settingsShortcut}>
+          <Ionicons name="settings" size={23} color={Colors.brandGreen} />
+        </TouchableOpacity>
+        <View style={styles.pageHeaderCenterGroup}>
+          <View style={styles.pageHeaderIconBadge}>
+            <Ionicons name="notifications" size={22} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>Notifications</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
+          <Ionicons name="grid" size={23} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
       {loading ? (showSpinner && (
         <ActivityIndicator color={Colors.brandGreen} style={{ marginTop: 40 }} size="large" />
@@ -146,7 +157,11 @@ const styles = StyleSheet.create({
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
   profileAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderCenterGroup: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  settingsShortcut: { padding: 4 },
+  dashboardShortcut: { padding: 4 },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   list: { padding: 16, gap: 10, paddingBottom: 100 },
   item: { backgroundColor: Colors.white, borderRadius: 12, padding: 14, flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.lightGrey },

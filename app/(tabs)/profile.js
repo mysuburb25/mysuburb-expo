@@ -261,13 +261,12 @@ export default function ProfileScreen() {
 
       {/* Fixed page header */}
       <View style={styles.pageHeader}>
-        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.settingsShortcut}>
-          <Ionicons name="settings-outline" size={21} color={Colors.brandGreen} />
-        </TouchableOpacity>
-        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Profile</Text>
-        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
-          <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
-        </TouchableOpacity>
+        <View style={styles.pageHeaderCenterGroup}>
+          <View style={styles.pageHeaderIconBadge}>
+            <Ionicons name="person" size={22} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Profile</Text>
+        </View>
       </View>
 
       {/* Fixed profile section */}
@@ -478,9 +477,9 @@ const styles = StyleSheet.create({
   suburbName: { fontSize: 17, color: '#FFD700', marginTop: 4 },
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  settingsShortcut: { padding: 4 },
-  dashboardShortcut: { padding: 4 },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderCenterGroup: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '700', color: Colors.brandGreen },
   profileSection: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   avatarWrapper: { position: 'relative' },

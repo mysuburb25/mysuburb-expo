@@ -307,7 +307,7 @@ export default function ServicesScreen() {
 
       <View style={styles.pageHeader}>
         <TouchableOpacity onPress={() => router.push('/settings')} style={styles.settingsShortcut}>
-          <Ionicons name="settings-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="settings" size={23} color={Colors.brandGreen} />
         </TouchableOpacity>
         <View style={styles.pageHeaderCenterGroup}>
           <View style={styles.pageHeaderIconBadge}>
@@ -316,7 +316,7 @@ export default function ServicesScreen() {
           <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Services</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
-          <Ionicons name="grid-outline" size={21} color={Colors.brandGreen} />
+          <Ionicons name="grid" size={23} color={Colors.brandGreen} />
         </TouchableOpacity>
       </View>
 

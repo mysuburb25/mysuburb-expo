@@ -211,7 +211,18 @@ export default function MessagesScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Messages</Text>
+        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.settingsShortcut}>
+          <Ionicons name="settings" size={23} color={Colors.brandGreen} />
+        </TouchableOpacity>
+        <View style={styles.pageHeaderCenterGroup}>
+          <View style={styles.pageHeaderIconBadge}>
+            <Ionicons name="chatbubbles" size={22} color={Colors.brandGreen} />
+          </View>
+          <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Messages</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.dashboardShortcut}>
+          <Ionicons name="grid" size={23} color={Colors.brandGreen} />
+        </TouchableOpacity>
       </View>
 
       {shareText && (
@@ -281,7 +292,11 @@ const styles = StyleSheet.create({
   bellBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#E53935', borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3 },
   bellBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   profileAvatarText: { fontSize: 15, fontWeight: '800', color: Colors.brandGreen },
-  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageHeaderCenterGroup: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  settingsShortcut: { padding: 4 },
+  dashboardShortcut: { padding: 4 },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   shareBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 16, paddingVertical: 10 },
   shareBannerText: { fontSize: 13, fontWeight: '600', color: Colors.brandGreen },
