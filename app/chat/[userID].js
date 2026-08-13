@@ -94,20 +94,42 @@ export default function ChatScreen() {
   // works correctly via KeyboardAvoidingView's 'height' behavior, so this
   // stays iOS-only to avoid touching what's already confirmed working.
   const keyboardHeight = useRef(new Animated.Value(0)).current;
+  // A second value, animated the same way but with useNativeDriver: true,
+  // applied as a translateY on the composer itself. keyboardHeight (above)
+  // can't use the native driver since it drives a layout property
+  // (height), which only runs on the JS thread — that's what left a
+  // residual lag even after switching from padding to a proper spacer.
+  // transform IS eligible for the native driver, so this one moves in
+  // real lockstep with the keyboard's own native-thread animation, while
+  // keyboardHeight still handles reserving the right amount of layout
+  // space underneath it.
+  const composerTranslateY = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
     const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+      const duration = e.duration || 250;
       Animated.timing(keyboardHeight, {
         toValue: e.endCoordinates.height,
-        duration: e.duration || 250,
+        duration,
         useNativeDriver: false,
+      }).start();
+      Animated.timing(composerTranslateY, {
+        toValue: -e.endCoordinates.height,
+        duration,
+        useNativeDriver: true,
       }).start();
     });
     const hideSub = Keyboard.addListener('keyboardWillHide', (e) => {
+      const duration = e.duration || 250;
       Animated.timing(keyboardHeight, {
         toValue: 0,
-        duration: e.duration || 250,
+        duration,
         useNativeDriver: false,
+      }).start();
+      Animated.timing(composerTranslateY, {
+        toValue: 0,
+        duration,
+        useNativeDriver: true,
       }).start();
     });
     return () => {
@@ -545,6 +567,7 @@ export default function ChatScreen() {
         />
       )}
 
+      <Animated.View style={{ transform: [{ translateY: composerTranslateY }] }}>
       {isBlocked ? (
         <View style={[styles.blockedBanner, { paddingBottom: 16 + insets.bottom }]}>
           <Ionicons name="ban-outline" size={18} color={Colors.midGrey} />
@@ -626,6 +649,7 @@ export default function ChatScreen() {
           </View>
         </>
       )}
+      </Animated.View>
       {/* Empty spacer sibling, not padding on the composer itself — its
           height grows to match the keyboard, which is what actually
           forces the FlatList above (flex: 1) to shrink and the composer
