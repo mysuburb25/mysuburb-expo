@@ -7,6 +7,7 @@ import AppName from '../components/AppName';
 
 const FAQS = [
   { q: 'How does My Suburb work?', a: 'My Suburb connects you with neighbours in your exact suburb. All posts are only visible to people who live in the same suburb as you.' },
+  { q: 'Where do I find Settings?', a: 'Tap the settings icon in the header at the top of any tab — Community Hub, Buy and Sell, Events, Services, Lost and Found, Messages, Notifications or Profile. It opens the same Settings screen no matter which tab you tap it from.' },
   { q: 'How do I change my suburb?', a: 'Go to your Profile and tap Edit Suburbs. You can search for any suburb in Australia.' },
   { q: 'Can I follow more than one suburb?', a: 'Yes, you can select up to 5 suburbs — a Primary plus four others. Posts from all your active suburbs appear together in your feed.' },
   { q: 'What is a Primary suburb?', a: 'Your Primary suburb is the first one you select and is where all your posts are published. It cannot be turned off, but you can replace it any time from Change Suburb.' },
@@ -20,7 +21,7 @@ const FAQS = [
   { q: 'I forgot my password — what do I do?', a: 'On the login screen, tap "Forgot Password?" and enter your email to receive a reset link.' },
   { q: 'What is Buy and Sell?', a: 'Buy and Sell lets you list items for sale, give things away for free, or post what you are looking for. All transactions are between neighbours directly. Once an item is no longer available, mark the listing as Closed.' },
   { q: 'How do Safety Alerts work?', a: 'Safety Alerts are for genuine urgent safety concerns in your suburb such as break-ins or dangerous conditions. For emergencies always call 000 first.' },
-  { q: 'How do I message another neighbour directly?', a: 'Tap on a neighbour\'s name or profile from any post to open a private one-on-one chat with them.' },
+  { q: 'How do I message another neighbour directly?', a: 'Tap on a neighbour\'s name or profile from any post to open a private one-on-one chat with them. You can also tap the three-dot menu on their post and choose Message.' },
   { q: 'Can I add photos to a post?', a: 'Yes, when creating a post you can attach up to 3 photos from your camera or photo library.' },
   { q: 'How do I change my profile photo?', a: 'Go to Profile and tap the camera icon on your avatar. You can take a new photo or choose one from your photo library.' },
   { q: 'How do I turn off notifications?', a: 'Go to Settings > Notification Preferences to manage which notifications you receive, such as likes, comments, and new posts in your suburb.' },
