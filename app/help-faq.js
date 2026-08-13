@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { renderTextWithEmail } from '../utils/renderTextWithEmail';
+import AppName from '../components/AppName';
 
 const FAQS = [
   { q: 'How does My Suburb work?', a: 'My Suburb connects you with neighbours in your exact suburb. All posts are only visible to people who live in the same suburb as you.' },
@@ -35,9 +36,17 @@ export default function HelpFAQScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Help and FAQ</Text>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
+        </View>
         <View style={{ width: 40 }} />
       </View>
+
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Help and FAQ</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.intro}>Find answers to common questions below.</Text>
         {FAQS.map((faq, i) => (
@@ -62,7 +71,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { backgroundColor: '#2D6A4F', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: '#fff' },
+  tagline: { fontSize: 15, color: '#FFD700', marginTop: 4, fontWeight: '500' },
+  pageHeader: { backgroundColor: '#E8F5E9', paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  pageTitle: { fontSize: 20, fontWeight: '700', color: '#2D6A4F' },
   content: { padding: 16, gap: 8, paddingBottom: 40 },
   intro: { fontSize: 15, color: '#6B7280', marginBottom: 8 },
   faqItem: { backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 0.5, borderColor: '#E5E7EB' },

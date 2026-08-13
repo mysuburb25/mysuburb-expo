@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Platform, KeyboardAvoidingView, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,13 +7,15 @@ import Constants from 'expo-constants';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
+import AppName from '../components/AppName';
 
-const CATEGORIES = ['Bug or technical issue', 'Inappropriate content', 'Account issue', 'Safety concern', 'Other'];
+const CATEGORIES = ['Bug or technical issue', 'Inappropriate content', 'Account issue', 'Safety concern', 'Others'];
 
 export default function ReportProblemScreen() {
   const { user, profile } = useAuth();
   const insets = useSafeAreaInsets();
   const [category, setCategory] = useState('');
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [description, setDescription] = useState('');
   const [issueLocation, setIssueLocation] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,29 +121,30 @@ export default function ReportProblemScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Report a Problem</Text>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
+        </View>
         <View style={{ width: 40 }} />
       </View>
+
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Report a Problem</Text>
+      </View>
+
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 60 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         <Text style={styles.label}>Category</Text>
-        <View style={styles.categories}>
-          {CATEGORIES.map(cat => (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.catChip, category === cat && styles.catChipActive]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text
-                style={[styles.catText, category === cat && styles.catTextActive]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TouchableOpacity style={styles.dropdown} onPress={() => setShowCategoryModal(true)}>
+          <Text
+            style={[styles.dropdownText, !category && styles.dropdownPlaceholder]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            {category || 'Select a category'}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color="#6B7280" />
+        </TouchableOpacity>
 
         {isTechnicalIssue && (
           <>
@@ -218,6 +221,35 @@ export default function ReportProblemScreen() {
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Submit Report</Text>}
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showCategoryModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowCategoryModal(false)}>
+          <View style={styles.filterSheet}>
+            <View style={styles.filterHeaderBar}>
+              <Text style={styles.filterHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Category</Text>
+            </View>
+            <View style={[styles.filterPad, { paddingBottom: 32 + insets.bottom }]}>
+              {CATEGORIES.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.filterOption, category === cat && styles.filterOptionActive]}
+                  onPress={() => { setCategory(cat); setShowCategoryModal(false); }}
+                >
+                  <Ionicons name={category === cat ? 'radio-button-on' : 'radio-button-off'} size={18} color={category === cat ? '#2D6A4F' : '#9CA3AF'} />
+                  <Text
+                    style={[styles.filterOptionText, category === cat && styles.filterOptionTextActive]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -226,14 +258,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   header: { backgroundColor: '#2D6A4F', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: '#fff' },
+  tagline: { fontSize: 15, color: '#FFD700', marginTop: 4, fontWeight: '500' },
+  pageHeader: { backgroundColor: '#E8F5E9', paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  pageTitle: { fontSize: 20, fontWeight: '700', color: '#2D6A4F' },
   content: { padding: 20, gap: 8, paddingBottom: 60 },
   label: { fontSize: 14, fontWeight: '700', color: '#2D6A4F', marginTop: 12, marginBottom: 10 },
-  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
-  catChipActive: { backgroundColor: '#2D6A4F', borderColor: '#2D6A4F' },
-  catText: { fontSize: 14, color: '#1B1F23', fontWeight: '500' },
-  catTextActive: { color: '#fff', fontWeight: '700' },
+  dropdown: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, backgroundColor: '#fff' },
+  dropdownText: { flex: 1, fontSize: 15, color: '#1B1F23', fontWeight: '500' },
+  dropdownPlaceholder: { color: '#9CA3AF', fontWeight: '400' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  filterSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  filterHeaderBar: { backgroundColor: '#2D6A4F', paddingTop: 14, paddingBottom: 16, alignItems: 'center' },
+  filterHeaderText: { fontSize: 19, fontWeight: '800', color: '#fff' },
+  filterPad: { padding: 16, paddingBottom: 32 },
+  filterOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  filterOptionActive: { backgroundColor: '#E8F5E9', borderColor: '#2D6A4F' },
+  filterOptionText: { fontSize: 15, color: '#1B1F23', fontWeight: '600' },
+  filterOptionTextActive: { color: '#2D6A4F', fontWeight: '700' },
   input: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#1B1F23', minHeight: 140 },
   locationInput: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, padding: 14, fontSize: 15, color: '#1B1F23' },
   userSearchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4 },

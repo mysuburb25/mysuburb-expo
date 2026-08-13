@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
+import AppName from '../components/AppName';
 
 export default function BlockedUsersScreen() {
   const { profile, unblockUser } = useAuth();
@@ -33,8 +34,15 @@ export default function BlockedUsersScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Blocked Users</Text>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
+        </View>
         <View style={{ width: 40 }} />
+      </View>
+
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Blocked Users</Text>
       </View>
 
       <FlatList
@@ -68,7 +76,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { backgroundColor: Colors.brandGreen, paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: '#fff' },
+  tagline: { fontSize: 15, color: '#FFD700', marginTop: 4, fontWeight: '500' },
+  pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.brandGreen },
   list: { padding: 16, gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: Colors.lightGrey },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },

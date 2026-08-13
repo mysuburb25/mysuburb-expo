@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import AppName from '../components/AppName';
 
 const DEFAULT_PREFS = {
   likes: true,
@@ -59,11 +60,19 @@ export default function NotificationPreferencesScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Notifications</Text>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
+        </View>
         <View style={{ width: 40, alignItems: 'flex-end' }}>
           {saving && <ActivityIndicator size="small" color="#fff" />}
         </View>
       </View>
+
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Notification Preferences</Text>
+      </View>
+
       <ScrollView contentContainerStyle={{ paddingBottom: 20 + insets.bottom }}>
         <Text style={styles.sectionLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Activity</Text>
         <View style={styles.section}>
@@ -87,7 +96,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: { backgroundColor: '#2D6A4F', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: '#fff' },
+  tagline: { fontSize: 15, color: '#FFD700', marginTop: 4, fontWeight: '500' },
+  pageHeader: { backgroundColor: '#E8F5E9', paddingVertical: 10, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  pageTitle: { fontSize: 20, fontWeight: '700', color: '#2D6A4F' },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: '#6B7280', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   section: { backgroundColor: '#fff', borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: '#E5E7EB' },
   item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6', gap: 12 },
