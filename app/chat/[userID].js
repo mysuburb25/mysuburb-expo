@@ -545,7 +545,6 @@ export default function ChatScreen() {
         />
       )}
 
-      <Animated.View style={{ paddingBottom: keyboardHeight }}>
       {isBlocked ? (
         <View style={[styles.blockedBanner, { paddingBottom: 16 + insets.bottom }]}>
           <Ionicons name="ban-outline" size={18} color={Colors.midGrey} />
@@ -627,7 +626,14 @@ export default function ChatScreen() {
           </View>
         </>
       )}
-      </Animated.View>
+      {/* Empty spacer sibling, not padding on the composer itself — its
+          height grows to match the keyboard, which is what actually
+          forces the FlatList above (flex: 1) to shrink and the composer
+          to end up sitting right above the keyboard. Padding inside the
+          composer's own wrapper only added invisible space below it
+          without moving anything, which is why that first attempt did
+          nothing visible at all. */}
+      <Animated.View style={{ height: keyboardHeight }} />
 
       <ImageViewerModal
         images={viewerIndex !== null ? chatImageUrls : null}
