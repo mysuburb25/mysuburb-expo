@@ -302,7 +302,7 @@ export default function ProfileScreen() {
 
       <View style={styles.dashboardRow}>
         <View style={styles.dashboardRowLeft}>
-          <Ionicons name="grid-outline" size={20} color={Colors.brandGreen} />
+          <Ionicons name="grid" size={20} color={Colors.brandGreen} />
           <Text style={styles.dashboardRowLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Dashboard</Text>
           <TouchableOpacity style={styles.dashboardViewBtn} onPress={() => router.push('/dashboard')}>
             <Text style={styles.dashboardViewBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>View Now</Text>
@@ -516,8 +516,8 @@ const styles = StyleSheet.create({
   suburbRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   suburbNumberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   suburbNumberText: { fontSize: 12, fontWeight: '900', color: Colors.brandGreen },
-  suburbRowText: { fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
-  primaryLabel: { fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  suburbRowText: { flex: 1, fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
+  primaryLabel: { flexShrink: 0, fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
 
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16, gap: 12 },
   card: {
