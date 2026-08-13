@@ -440,7 +440,19 @@ export default function ChatScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      // On Android, letting KeyboardAvoidingView also animate the
+      // container's height on top of the OS's own native window resize
+      // (adjustSizeMode="resize" is already set by default) double-handles
+      // the keyboard opening — the container visibly shrinks in its own
+      // slower JS-driven animation, on top of the native one, which is
+      // what made the composer look like it was being "pushed up slowly".
+      // Leaving behavior undefined on Android lets the native resize
+      // alone handle it, which is instant and matches every other app's
+      // keyboard behavior.
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
@@ -489,7 +501,7 @@ export default function ChatScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubbles-outline" size={48} color={Colors.lightGrey} />
-              <Text style={styles.emptyText}>Say hi to {userName}!</Text>
+              <Text style={styles.emptyText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Say hi to {userName}!</Text>
               <Text style={styles.emptySubText}>Start a conversation</Text>
             </View>
           }
