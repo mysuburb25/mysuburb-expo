@@ -516,8 +516,8 @@ const styles = StyleSheet.create({
   suburbRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   suburbNumberBadge: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brandGreenPale, justifyContent: 'center', alignItems: 'center' },
   suburbNumberText: { fontSize: 12, fontWeight: '900', color: Colors.brandGreen },
-  suburbRowText: { flex: 1, fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
-  primaryLabel: { flexShrink: 0, fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  suburbRowText: { flexShrink: 1, fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
+  primaryLabel: { flexShrink: 0, minWidth: 52, textAlign: 'center', fontSize: 11, color: Colors.brandGreen, fontWeight: '700', backgroundColor: '#FFD700', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
 
   list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16, gap: 12 },
   card: {
