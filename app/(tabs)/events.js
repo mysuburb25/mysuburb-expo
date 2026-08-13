@@ -794,6 +794,9 @@ export default function EventsScreen() {
         </View>
       </View>
       <View style={styles.pageHeader}>
+        <TouchableOpacity onPress={() => router.push('/settings')} style={styles.settingsShortcut}>
+          <Ionicons name="settings-outline" size={21} color={Colors.brandGreen} />
+        </TouchableOpacity>
         <View style={styles.pageHeaderCenterGroup}>
           <View style={styles.pageHeaderIconBadge}>
             <Ionicons name="calendar" size={22} color={Colors.brandGreen} />
@@ -1247,6 +1250,7 @@ const styles = StyleSheet.create({
   pageHeader: { backgroundColor: Colors.brandGreenPale, paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderCenterGroup: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   dashboardShortcut: { padding: 4 },
+  settingsShortcut: { padding: 4 },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: Colors.brandGreen, letterSpacing: 0.2 },
   primarySuburbBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: Colors.white, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
