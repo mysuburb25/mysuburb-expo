@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as NavigationBar from 'expo-navigation-bar';
 import { AuthProvider } from '../context/AuthContext';
 
 // Without this, a push that arrives while the app is open and in the
@@ -25,6 +27,25 @@ export default function RootLayout() {
     // on a real dev/production build, where app.json's setting works
     // properly on its own.
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Gives the on-screen Android navigation bar a solid background
+    // instead of the system default transparent/see-through bar, which
+    // was letting content underneath (e.g. the Create Account button)
+    // show through it. Only relevant on Android — iOS and web have no
+    // equivalent API, and calling this there would throw.
+    //
+    // Note: on Android 15+ (API 35+), Google enforces edge-to-edge
+    // display and may ignore this setting entirely — that's a deliberate
+    // OS-level design change, not something an app can override. On
+    // those versions, correct insets.bottom padding on each screen (already
+    // in place) is what actually keeps content clear of that area, since
+    // the transparency itself is expected system behavior there, not a bug.
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {});
+      NavigationBar.setButtonStyleAsync('dark').catch(() => {});
+    }
   }, []);
 
   return (
