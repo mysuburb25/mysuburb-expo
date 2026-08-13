@@ -452,6 +452,15 @@ export default function ChatScreen() {
       // android.softwareKeyboardLayoutMode in app.json) rather than
       // removing KeyboardAvoidingView's own handling outright.
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // On iOS specifically, KeyboardAvoidingView's padding calculation
+      // assumes it starts at the very top of the physical screen — but
+      // this screen uses its own custom header rather than React
+      // Navigation's built-in one, so the view actually starts insets.top
+      // lower than that. Without accounting for the difference, the
+      // padding animation initially undershoots and then visibly corrects
+      // itself a beat after the keyboard has already appeared, which is
+      // what read as "keyboard comes up first, then the composer follows".
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
