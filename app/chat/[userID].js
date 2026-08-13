@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image, ScrollView, Animated, Keyboard } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -85,6 +85,36 @@ export default function ChatScreen() {
   const [pendingImages, setPendingImages] = useState([]); // local uris, staged but not yet sent
   const [viewerIndex, setViewerIndex] = useState(null); // index into chatImageUrls, or null when closed
   const flatListRef = useRef(null);
+  // iOS-only: KeyboardAvoidingView's built-in 'padding' behavior visibly
+  // lagged a beat behind the keyboard's own animation (the keyboard would
+  // finish rising before the composer caught up). Manually listening for
+  // keyboardWillShow/keyboardWillHide and animating with the SAME duration
+  // the OS reports keeps the composer moving in exact lockstep with the
+  // keyboard instead of reacting to it after the fact. Android already
+  // works correctly via KeyboardAvoidingView's 'height' behavior, so this
+  // stays iOS-only to avoid touching what's already confirmed working.
+  const keyboardHeight = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const showSub = Keyboard.addListener('keyboardWillShow', (e) => {
+      Animated.timing(keyboardHeight, {
+        toValue: e.endCoordinates.height,
+        duration: e.duration || 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', (e) => {
+      Animated.timing(keyboardHeight, {
+        toValue: 0,
+        duration: e.duration || 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const userName = resolvedUserName || 'Neighbour';
   const iBlockedThem = profile?.blockedUsers?.some(b => b.uid === userId) || false;
@@ -451,7 +481,7 @@ export default function ChatScreen() {
       // is real but needs a different fix (e.g. confirming/adding
       // android.softwareKeyboardLayoutMode in app.json) rather than
       // removing KeyboardAvoidingView's own handling outright.
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'android' ? 'height' : undefined}
       // Reverted: keyboardVerticalOffset={insets.top} was an attempt to
       // fix the iOS composer lagging a beat behind the keyboard, but it
       // over-corrected and introduced a persistent visible gap between
@@ -515,6 +545,7 @@ export default function ChatScreen() {
         />
       )}
 
+      <Animated.View style={{ paddingBottom: keyboardHeight }}>
       {isBlocked ? (
         <View style={[styles.blockedBanner, { paddingBottom: 16 + insets.bottom }]}>
           <Ionicons name="ban-outline" size={18} color={Colors.midGrey} />
@@ -596,6 +627,7 @@ export default function ChatScreen() {
           </View>
         </>
       )}
+      </Animated.View>
 
       <ImageViewerModal
         images={viewerIndex !== null ? chatImageUrls : null}
