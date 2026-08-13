@@ -2,6 +2,7 @@ import { ScrollView, Text, StyleSheet, View, TouchableOpacity } from 'react-nati
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { renderTextWithEmail } from '../utils/renderTextWithEmail';
+import AppName from '../components/AppName';
 
 export default function PrivacyPolicyScreen() {
   return (
@@ -10,7 +11,10 @@ export default function PrivacyPolicyScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Privacy Policy</Text>
+        <View style={styles.headerCenter}>
+          <AppName style={styles.mySuburb} />
+          <Text style={styles.tagline} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Bringing suburbs together</Text>
+        </View>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
@@ -74,7 +78,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   header: { backgroundColor: '#2D6A4F', paddingTop: 56, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerCenter: { alignItems: 'center', marginLeft: 8 },
+  mySuburb: { fontSize: 27, fontWeight: '800', color: '#fff' },
+  tagline: { fontSize: 15, color: '#FFD700', marginTop: 4, fontWeight: '500' },
   content: { padding: 20, paddingBottom: 60 },
   title: { fontSize: 24, fontWeight: '800', color: '#2D6A4F', marginBottom: 4 },
   updated: { fontSize: 13, color: '#6B7280', marginBottom: 20 },
