@@ -607,7 +607,7 @@ export default function ChatScreen() {
       return (
         <>
           {showDate && item.createdAt && (
-            <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
+            <Text style={styles.dateLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatDate(item.createdAt)}</Text>
           )}
           <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
             {!isMe && (
@@ -615,13 +615,13 @@ export default function ChatScreen() {
                 {otherUserPhotoURL ? (
                   <Image source={{ uri: otherUserPhotoURL }} style={styles.avatarSmallImage} />
                 ) : (
-                  <Text style={styles.avatarSmallText}>{userName?.[0]?.toUpperCase()}</Text>
+                  <Text style={styles.avatarSmallText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{userName?.[0]?.toUpperCase()}</Text>
                 )}
               </View>
             )}
             <View style={styles.bubbleUnsent}>
               <Ionicons name="ban-outline" size={14} color={Colors.midGrey} />
-              <Text style={styles.bubbleUnsentText}>This message was unsent</Text>
+              <Text style={styles.bubbleUnsentText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>This message was unsent</Text>
             </View>
           </View>
         </>
@@ -631,7 +631,7 @@ export default function ChatScreen() {
     return (
       <>
         {showDate && item.createdAt && (
-          <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
+          <Text style={styles.dateLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatDate(item.createdAt)}</Text>
         )}
         <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
           {!isMe && (
@@ -639,7 +639,7 @@ export default function ChatScreen() {
               {otherUserPhotoURL ? (
                 <Image source={{ uri: otherUserPhotoURL }} style={styles.avatarSmallImage} />
               ) : (
-                <Text style={styles.avatarSmallText}>{userName?.[0]?.toUpperCase()}</Text>
+                <Text style={styles.avatarSmallText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{userName?.[0]?.toUpperCase()}</Text>
               )}
             </View>
           )}
@@ -659,7 +659,7 @@ export default function ChatScreen() {
               </View>
             )}
             {hasMedia && itemMedia.length === 1 && (
-              <TouchableOpacity onPress={() => openViewer(itemMedia, 0)}>
+              <TouchableOpacity onPress={() => openViewer(itemMedia, 0)} onLongPress={() => handleLongPressMessage(item)}>
                 <Image source={{ uri: itemMedia[0].thumbnailUrl || itemMedia[0].url }} style={styles.msgImage} />
                 {itemMedia[0].type === 'video' && (
                   <View style={styles.videoPlayBadge} pointerEvents="none">
@@ -673,7 +673,7 @@ export default function ChatScreen() {
                 {itemMedia.slice(0, MAX_GRID_PREVIEW).map((m, i) => {
                   const isLastVisible = i === MAX_GRID_PREVIEW - 1 && itemMedia.length > MAX_GRID_PREVIEW;
                   return (
-                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i)} style={styles.mediaGridCell}>
+                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i)} onLongPress={() => handleLongPressMessage(item)} style={styles.mediaGridCell}>
                       <Image source={{ uri: m.thumbnailUrl || m.url }} style={styles.mediaGridImage} />
                       {m.type === 'video' && !isLastVisible && (
                         <View style={styles.videoPlayBadgeSmall} pointerEvents="none">
@@ -682,7 +682,7 @@ export default function ChatScreen() {
                       )}
                       {isLastVisible && (
                         <View style={styles.mediaGridMoreOverlay} pointerEvents="none">
-                          <Text style={styles.mediaGridMoreText}>+{itemMedia.length - MAX_GRID_PREVIEW}</Text>
+                          <Text style={styles.mediaGridMoreText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>+{itemMedia.length - MAX_GRID_PREVIEW}</Text>
                         </View>
                       )}
                     </TouchableOpacity>
@@ -740,7 +740,7 @@ export default function ChatScreen() {
           <Ionicons name="notifications-outline" size={26} color={Colors.white} />
           {unreadCount > 0 && (
             <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              <Text style={styles.bellBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -751,7 +751,7 @@ export default function ChatScreen() {
             {otherUserPhotoURL ? (
               <Image source={{ uri: otherUserPhotoURL }} style={styles.headerAvatarImage} />
             ) : (
-              <Text style={styles.headerAvatarText}>{userName?.[0]?.toUpperCase()}</Text>
+              <Text style={styles.headerAvatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{userName?.[0]?.toUpperCase()}</Text>
             )}
             {isOtherUserOnline && <View style={styles.onlineDot} />}
           </View>
@@ -777,7 +777,7 @@ export default function ChatScreen() {
             <View style={styles.empty}>
               <Ionicons name="chatbubbles-outline" size={48} color={Colors.lightGrey} />
               <Text style={styles.emptyText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Say hi to {userName}!</Text>
-              <Text style={styles.emptySubText}>Start a conversation</Text>
+              <Text style={styles.emptySubText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Start a conversation</Text>
             </View>
           }
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
