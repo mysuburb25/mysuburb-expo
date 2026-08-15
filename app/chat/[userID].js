@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
@@ -11,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
 import useOnlineStatus from '../../utils/useOnlineStatus';
-import ImageViewerModal from '../../components/ImageViewerModal';
+import MediaViewerModal from '../../components/MediaViewerModal';
 
 function formatTime(date) {
   if (!date) return '';
@@ -68,6 +69,20 @@ function renderMessageText(text, isMe, styles) {
   );
 }
 
+// Normalizes a message's media into a single, consistent shape regardless
+// of whether it's a legacy single-photo message (the old imageUrl field)
+// or a newer grouped message (the media array). Every caller downstream —
+// rendering, the viewer, the reply bar — only ever has to deal with one
+// shape, rather than branching on which schema a given message happens
+// to use.
+function getItemMedia(item) {
+  if (item.media && item.media.length > 0) return item.media;
+  if (item.imageUrl) return [{ type: 'photo', url: item.imageUrl, thumbnailUrl: null }];
+  return [];
+}
+
+const MAX_GRID_PREVIEW = 4; // how many thumbnails show before collapsing into a "+N" overlay
+
 export default function ChatScreen() {
   const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
   const { user, profile, blockUser, unblockUser, unreadCount } = useAuth();
@@ -81,9 +96,10 @@ export default function ChatScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [theyBlockedMe, setTheyBlockedMe] = useState(false);
   const [otherUserPhotoURL, setOtherUserPhotoURL] = useState(null);
-  const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName }
-  const [pendingImages, setPendingImages] = useState([]); // local uris, staged but not yet sent
-  const [viewerIndex, setViewerIndex] = useState(null); // index into chatImageUrls, or null when closed
+  const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName, imageUrl }
+  const [pendingMedia, setPendingMedia] = useState([]); // [{ kind: 'image'|'video', uri, thumbnailUri? }], staged but not yet sent
+  const [viewerMedia, setViewerMedia] = useState(null); // full media array for the tapped message, or null when closed
+  const [viewerIndex, setViewerIndex] = useState(0);
   const flatListRef = useRef(null);
   // iOS-only: KeyboardAvoidingView's built-in 'padding' behavior visibly
   // lagged a beat behind the keyboard's own animation (the keyboard would
@@ -206,11 +222,13 @@ export default function ChatScreen() {
     return unsub;
   }, [conversationId, user.uid, clearedAt]);
 
-  // Shared by both text and image sends — handles the conversation
+  // Shared by both text and media sends — handles the conversation
   // metadata update, the message document itself, and the notification.
   // previewText is what shows in the conversation list (e.g. "You: hey"
-  // vs "You: 📷 Photo").
-  const sendMessage = async ({ text, imageUrl, previewText }) => {
+  // vs "You: 📷 Photo"). `media` is an array of { type, url, thumbnailUrl }
+  // — every photo/video sent together lands on ONE message document as
+  // one array, rather than each becoming its own separate message.
+  const sendMessage = async ({ text, media, previewText }) => {
     await setDoc(doc(db, 'conversations', conversationId), {
       participants: [user.uid, userId],
       participantNames: { [user.uid]: profile.displayName, [userId]: userName },
@@ -233,7 +251,7 @@ export default function ChatScreen() {
       read: false,
     };
     if (text) messageData.text = text;
-    if (imageUrl) messageData.imageUrl = imageUrl;
+    if (media && media.length > 0) messageData.media = media;
     if (replyingTo) {
       messageData.replyTo = {
         messageId: replyingTo.messageId,
@@ -259,60 +277,96 @@ export default function ChatScreen() {
     } catch (e) { console.error('notification error:', e); }
   };
 
-  // Picking photos only stages them (pendingImages) — nothing sends
-  // immediately. Each staged photo becomes its own message on Send (same
-  // as how most chat apps handle a multi-photo batch), with any typed
-  // caption attached to the last one rather than sent as a separate
-  // bubble on its own.
-  const MAX_PENDING_IMAGES = 5;
+  // Picking media only stages it (pendingMedia) — nothing sends
+  // immediately. Everything staged becomes ONE message on Send, shown as
+  // a stack/grid rather than separate bubbles, with any typed caption
+  // attached to that same message.
+  const MAX_PENDING_MEDIA = 8;
+  const MAX_VIDEO_DURATION_SEC = 120;
+  const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
 
   const handleSend = async () => {
-    if ((!message.trim() && pendingImages.length === 0) || sending || isBlocked) return;
+    if ((!message.trim() && pendingMedia.length === 0) || sending || isBlocked) return;
     const text = message.trim();
-    const imagesToSend = pendingImages;
+    const mediaToSend = pendingMedia;
     setMessage('');
-    setPendingImages([]);
+    setPendingMedia([]);
     setSending(true);
     try {
-      if (imagesToSend.length === 0) {
+      if (mediaToSend.length === 0) {
         await sendMessage({ text, previewText: text });
       } else {
-        for (let i = 0; i < imagesToSend.length; i++) {
-          const response = await fetch(imagesToSend[i]);
+        // Every staged item uploads concurrently instead of one at a
+        // time — this is what actually fixes the slow send. Previously
+        // each photo waited for the previous one to fully finish before
+        // starting, so sending N items took roughly N times as long as a
+        // single upload. Running them in parallel means the total wait
+        // is close to the time of the single slowest upload, not the sum
+        // of all of them.
+        const uploaded = await Promise.all(mediaToSend.map(async (item, i) => {
+          const response = await fetch(item.uri);
           const blob = await response.blob();
-          const fileName = `${Date.now()}_${i}.jpg`;
-          const storageRef = ref(storage, `chatImages/${conversationId}/${fileName}`);
-          await uploadBytes(storageRef, blob);
-          const imageUrl = await getDownloadURL(storageRef);
-          const isLast = i === imagesToSend.length - 1;
-          const captionForThis = isLast ? text : '';
-          await sendMessage({
-            text: captionForThis || undefined,
-            imageUrl,
-            previewText: captionForThis || '\ud83d\udcf7 Photo',
-          });
-        }
+          const ext = item.kind === 'video' ? 'mp4' : 'jpg';
+          const fileName = `${Date.now()}_${i}.${ext}`;
+          const storageRef = ref(storage, `chatMedia/${conversationId}/${fileName}`);
+          await uploadBytes(storageRef, blob, item.kind === 'video' ? { contentType: blob.type || 'video/mp4' } : undefined);
+          const url = await getDownloadURL(storageRef);
+
+          let thumbnailUrl = null;
+          if (item.kind === 'video' && item.thumbnailUri) {
+            try {
+              const thumbResponse = await fetch(item.thumbnailUri);
+              const thumbBlob = await thumbResponse.blob();
+              const thumbRef = ref(storage, `chatMedia/${conversationId}/thumb_${Date.now()}_${i}.jpg`);
+              await uploadBytes(thumbRef, thumbBlob);
+              thumbnailUrl = await getDownloadURL(thumbRef);
+            } catch (e) {
+              console.error('Chat video thumbnail upload failed:', e);
+            }
+          }
+
+          return { type: item.kind === 'video' ? 'video' : 'photo', url, thumbnailUrl };
+        }));
+
+        const previewText = text || (
+          mediaToSend.length > 1
+            ? `\ud83d\udcf7 ${mediaToSend.length} items`
+            : (mediaToSend[0].kind === 'video' ? '\ud83c\udfa5 Video' : '\ud83d\udcf7 Photo')
+        );
+
+        await sendMessage({
+          text: text || undefined,
+          media: uploaded,
+          previewText,
+        });
       }
     } catch (e) {
       console.error(e);
       setMessage(text);
-      setPendingImages(imagesToSend);
+      setPendingMedia(mediaToSend);
     } finally {
       setSending(false);
     }
   };
 
-  const handlePickImage = () => {
-    if (pendingImages.length >= MAX_PENDING_IMAGES || isBlocked) return;
-    const remaining = MAX_PENDING_IMAGES - pendingImages.length;
-    Alert.alert('Add Photo', 'Choose an option', [
+  // Single "Add Photo or Video" entry point — camera and library both
+  // accept either media type in one go, matching the same pattern used
+  // for event/post creation elsewhere in the app.
+  const handlePickMedia = () => {
+    if (pendingMedia.length >= MAX_PENDING_MEDIA || isBlocked) return;
+    const remaining = MAX_PENDING_MEDIA - pendingMedia.length;
+    Alert.alert('Add Photo or Video', 'Choose an option', [
       {
-        text: 'Take Photo',
+        text: 'Take Photo or Video',
         onPress: async () => {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
-          const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7 });
-          if (!result.canceled) setPendingImages(prev => [...prev, result.assets[0].uri]);
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
+            videoMaxDuration: MAX_VIDEO_DURATION_SEC,
+            quality: 0.7,
+          });
+          if (!result.canceled) await routeAsset(result.assets[0]);
         },
       },
       {
@@ -321,14 +375,15 @@ export default function ChatScreen() {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
           const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ImagePicker.MediaTypeOptions.All,
             quality: 0.7,
             allowsMultipleSelection: true,
             selectionLimit: remaining,
           });
           if (!result.canceled) {
-            const newUris = result.assets.slice(0, remaining).map(a => a.uri);
-            setPendingImages(prev => [...prev, ...newUris]);
+            for (const asset of result.assets.slice(0, remaining)) {
+              await routeAsset(asset);
+            }
           }
         },
       },
@@ -336,8 +391,32 @@ export default function ChatScreen() {
     ]);
   };
 
-  const removePendingImage = (index) => {
-    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  const routeAsset = async (asset) => {
+    if (asset.type === 'video') {
+      const durationSec = (asset.duration || 0) / 1000;
+      if (durationSec > MAX_VIDEO_DURATION_SEC) {
+        Alert.alert('Video skipped', `That video is ${Math.round(durationSec)}s, which is over the ${MAX_VIDEO_DURATION_SEC}s limit, so it wasn't added.`);
+        return;
+      }
+      if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+        Alert.alert('Video skipped', `That video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB, which is over the ${MAX_VIDEO_SIZE_BYTES / (1024 * 1024)}MB limit, so it wasn't added.`);
+        return;
+      }
+      let thumbnailUri = null;
+      try {
+        const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
+        thumbnailUri = thumb.uri;
+      } catch (e) {
+        console.error('Video thumbnail generation failed:', e);
+      }
+      setPendingMedia(prev => [...prev, { kind: 'video', uri: asset.uri, thumbnailUri }]);
+    } else {
+      setPendingMedia(prev => [...prev, { kind: 'image', uri: asset.uri }]);
+    }
+  };
+
+  const removePendingMedia = (index) => {
+    setPendingMedia(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleTogglePin = () => {
@@ -399,19 +478,19 @@ export default function ChatScreen() {
   };
 
   const handleLongPressMessage = (item) => {
+    const itemMedia = getItemMedia(item);
     setReplyingTo({
       messageId: item.id,
-      text: item.text || (item.imageUrl ? 'Photo' : ''),
-      imageUrl: item.imageUrl || null,
+      text: item.text || (itemMedia.length > 1 ? `${itemMedia.length} items` : (itemMedia.length === 1 ? (itemMedia[0].type === 'video' ? 'Video' : 'Photo') : '')),
+      imageUrl: itemMedia.length > 0 ? (itemMedia[0].thumbnailUrl || itemMedia[0].url) : null,
       senderName: item.senderId === user.uid ? 'You' : userName,
     });
   };
 
-  // Every photo shared in this conversation, in the same order they
-  // appear in the message list — lets the viewer swipe through all of
-  // them starting from whichever one was tapped, rather than only
-  // showing that single image with no way to browse the rest.
-  const chatImageUrls = messages.filter(m => m.imageUrl).map(m => m.imageUrl);
+  const openViewer = (itemMedia, index) => {
+    setViewerMedia(itemMedia);
+    setViewerIndex(index);
+  };
 
   const renderItem = ({ item, index }) => {
     const isMe = item.senderId === user.uid;
@@ -420,6 +499,9 @@ export default function ChatScreen() {
       item.createdAt && prevMsg.createdAt &&
       formatDate(item.createdAt) !== formatDate(prevMsg.createdAt)
     );
+    const itemMedia = getItemMedia(item);
+    const hasMedia = itemMedia.length > 0;
+    const isMediaOnly = hasMedia && !item.text;
 
     return (
       <>
@@ -440,8 +522,8 @@ export default function ChatScreen() {
             activeOpacity={0.85}
             onLongPress={() => handleLongPressMessage(item)}
             style={[
-              (item.imageUrl && !item.text) ? styles.bubbleImageOnly : styles.bubble,
-              !(item.imageUrl && !item.text) && (isMe ? styles.bubbleMe : styles.bubbleThem),
+              isMediaOnly ? styles.bubbleImageOnly : styles.bubble,
+              !isMediaOnly && (isMe ? styles.bubbleMe : styles.bubbleThem),
               replyingTo?.messageId === item.id && styles.bubbleReplyHighlight,
             ]}
           >
@@ -451,15 +533,42 @@ export default function ChatScreen() {
                 <Text style={[styles.replyQuoteText, isMe && styles.replyQuoteTextMe]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.replyTo.text}</Text>
               </View>
             )}
-            {item.imageUrl && (
-              <TouchableOpacity onPress={() => setViewerIndex(chatImageUrls.indexOf(item.imageUrl))}>
-                <Image source={{ uri: item.imageUrl }} style={styles.msgImage} />
+            {hasMedia && itemMedia.length === 1 && (
+              <TouchableOpacity onPress={() => openViewer(itemMedia, 0)}>
+                <Image source={{ uri: itemMedia[0].thumbnailUrl || itemMedia[0].url }} style={styles.msgImage} />
+                {itemMedia[0].type === 'video' && (
+                  <View style={styles.videoPlayBadge} pointerEvents="none">
+                    <Ionicons name="play" size={18} color="#fff" />
+                  </View>
+                )}
               </TouchableOpacity>
+            )}
+            {hasMedia && itemMedia.length > 1 && (
+              <View style={styles.mediaGrid}>
+                {itemMedia.slice(0, MAX_GRID_PREVIEW).map((m, i) => {
+                  const isLastVisible = i === MAX_GRID_PREVIEW - 1 && itemMedia.length > MAX_GRID_PREVIEW;
+                  return (
+                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i)} style={styles.mediaGridCell}>
+                      <Image source={{ uri: m.thumbnailUrl || m.url }} style={styles.mediaGridImage} />
+                      {m.type === 'video' && !isLastVisible && (
+                        <View style={styles.videoPlayBadgeSmall} pointerEvents="none">
+                          <Ionicons name="play" size={14} color="#fff" />
+                        </View>
+                      )}
+                      {isLastVisible && (
+                        <View style={styles.mediaGridMoreOverlay} pointerEvents="none">
+                          <Text style={styles.mediaGridMoreText}>+{itemMedia.length - MAX_GRID_PREVIEW}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             )}
             {item.text ? renderMessageText(item.text, isMe, styles) : null}
             <Text style={[
               styles.bubbleTime,
-              (item.imageUrl && !item.text) ? styles.bubbleTimeImageOnly : (isMe && styles.bubbleTimeMe),
+              isMediaOnly ? styles.bubbleTimeImageOnly : (isMe && styles.bubbleTimeMe),
             ]}>
               {item.createdAt ? formatTime(item.createdAt) : ''}
             </Text>
@@ -577,19 +686,23 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           )}
-          {pendingImages.length > 0 && (
+          {pendingMedia.length > 0 && (
             <View style={styles.pendingImageBar}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                {pendingImages.map((uri, i) => (
+                {pendingMedia.map((item, i) => (
                   <View key={i} style={styles.pendingImageThumbWrap}>
-                    <Image source={{ uri }} style={styles.pendingImageThumb} />
-                    <TouchableOpacity style={styles.pendingImageRemoveBtn} onPress={() => removePendingImage(i)}>
+                    <Image source={{ uri: item.kind === 'video' ? (item.thumbnailUri || item.uri) : item.uri }} style={styles.pendingImageThumb} />
+                    {item.kind === 'video' && (
+                      <View style={styles.pendingVideoBadge} pointerEvents="none">
+                        <Ionicons name="play" size={12} color="#fff" />
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.pendingImageRemoveBtn} onPress={() => removePendingMedia(i)}>
                       <Ionicons name="close-circle" size={18} color="#E53935" />
                     </TouchableOpacity>
                   </View>
                 ))}
               </ScrollView>
-              <Text style={styles.pendingImageCount}>{pendingImages.length}</Text>
             </View>
           )}
           {/* paddingBottom includes the safe-area inset (on top of the
@@ -599,12 +712,12 @@ export default function ChatScreen() {
               boundary and can end up partially covered by the system
               nav bar, which is what made the send button look "overlaid". */}
           <View style={[styles.inputRow, { paddingBottom: 12 + insets.bottom }]}>
-            <TouchableOpacity style={styles.imageBtn} onPress={handlePickImage} disabled={pendingImages.length >= MAX_PENDING_IMAGES}>
-              <Ionicons name="camera-outline" size={24} color={pendingImages.length >= MAX_PENDING_IMAGES ? Colors.lightGrey : Colors.brandGreen} />
+            <TouchableOpacity style={styles.imageBtn} onPress={handlePickMedia} disabled={pendingMedia.length >= MAX_PENDING_MEDIA}>
+              <Ionicons name="camera-outline" size={24} color={pendingMedia.length >= MAX_PENDING_MEDIA ? Colors.lightGrey : Colors.brandGreen} />
             </TouchableOpacity>
             <TextInput
               style={styles.input}
-              placeholder={pendingImages.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
+              placeholder={pendingMedia.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
               placeholderTextColor={Colors.midGrey}
               value={message}
               onChangeText={setMessage}
@@ -614,9 +727,9 @@ export default function ChatScreen() {
               autoCapitalize="sentences"
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!message.trim() && pendingImages.length === 0 || sending) && styles.sendBtnDisabled]}
+              style={[styles.sendBtn, (!message.trim() && pendingMedia.length === 0 || sending) && styles.sendBtnDisabled]}
               onPress={handleSend}
-              disabled={(!message.trim() && pendingImages.length === 0) || sending}
+              disabled={(!message.trim() && pendingMedia.length === 0) || sending}
             >
               {sending
                 ? <ActivityIndicator color={Colors.white} size="small" />
@@ -635,10 +748,10 @@ export default function ChatScreen() {
           nothing visible at all. */}
       <Animated.View style={{ height: keyboardHeight }} />
 
-      <ImageViewerModal
-        images={viewerIndex !== null ? chatImageUrls : null}
-        initialIndex={viewerIndex ?? 0}
-        onClose={() => setViewerIndex(null)}
+      <MediaViewerModal
+        media={viewerMedia}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerMedia(null)}
       />
 
       <Modal visible={showMenu} transparent animationType="fade">
@@ -702,9 +815,10 @@ const styles = StyleSheet.create({
   avatarSmallImage: { width: 28, height: 28, borderRadius: 14 },
   avatarSmallText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2, flexShrink: 1 },
-  // Image-only messages skip the colored bubble background/padding
-  // entirely — the photo shows edge-to-edge with just rounded corners,
-  // rather than sitting inside a green/white frame like text messages.
+  // Media-only messages skip the colored bubble background/padding
+  // entirely — the photo/video shows edge-to-edge with just rounded
+  // corners, rather than sitting inside a green/white frame like text
+  // messages.
   bubbleImageOnly: { maxWidth: '75%', borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', gap: 2, flexShrink: 1 },
   // Light yellow highlight on whichever bubble is currently selected as
   // the reply target — overrides both bubbleMe (green) and bubbleThem
@@ -718,7 +832,7 @@ const styles = StyleSheet.create({
   bubbleTextMe: { color: Colors.white },
   bubbleTime: { fontSize: 10, color: Colors.midGrey, alignSelf: 'flex-end' },
   // Neutral grey regardless of sender, since there's no colored backdrop
-  // behind an image-only message the way bubbleTimeMe's white assumes.
+  // behind a media-only message the way bubbleTimeMe's white assumes.
   bubbleTimeImageOnly: { color: Colors.midGrey, marginTop: 2 },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.7)' },
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
@@ -745,12 +859,33 @@ const styles = StyleSheet.create({
   pendingImageBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   pendingImageThumbWrap: { position: 'relative' },
   pendingImageThumb: { width: 52, height: 52, borderRadius: 10 },
+  pendingVideoBadge: {
+    position: 'absolute', top: '50%', left: '50%', marginTop: -10, marginLeft: -10,
+    width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
   pendingImageRemoveBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 9 },
-  pendingImageCount: { fontSize: 13, fontWeight: '800', color: Colors.brandGreen, minWidth: 20, textAlign: 'center' },
   replyBarSender: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   replyBarText: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
-  // Image message + full-screen viewer
+  // Single-image/video message + full-screen viewer
   msgImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
+  videoPlayBadge: {
+    position: 'absolute', top: '50%', left: '50%', marginTop: -18, marginLeft: -18,
+    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  // Multi-photo/video grid — 2 columns, up to 4 visible thumbnails, with
+  // a "+N" overlay on the last one if there are more than 4 in total.
+  mediaGrid: { width: 200, flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: 4 },
+  mediaGridCell: { width: 98.5, height: 98.5, borderRadius: 8, overflow: 'hidden', position: 'relative', backgroundColor: '#00000010' },
+  mediaGridImage: { width: '100%', height: '100%' },
+  videoPlayBadgeSmall: {
+    position: 'absolute', top: '50%', left: '50%', marginTop: -14, marginLeft: -14,
+    width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  mediaGridMoreOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
+  mediaGridMoreText: { color: '#fff', fontSize: 20, fontWeight: '800' },
 
   blockedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   blockedBannerText: { flex: 1, fontSize: 13, color: Colors.midGrey },

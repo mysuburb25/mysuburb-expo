@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MySuburb</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #2D6A4F;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 40px 28px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .app-name {
+    font-size: 32px;
+    font-weight: 800;
+    color: #2D6A4F;
+    letter-spacing: 0.5px;
+  }
+  .tagline {
+    font-size: 14px;
+    color: #FFB800;
+    font-weight: 600;
+    margin-top: 4px;
+    margin-bottom: 24px;
+  }
+  .icon-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    background: #E8F5E9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 28px;
+  }
+  h1 {
+    font-size: 19px;
+    color: #1B1F23;
+    margin-bottom: 8px;
+  }
+  p {
+    font-size: 14px;
+    color: #6B7280;
+    line-height: 20px;
+    margin-bottom: 28px;
+  }
+  .status {
+    font-size: 13px;
+    color: #2D6A4F;
+    font-weight: 600;
+    margin-bottom: 20px;
+    min-height: 18px;
+  }
+  .store-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .store-btn {
+    display: block;
+    text-decoration: none;
+    padding: 14px 20px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    transition: opacity 0.15s;
+  }
+  .store-btn:active { opacity: 0.8; }
+  .btn-ios {
+    background: #2D6A4F;
+    color: #ffffff;
+  }
+  .btn-android {
+    background: #FFFFFF;
+    color: #2D6A4F;
+    border: 1.5px solid #2D6A4F;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="app-name">MySuburb</div>
+    <div class="tagline">Bringing suburbs together</div>
+
+    <div class="icon-circle">👋</div>
+    <h1>Someone shared a post with you</h1>
+    <p>Open it in the MySuburb app to see the full details and connect with your local community.</p>
+
+    <div id="status" class="status"></div>
+
+    <div class="store-buttons">
+      <a class="store-btn btn-ios" href="https://apps.apple.com/app/id6791455586">Download on the App Store</a>
+      <a class="store-btn btn-android" href="https://play.google.com/store/apps/details?id=com.mysuburb.app">Get it on Google Play</a>
+    </div>
+  </div>
+
+  <script>
+    // If someone with the app already installed lands here anyway (e.g. an
+    // older app version without Universal Links support, or a platform
+    // where OS-level interception didn't apply), try the custom-scheme
+    // deep link as a best-effort fallback. If nothing happens within a
+    // second or two, they simply see the download buttons above — this
+    // never blocks or delays that fallback UI, it just attempts a bonus
+    // path before it.
+    (function () {
+      var path = window.location.pathname; // e.g. /post/abc123
+      var match = path.match(/\/post\/([a-zA-Z0-9_-]+)/);
+      if (!match) return;
+      var postId = match[1];
+      var statusEl = document.getElementById('status');
+      statusEl.textContent = 'Opening in the app…';
+      window.location.href = 'mysuburb://post/' + postId;
+      setTimeout(function () {
+        statusEl.textContent = '';
+      }, 2500);
+    })();
+  </script>
+</body>
+</html>
