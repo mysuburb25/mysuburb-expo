@@ -1,7 +1,6 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-
     // Profile photos — the filename must be the uploader's own UID, so a
     // user can only ever create/overwrite their own photo, never someone
     // else's. 5MB cap, must actually be an image.
@@ -12,7 +11,6 @@ service firebase.storage {
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
-
     // Post images AND videos — the storage path is keyed by postId (a
     // generated Firestore document ID), not the uploader's uid, so
     // ownership can't be checked from the path alone. Instead we look up
@@ -32,22 +30,27 @@ service firebase.storage {
                         (request.resource.contentType.matches('video/.*') && request.resource.size < 50 * 1024 * 1024)
                       );
     }
-
-    // Chat images — keyed by conversationId, so ownership is checked the
-    // same way as post images: look up the conversation doc and confirm
-    // the uploader is one of its two participants. Both read and write
-    // are scoped this way, since chat images should only ever be visible
-    // to the two people actually in that conversation, unlike post images
-    // which are public to any signed-in user.
-    match /chatImages/{conversationId}/{fileName} {
+    // Chat media (photos AND videos) — keyed by conversationId, so
+    // ownership is checked the same way as post media: look up the
+    // conversation doc and confirm the uploader is one of its two
+    // participants. Both read and write are scoped this way, since chat
+    // media should only ever be visible to the two people actually in
+    // that conversation, unlike post media which is public to any
+    // signed-in user. Renamed from chatImages to chatMedia, and video
+    // support added, when chat gained the ability to send videos
+    // alongside photos — the old path/rule only ever allowed
+    // image/.* uploads.
+    match /chatMedia/{conversationId}/{fileName} {
       allow read: if request.auth != null
                   && request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participants;
       allow write: if request.auth != null
                    && request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participants
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && (
+                        (request.resource.contentType.matches('image/.*') && request.resource.size < 10 * 1024 * 1024)
+                        ||
+                        (request.resource.contentType.matches('video/.*') && request.resource.size < 50 * 1024 * 1024)
+                      );
     }
-
     // Deny everything else by default — no other paths are used by the
     // app, so there's no reason to leave them open.
     match /{allPaths=**} {

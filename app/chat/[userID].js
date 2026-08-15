@@ -97,6 +97,7 @@ export default function ChatScreen() {
   const [theyBlockedMe, setTheyBlockedMe] = useState(false);
   const [otherUserPhotoURL, setOtherUserPhotoURL] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName, imageUrl }
+  const [actionSheetMessage, setActionSheetMessage] = useState(null); // the message item currently showing its long-press menu, or null
   const [pendingMedia, setPendingMedia] = useState([]); // [{ kind: 'image'|'video', uri, thumbnailUri? }], staged but not yet sent
   const [viewerMedia, setViewerMedia] = useState(null); // full media array for the tapped message, or null when closed
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -206,7 +207,13 @@ export default function ChatScreen() {
       ? query(messagesRef, orderBy('createdAt', 'asc'), where('createdAt', '>', clearedAt))
       : query(messagesRef, orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Messages the current user has "deleted for me" are filtered out
+      // here rather than at query level (Firestore can't query "array
+      // does NOT contain X" efficiently) — they still exist in Firestore
+      // for the other participant, who never sees this filtering.
+      const items = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(m => !(m.deletedFor || []).includes(user.uid));
       setMessages(items);
       setLoading(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -478,6 +485,13 @@ export default function ChatScreen() {
   };
 
   const handleLongPressMessage = (item) => {
+    if (item.unsent) return; // nothing to do on an already-unsent message
+    setActionSheetMessage(item);
+  };
+
+  const handleReplyFromSheet = () => {
+    const item = actionSheetMessage;
+    setActionSheetMessage(null);
     const itemMedia = getItemMedia(item);
     setReplyingTo({
       messageId: item.id,
@@ -485,6 +499,88 @@ export default function ChatScreen() {
       imageUrl: itemMedia.length > 0 ? (itemMedia[0].thumbnailUrl || itemMedia[0].url) : null,
       senderName: item.senderId === user.uid ? 'You' : userName,
     });
+  };
+
+  // Hides the message from the current user's own view only — the other
+  // participant keeps seeing it normally. The message document itself
+  // isn't touched beyond adding this uid to deletedFor; the onSnapshot
+  // listener above is what actually filters it out of what renders.
+  const handleDeleteForMe = () => {
+    const item = actionSheetMessage;
+    setActionSheetMessage(null);
+    updateDoc(doc(db, 'conversations', conversationId, 'messages', item.id), {
+      deletedFor: arrayUnion(user.uid),
+    }).catch(e => console.error(e));
+  };
+
+  // Only ever offered to the sender (see the menu's own conditional
+  // rendering below). Clears the message's actual content and marks it
+  // unsent, rather than deleting the Firestore document outright — this
+  // keeps a "This message was unsent" placeholder in both people's
+  // conversation history instead of leaving a confusing silent gap.
+  const handleUnsend = () => {
+    const item = actionSheetMessage;
+    setActionSheetMessage(null);
+    Alert.alert(
+      'Unsend Message',
+      'This will remove the message for both you and ' + userName + '. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unsend', style: 'destructive',
+          onPress: () => {
+            updateDoc(doc(db, 'conversations', conversationId, 'messages', item.id), {
+              unsent: true,
+              text: null,
+              media: null,
+              imageUrl: null,
+              replyTo: null,
+            }).catch(e => console.error(e));
+          },
+        },
+      ]
+    );
+  };
+
+  // Reuses the same reports collection the rest of the app already
+  // writes to (see report-problem.js) — pre-filled with the message's
+  // own context rather than sending the person to a separate form, so
+  // reporting something mid-conversation stays a single quick action.
+  const handleReportMessage = () => {
+    const item = actionSheetMessage;
+    setActionSheetMessage(null);
+    Alert.alert(
+      'Report this message?',
+      'Our moderation team will review it. This is anonymous to ' + userName + '.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report', style: 'destructive',
+          onPress: async () => {
+            try {
+              const itemMedia = getItemMedia(item);
+              await addDoc(collection(db, 'reports'), {
+                category: 'Inappropriate content',
+                description: item.text || (itemMedia.length > 0 ? '[Photo/video message]' : '[message]'),
+                userId: user?.uid || null,
+                userEmail: profile?.email || user?.email || null,
+                userDisplayName: profile?.displayName || null,
+                reportedUserId: item.senderId,
+                reportedUserName: item.senderId === user.uid ? profile?.displayName : userName,
+                conversationId,
+                reportedMessageId: item.id,
+                status: 'open',
+                createdAt: serverTimestamp(),
+              });
+              Alert.alert('Reported', 'Thank you — our team will review this within 24 hours.');
+            } catch (e) {
+              console.error(e);
+              Alert.alert('Error', 'Could not submit the report. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const openViewer = (itemMedia, index) => {
@@ -502,6 +598,35 @@ export default function ChatScreen() {
     const itemMedia = getItemMedia(item);
     const hasMedia = itemMedia.length > 0;
     const isMediaOnly = hasMedia && !item.text;
+
+    // An unsent message keeps its place in the conversation (rather than
+    // vanishing, which would leave a confusing silent gap) but shows only
+    // a neutral placeholder — no text, media, or reply preview, and it's
+    // no longer interactive (no long-press menu, see handleLongPressMessage).
+    if (item.unsent) {
+      return (
+        <>
+          {showDate && item.createdAt && (
+            <Text style={styles.dateLabel}>{formatDate(item.createdAt)}</Text>
+          )}
+          <View style={[styles.msgRow, isMe && styles.msgRowMe]}>
+            {!isMe && (
+              <View style={styles.avatarSmall}>
+                {otherUserPhotoURL ? (
+                  <Image source={{ uri: otherUserPhotoURL }} style={styles.avatarSmallImage} />
+                ) : (
+                  <Text style={styles.avatarSmallText}>{userName?.[0]?.toUpperCase()}</Text>
+                )}
+              </View>
+            )}
+            <View style={styles.bubbleUnsent}>
+              <Ionicons name="ban-outline" size={14} color={Colors.midGrey} />
+              <Text style={styles.bubbleUnsentText}>This message was unsent</Text>
+            </View>
+          </View>
+        </>
+      );
+    }
 
     return (
       <>
@@ -754,6 +879,55 @@ export default function ChatScreen() {
         onClose={() => setViewerMedia(null)}
       />
 
+      {/* Long-press message action sheet — Reply, Report (only on the
+          other person's messages), Unsend (only on your own), and Delete
+          for me (always available, hides it from your view only). Same
+          green-header "Select" pattern as the conversation's own 3-dot
+          menu below, kept visually consistent across every action sheet
+          in the app. */}
+      <Modal visible={!!actionSheetMessage} transparent animationType="fade">
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setActionSheetMessage(null)}>
+          <View style={styles.menuSheet}>
+            <View style={styles.menuHeaderBar}>
+              <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
+            </View>
+            <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleReplyFromSheet}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="arrow-undo-outline" size={20} color={Colors.brandGreen} />
+                </View>
+                <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Reply</Text>
+              </TouchableOpacity>
+              {actionSheetMessage?.senderId !== user.uid && (
+                <TouchableOpacity style={styles.menuItem} onPress={handleReportMessage}>
+                  <View style={styles.menuItemIconDanger}>
+                    <Ionicons name="flag-outline" size={20} color="#E53935" />
+                  </View>
+                  <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report</Text>
+                </TouchableOpacity>
+              )}
+              {actionSheetMessage?.senderId === user.uid && (
+                <TouchableOpacity style={styles.menuItem} onPress={handleUnsend}>
+                  <View style={styles.menuItemIconDanger}>
+                    <Ionicons name="close-circle-outline" size={20} color="#E53935" />
+                  </View>
+                  <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Unsend</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.menuItem} onPress={handleDeleteForMe}>
+                <View style={styles.menuItemIconDanger}>
+                  <Ionicons name="trash-outline" size={20} color="#E53935" />
+                </View>
+                <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete for Me</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.menuItem, styles.menuCancelBtn]} onPress={() => setActionSheetMessage(null)}>
+                <Text style={styles.menuCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={showMenu} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={styles.menuSheet}>
@@ -835,6 +1009,8 @@ const styles = StyleSheet.create({
   // behind a media-only message the way bubbleTimeMe's white assumes.
   bubbleTimeImageOnly: { color: Colors.midGrey, marginTop: 2 },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.7)' },
+  bubbleUnsent: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
+  bubbleUnsentText: { fontSize: 13, color: Colors.midGrey, fontStyle: 'italic' },
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptySubText: { fontSize: 14, color: Colors.midGrey },
