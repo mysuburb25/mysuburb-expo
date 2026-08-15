@@ -691,10 +691,15 @@ export default function ChatScreen() {
               </View>
             )}
             {item.text ? renderMessageText(item.text, isMe, styles) : null}
-            <Text style={[
-              styles.bubbleTime,
-              isMediaOnly ? styles.bubbleTimeImageOnly : (isMe && styles.bubbleTimeMe),
-            ]}>
+            <Text
+              style={[
+                styles.bubbleTime,
+                isMediaOnly ? styles.bubbleTimeImageOnly : (isMe && styles.bubbleTimeMe),
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {item.createdAt ? formatTime(item.createdAt) : ''}
             </Text>
           </TouchableOpacity>
