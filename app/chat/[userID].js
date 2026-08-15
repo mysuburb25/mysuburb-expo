@@ -1012,7 +1012,11 @@ const styles = StyleSheet.create({
   bubbleTime: { fontSize: 10, color: Colors.midGrey, alignSelf: 'flex-end' },
   // Neutral grey regardless of sender, since there's no colored backdrop
   // behind a media-only message the way bubbleTimeMe's white assumes.
-  bubbleTimeImageOnly: { color: Colors.midGrey, marginTop: 2 },
+  // marginRight pushes the text away from the bubble's rounded corner —
+  // without it, the corner's curve (from overflow: hidden + borderRadius
+  // on bubbleImageOnly) was visually clipping into the last character,
+  // even though the text itself was never actually being told to shrink.
+  bubbleTimeImageOnly: { color: Colors.midGrey, marginTop: 2, marginRight: 8 },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.7)' },
   bubbleUnsent: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
   bubbleUnsentText: { fontSize: 13, color: Colors.midGrey, fontStyle: 'italic' },
