@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as NavigationBar from 'expo-navigation-bar';
+import * as Updates from 'expo-updates';
 import { AuthProvider } from '../context/AuthContext';
 
 // Without this, a push that arrives while the app is open and in the
@@ -18,6 +19,32 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Proactively checks for a newer OTA update the moment the app
+    // starts, rather than passively waiting for it to be noticed on some
+    // future launch. If one's found, it downloads and immediately
+    // reloads the app with it — right here, in this same session — so a
+    // fresh install (or anyone who hasn't relaunched in a while) gets
+    // the latest code on effectively their first real launch, instead of
+    // needing to manually close and reopen the app twice to pick it up.
+    // Wrapped defensively: any failure here (offline, dev mode, etc.)
+    // just means the app continues running on whatever code it already
+    // has — never blocks or crashes the app itself.
+    async function checkForUpdate() {
+      if (__DEV__) return; // updates don't apply in local dev anyway
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        if (result.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch (e) {
+        console.error('Update check failed:', e);
+      }
+    }
+    checkForUpdate();
+  }, []);
+
   useEffect(() => {
     // The "orientation": "portrait" setting in app.json is often not
     // reliably enforced inside Expo Go specifically (a known Expo Go
