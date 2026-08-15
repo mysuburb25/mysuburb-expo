@@ -400,7 +400,7 @@ export default function LostFoundScreen() {
                   </View>
                 </View>
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{item.content}</Text>
+                  <Text style={[styles.cardTitle, item.isResolved && styles.closedText]} numberOfLines={2}>{item.content}</Text>
                   {item.description ? <Text style={[styles.cardDesc, item.isResolved && styles.closedText]} numberOfLines={2}>{item.description}</Text> : null}
                   {item.lostFoundLocation ? (
                     <TouchableOpacity
