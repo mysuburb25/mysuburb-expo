@@ -18,7 +18,12 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // would conflict with tapping a video's own controls — closing is a
 // deliberate swipe-down gesture instead, the same "pull to dismiss"
 // pattern most full-screen media viewers use.
-export default function MediaViewerModal({ media, initialIndex = 0, onClose }) {
+// onDownload is optional — when provided, a download button appears next
+// to the close button, calling onDownload(currentItem, currentIndex) when
+// tapped. Left out entirely by any caller that doesn't need it (this
+// component is shared across several screens, most of which have no
+// reason to offer downloading).
+export default function MediaViewerModal({ media, initialIndex = 0, onClose, onDownload }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const visible = !!media && media.length > 0;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -89,6 +94,11 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose }) {
           <View style={styles.counter} pointerEvents="none">
             <Text style={styles.counterText}>{currentIndex + 1} / {media.length}</Text>
           </View>
+        )}
+        {onDownload && (
+          <TouchableOpacity style={styles.downloadBtn} onPress={() => onDownload(media[currentIndex], currentIndex)}>
+            <Ionicons name="download-outline" size={26} color="#fff" />
+          </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <Ionicons name="close" size={28} color="#fff" />
@@ -182,6 +192,7 @@ const styles = StyleSheet.create({
   video: { width: SCREEN_WIDTH, height: '90%' },
   playOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   closeBtn: { position: 'absolute', top: 56, right: 20, padding: 8 },
+  downloadBtn: { position: 'absolute', top: 56, right: 64, padding: 8 },
   counter: { position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
   counterText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });

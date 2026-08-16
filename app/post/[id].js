@@ -17,6 +17,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { getOrderedMedia } from '../../utils/mediaOrder';
+import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 
 const REPORT_REASONS = [
   'Spam or scam',
@@ -366,6 +369,47 @@ export default function PostDetailScreen() {
     if (Platform.OS === 'ios' && pendingExternalShareRef.current) {
       pendingExternalShareRef.current = false;
       Share.share({ message: buildShareText() }).catch(e => console.error(e));
+    }
+  };
+
+  // Copies the post's own text (title/content + description, for
+  // whichever fields this post actually has) — available to anyone who
+  // can view the post, not just the owner, since copying is a read-only
+  // action.
+  const handleCopyPostText = async () => {
+    setShowPostMenu(false);
+    const parts = [post.content, post.description].filter(Boolean);
+    if (parts.length === 0) return;
+    try {
+      await Clipboard.setStringAsync(parts.join('\n\n'));
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not copy text.');
+    }
+  };
+
+  // Downloads one or more { type, url } media items to the device's
+  // photo library. Requires photo library write permission, requested
+  // here rather than at app startup, since it's only ever needed at the
+  // moment someone actually tries to download something. Used by the
+  // MediaViewerModal's own download button below.
+  const saveMediaToLibrary = async (targets) => {
+    if (!targets || targets.length === 0 || !targets[0]) return;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow photo library access to save media.');
+        return;
+      }
+      for (const t of targets) {
+        const localUri = FileSystem.cacheDirectory + Date.now() + '_' + Math.random().toString(36).slice(2) + (t.type === 'video' ? '.mp4' : '.jpg');
+        const { uri } = await FileSystem.downloadAsync(t.url, localUri);
+        await MediaLibrary.saveToLibraryAsync(uri);
+      }
+      Alert.alert('Saved', targets.length > 1 ? `${targets.length} items saved to your photo library.` : 'Saved to your photo library.');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not save to your photo library. Please try again.');
     }
   };
 
@@ -1147,6 +1191,12 @@ export default function PostDetailScreen() {
               <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
             </View>
             <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleCopyPostText}>
+              <View style={styles.menuItemIcon}>
+                <Ionicons name="copy-outline" size={20} color={Colors.brandGreen} />
+              </View>
+              <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Copy Text</Text>
+            </TouchableOpacity>
             {isOwner ? (
               <>
                 {(post.category === 'marketplace' || post.category === 'lostfound') && (
@@ -1208,7 +1258,7 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <MediaViewerModal media={viewerIndex !== null ? orderedMedia : null} initialIndex={viewerIndex ?? 0} onClose={() => setViewerIndex(null)} />
+      <MediaViewerModal media={viewerIndex !== null ? orderedMedia : null} initialIndex={viewerIndex ?? 0} onClose={() => setViewerIndex(null)} onDownload={(item) => saveMediaToLibrary([item])} />
 
       {/* Share modal */}
       <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>

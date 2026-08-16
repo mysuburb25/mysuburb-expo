@@ -19,7 +19,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "MySuburb uses your camera so you can take photos to attach to posts and update your profile picture.",
         "NSPhotoLibraryUsageDescription": "MySuburb accesses your photo library so you can attach existing photos to posts and set your profile picture.",
-        "NSCalendarsUsageDescription": "MySuburb needs calendar access so you can add community events to your calendar."
+        "NSCalendarsUsageDescription": "MySuburb needs calendar access so you can add community events to your calendar.",
+        "NSPhotoLibraryAddUsageDescription": "MySuburb needs access to save photos and videos you download to your photo library."
       }
     },
     "android": {
@@ -67,6 +68,12 @@
         "expo-calendar",
         {
           "calendarPermission": "MySuburb needs calendar access so you can add community events to your calendar."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "MySuburb needs access to save photos and videos you download to your photo library."
         }
       ],
       "expo-video"
