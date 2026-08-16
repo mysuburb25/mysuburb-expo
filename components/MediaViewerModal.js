@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal, TouchableOpacity, Image, StyleSheet, FlatList, View, Text, Dimensions, Animated, PanResponder } from 'react-native';
+import { Modal, TouchableOpacity, Image, StyleSheet, FlatList, View, Text, Dimensions, Animated, PanResponder, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -18,28 +19,30 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // would conflict with tapping a video's own controls — closing is a
 // deliberate swipe-down gesture instead, the same "pull to dismiss"
 // pattern most full-screen media viewers use.
+//
 // onDownload is optional — when provided, a download button appears next
 // to the close button, calling onDownload(currentItem, currentIndex) when
 // tapped. Left out entirely by any caller that doesn't need it (this
 // component is shared across several screens, most of which have no
 // reason to offer downloading).
 //
-// onLongPress is also optional — when provided, long-pressing the
-// currently-displayed photo/video calls onLongPress(currentItem,
-// currentIndex). This is what lets chat's action sheet (reply to this
-// photo, download, etc.) work from inside the full-screen viewer too —
-// not just via the grid's own per-thumbnail long-press, which only
-// covers the first few visible thumbnails in a large multi-photo
-// message. Without this, anything beyond the grid's visible items was
-// only ever reachable by viewing, with no way to act on it.
-export default function MediaViewerModal({ media, initialIndex = 0, onClose, onDownload, onLongPress }) {
+// onSendReply is also optional — when provided, a reply input box
+// appears pinned to the bottom of the viewer. Typing and sending calls
+// onSendReply(text, currentItem, currentIndex), letting someone reply
+// to a specific photo/video directly from the big view — e.g. picking
+// one item out of a multi-photo message and saying "I want this one" —
+// without needing to close the viewer first.
+export default function MediaViewerModal({ media, initialIndex = 0, onClose, onDownload, onSendReply }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [replyText, setReplyText] = useState('');
+  const insets = useSafeAreaInsets();
   const visible = !!media && media.length > 0;
   const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setCurrentIndex(initialIndex);
+      setReplyText('');
       translateY.setValue(0);
     }
   }, [visible, initialIndex]);
@@ -47,6 +50,12 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
   const onScrollEnd = (e) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setCurrentIndex(idx);
+  };
+
+  const handleSendReply = () => {
+    if (!replyText.trim() || !onSendReply) return;
+    onSendReply(replyText, media[currentIndex], currentIndex);
+    setReplyText('');
   };
 
   // Only claims the gesture once movement is clearly more vertical than
@@ -83,7 +92,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {visible && (
           <Animated.View style={{ flex: 1, transform: [{ translateY }] }} {...panResponder.panHandlers}>
             <FlatList
@@ -95,7 +104,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
               initialScrollIndex={initialIndex}
               getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
               onMomentumScrollEnd={onScrollEnd}
-              renderItem={({ item, index }) => <MediaPage item={item} isActive={index === currentIndex} onClose={onClose} onLongPress={onLongPress ? () => onLongPress(item, index) : undefined} />}
+              renderItem={({ item, index }) => <MediaPage item={item} isActive={index === currentIndex} onClose={onClose} />}
             />
           </Animated.View>
         )}
@@ -112,7 +121,27 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
-      </View>
+        {onSendReply && (
+          <View style={[styles.replyBar, { paddingBottom: 12 + insets.bottom }]}>
+            <TextInput
+              style={styles.replyInput}
+              placeholder="Reply to this photo..."
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={replyText}
+              onChangeText={setReplyText}
+              multiline
+              maxLength={500}
+            />
+            <TouchableOpacity
+              style={[styles.replySendBtn, !replyText.trim() && styles.replySendBtnDisabled]}
+              onPress={handleSendReply}
+              disabled={!replyText.trim()}
+            >
+              <Ionicons name="send" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -121,7 +150,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
 // is a hook — it can't be called conditionally or inside a .map/render-
 // item callback directly. Every page gets its own instance; photo pages
 // simply never touch the player.
-function MediaPage({ item, isActive, onClose, onLongPress }) {
+function MediaPage({ item, isActive, onClose }) {
   const videoViewRef = useRef(null);
   const isVideo = item.type === 'video';
   const [isPlaying, setIsPlaying] = useState(false);
@@ -129,9 +158,6 @@ function MediaPage({ item, isActive, onClose, onLongPress }) {
     if (p) p.loop = false;
   });
 
-  // Same play-button overlay as the small inline players elsewhere —
-  // native controls stay hidden until tapped, so without this a paused
-  // video here would look identical to a photo at a glance.
   useEffect(() => {
     if (!isVideo) return;
     const sub = player.addListener('playingChange', (event) => {
@@ -165,8 +191,10 @@ function MediaPage({ item, isActive, onClose, onLongPress }) {
             anywhere on the video (including its own native play button)
             also triggered the outer TouchableOpacity's onClose, which is
             why pressing play appeared to close the viewer and navigate
-            back to the post instead of actually playing. */}
-        <TouchableOpacity activeOpacity={1} onPress={() => {}} onLongPress={onLongPress}>
+            back to the post instead of actually playing. Native controls
+            already provide their own play button — no custom overlay
+            needed here, which previously caused a double play button. */}
+        <TouchableOpacity activeOpacity={1} onPress={() => {}}>
           <VideoView
             ref={videoViewRef}
             style={styles.video}
@@ -182,7 +210,7 @@ function MediaPage({ item, isActive, onClose, onLongPress }) {
 
   return (
     <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.page}>
-      <TouchableOpacity activeOpacity={1} onPress={() => {}} onLongPress={onLongPress}>
+      <TouchableOpacity activeOpacity={1} onPress={() => {}}>
         <Image source={{ uri: item.url }} style={styles.image} resizeMode="contain" />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -194,9 +222,12 @@ const styles = StyleSheet.create({
   page: { width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center' },
   image: { width: SCREEN_WIDTH, height: '90%' },
   video: { width: SCREEN_WIDTH, height: '90%' },
-  playOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   closeBtn: { position: 'absolute', top: 56, right: 20, padding: 8 },
   downloadBtn: { position: 'absolute', top: 56, right: 64, padding: 8 },
   counter: { position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },
   counterText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  replyBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 16, paddingTop: 10, backgroundColor: 'rgba(0,0,0,0.6)' },
+  replyInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: '#fff', maxHeight: 100 },
+  replySendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2D6A4F', justifyContent: 'center', alignItems: 'center' },
+  replySendBtnDisabled: { opacity: 0.4 },
 });

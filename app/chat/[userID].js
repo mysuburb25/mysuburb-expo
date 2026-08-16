@@ -240,7 +240,13 @@ export default function ChatScreen() {
   // vs "You: 📷 Photo"). `media` is an array of { type, url, thumbnailUrl }
   // — every photo/video sent together lands on ONE message document as
   // one array, rather than each becoming its own separate message.
-  const sendMessage = async ({ text, media, previewText }) => {
+  // replyToOverride lets a caller supply the reply-to data directly,
+  // bypassing the replyingTo state entirely — used by the photo viewer's
+  // own reply box, which sends immediately rather than staging through
+  // the main composer. Reading replyingTo via setReplyingTo() followed
+  // immediately by sendMessage() would risk using its stale pre-update
+  // value, since React state updates aren't applied synchronously.
+  const sendMessage = async ({ text, media, previewText, replyToOverride }) => {
     await setDoc(doc(db, 'conversations', conversationId), {
       participants: [user.uid, userId],
       participantNames: { [user.uid]: profile.displayName, [userId]: userName },
@@ -264,12 +270,13 @@ export default function ChatScreen() {
     };
     if (text) messageData.text = text;
     if (media && media.length > 0) messageData.media = media;
-    if (replyingTo) {
+    const effectiveReplyTo = replyToOverride || replyingTo;
+    if (effectiveReplyTo) {
       messageData.replyTo = {
-        messageId: replyingTo.messageId,
-        text: replyingTo.text,
-        senderName: replyingTo.senderName,
-        imageUrl: replyingTo.imageUrl || null,
+        messageId: effectiveReplyTo.messageId,
+        text: effectiveReplyTo.text,
+        senderName: effectiveReplyTo.senderName,
+        imageUrl: effectiveReplyTo.imageUrl || null,
       };
     }
 
@@ -492,6 +499,7 @@ export default function ChatScreen() {
 
   const handleLongPressMessage = (item, mediaIndex = null) => {
     if (item.unsent) return; // nothing to do on an already-unsent message
+    Keyboard.dismiss();
     setActionSheetMessage(item);
     setActionSheetMediaIndex(mediaIndex);
   };
@@ -576,7 +584,11 @@ export default function ChatScreen() {
       Alert.alert('Saved', targets.length > 1 ? `${targets.length} items saved to your photo library.` : 'Saved to your photo library.');
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not save to your photo library. Please try again.');
+      // Temporarily showing the actual error message rather than a
+      // generic one — my last fix attempt (writeOnly permission) didn't
+      // resolve this, so guessing again without more information isn't
+      // the right move. This lets us see exactly what's failing.
+      Alert.alert('Error (debug)', 'Could not save: ' + (e?.message || String(e)));
     }
   };
 
@@ -597,6 +609,7 @@ export default function ChatScreen() {
   const handleDeleteForMe = () => {
     const item = actionSheetMessage;
     setActionSheetMessage(null);
+    Keyboard.dismiss();
     updateDoc(doc(db, 'conversations', conversationId, 'messages', item.id), {
       deletedFor: arrayUnion(user.uid),
     }).catch(e => {
@@ -613,6 +626,7 @@ export default function ChatScreen() {
   const handleUnsend = () => {
     const item = actionSheetMessage;
     setActionSheetMessage(null);
+    Keyboard.dismiss();
     Alert.alert(
       'Unsend Message',
       'This will remove the message for both you and ' + userName + '. This cannot be undone.',
@@ -641,29 +655,26 @@ export default function ChatScreen() {
   // writes to (see report-problem.js) — pre-filled with the message's
   // own context rather than sending the person to a separate form, so
   // reporting something mid-conversation stays a single quick action.
-  const handleReportMessage = () => {
-    const item = actionSheetMessage;
-    setActionSheetMessage(null);
+  const handleReportUser = () => {
+    setShowMenu(false);
     Alert.alert(
-      'Report this message?',
-      'Our moderation team will review it. This is anonymous to ' + userName + '.',
+      `Report ${userName}?`,
+      'Our moderation team will review this conversation. This is anonymous to ' + userName + '.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Report', style: 'destructive',
           onPress: async () => {
             try {
-              const itemMedia = getItemMedia(item);
               await addDoc(collection(db, 'reports'), {
-                category: 'Inappropriate content',
-                description: item.text || (itemMedia.length > 0 ? '[Photo/video message]' : '[message]'),
+                category: 'User conduct',
+                description: 'Reported from a conversation with ' + userName,
                 userId: user?.uid || null,
                 userEmail: profile?.email || user?.email || null,
                 userDisplayName: profile?.displayName || null,
-                reportedUserId: item.senderId,
-                reportedUserName: item.senderId === user.uid ? profile?.displayName : userName,
+                reportedUserId: userId,
+                reportedUserName: userName,
                 conversationId,
-                reportedMessageId: item.id,
                 status: 'open',
                 createdAt: serverTimestamp(),
               });
@@ -679,9 +690,34 @@ export default function ChatScreen() {
   };
 
   const openViewer = (itemMedia, index, sourceMessage) => {
+    Keyboard.dismiss();
     setViewerMedia(itemMedia);
     setViewerIndex(index);
     setViewerSourceMessage(sourceMessage);
+  };
+
+  // Sends a reply directly from the viewer's own reply box — typed and
+  // sent right there, rather than staging it through the main composer
+  // the way the ordinary Reply option does. Closes the viewer immediately
+  // on send so the person lands back in the conversation and sees their
+  // reply arrive, same as sending any other message.
+  const handleSendPhotoReply = async (text, targetItem, targetIndex) => {
+    if (!text.trim() || !viewerSourceMessage) return;
+    const trimmed = text.trim();
+    const replyToOverride = {
+      messageId: viewerSourceMessage.id,
+      text: targetItem.type === 'video' ? 'Video' : 'Photo',
+      senderName: viewerSourceMessage.senderId === user.uid ? 'You' : userName,
+      imageUrl: targetItem.thumbnailUrl || targetItem.url,
+    };
+    setViewerMedia(null);
+    setViewerSourceMessage(null);
+    try {
+      await sendMessage({ text: trimmed, previewText: trimmed, replyToOverride });
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Could not send reply. Please try again.');
+    }
   };
 
   const renderItem = ({ item, index }) => {
@@ -874,6 +910,7 @@ export default function ChatScreen() {
           renderItem={renderItem}
           extraData={replyingTo}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubbles-outline" size={48} color={Colors.lightGrey} />
@@ -984,13 +1021,7 @@ export default function ChatScreen() {
         initialIndex={viewerIndex}
         onClose={() => { setViewerMedia(null); setViewerSourceMessage(null); }}
         onDownload={(item) => saveMediaToLibrary([item])}
-        onLongPress={(item, index) => {
-          if (!viewerSourceMessage) return;
-          const msg = viewerSourceMessage;
-          setViewerMedia(null);
-          setViewerSourceMessage(null);
-          handleLongPressMessage(msg, index);
-        }}
+        onSendReply={(text, item, index) => handleSendPhotoReply(text, item, index)}
       />
 
       {/* Long-press message action sheet — Reply, Report (only on the
@@ -1026,16 +1057,8 @@ export default function ChatScreen() {
                     <Ionicons name="download-outline" size={20} color={Colors.brandGreen} />
                   </View>
                   <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
-                    {actionSheetMediaIndex !== null ? 'Download this Photo' : 'Download All'}
+                    Download
                   </Text>
-                </TouchableOpacity>
-              )}
-              {actionSheetMessage?.senderId !== user.uid && (
-                <TouchableOpacity style={styles.menuItem} onPress={handleReportMessage}>
-                  <View style={styles.menuItemIconDanger}>
-                    <Ionicons name="flag-outline" size={20} color="#E53935" />
-                  </View>
-                  <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report</Text>
                 </TouchableOpacity>
               )}
               {actionSheetMessage?.senderId === user.uid && (
@@ -1078,6 +1101,12 @@ export default function ChatScreen() {
                   <Ionicons name="ban-outline" size={20} color="#E53935" />
                 </View>
                 <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{iBlockedThem ? 'Unblock' : 'Block'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleReportUser}>
+                <View style={styles.menuItemIconDanger}>
+                  <Ionicons name="flag-outline" size={20} color="#E53935" />
+                </View>
+                <Text style={styles.menuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report User</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={handleDeleteConversation}>
                 <View style={styles.menuItemIconDanger}>

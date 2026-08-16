@@ -396,7 +396,7 @@ export default function PostDetailScreen() {
       Alert.alert('Saved', targets.length > 1 ? `${targets.length} items saved to your photo library.` : 'Saved to your photo library.');
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not save to your photo library. Please try again.');
+      Alert.alert('Error (debug)', 'Could not save: ' + (e?.message || String(e)));
     }
   };
 
