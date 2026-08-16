@@ -105,6 +105,7 @@ export default function ChatScreen() {
   const [pendingMedia, setPendingMedia] = useState([]); // [{ kind: 'image'|'video', uri, thumbnailUri? }], staged but not yet sent
   const [viewerMedia, setViewerMedia] = useState(null); // full media array for the tapped message, or null when closed
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerSourceMessage, setViewerSourceMessage] = useState(null); // the message the currently-open viewer's media belongs to, so long-pressing inside the viewer can still open the right action sheet
   const flatListRef = useRef(null);
   // iOS-only: KeyboardAvoidingView's built-in 'padding' behavior visibly
   // lagged a beat behind the keyboard's own animation (the keyboard would
@@ -495,40 +496,39 @@ export default function ChatScreen() {
     setActionSheetMediaIndex(mediaIndex);
   };
 
-  // General "Reply" — replies to the whole message. If it has multiple
-  // media items, the reply preview shows a count rather than any one
-  // specific photo (use "Reply to this Photo" instead for that).
+  // Single "Reply" — automatically replies to the exact photo/video that
+  // was long-pressed if there was one (shown as that item's own
+  // thumbnail, both while composing and once sent), or to the whole
+  // message otherwise. This used to be two separate menu items (plain
+  // "Reply" and "Reply to this Photo") shown together, which was
+  // confusing since they looked like different actions when one was
+  // really just a more specific version of the other.
   const handleReplyFromSheet = () => {
-    const item = actionSheetMessage;
-    setActionSheetMessage(null);
-    const itemMedia = getItemMedia(item);
-    setReplyingTo({
-      messageId: item.id,
-      text: item.text || (itemMedia.length > 1 ? `${itemMedia.length} items` : (itemMedia.length === 1 ? (itemMedia[0].type === 'video' ? 'Video' : 'Photo') : '')),
-      imageUrl: itemMedia.length > 0 ? (itemMedia[0].thumbnailUrl || itemMedia[0].url) : null,
-      senderName: item.senderId === user.uid ? 'You' : userName,
-    });
-  };
-
-  // Replies specifically to whichever photo/video was long-pressed, not
-  // the message as a whole — this is what makes "user B picks photo #3
-  // out of 8 and says 'I want this one'" actually work. The reply
-  // preview (both while composing and once sent) shows that exact
-  // item's thumbnail, not just a generic "N items" summary.
-  const handleReplyToPhotoFromSheet = () => {
     const item = actionSheetMessage;
     const mediaIndex = actionSheetMediaIndex;
     setActionSheetMessage(null);
     setActionSheetMediaIndex(null);
     const itemMedia = getItemMedia(item);
-    const target = itemMedia[mediaIndex];
-    if (!target) return;
+
+    if (mediaIndex !== null) {
+      const target = itemMedia[mediaIndex];
+      if (target) {
+        setReplyingTo({
+          messageId: item.id,
+          text: target.type === 'video' ? 'Video' : 'Photo',
+          imageUrl: target.thumbnailUrl || target.url,
+          senderName: item.senderId === user.uid ? 'You' : userName,
+          mediaIndex,
+        });
+        return;
+      }
+    }
+
     setReplyingTo({
       messageId: item.id,
-      text: target.type === 'video' ? 'Video' : 'Photo',
-      imageUrl: target.thumbnailUrl || target.url,
+      text: item.text || (itemMedia.length > 1 ? `${itemMedia.length} items` : (itemMedia.length === 1 ? (itemMedia[0].type === 'video' ? 'Video' : 'Photo') : '')),
+      imageUrl: itemMedia.length > 0 ? (itemMedia[0].thumbnailUrl || itemMedia[0].url) : null,
       senderName: item.senderId === user.uid ? 'You' : userName,
-      mediaIndex,
     });
   };
 
@@ -559,7 +559,11 @@ export default function ChatScreen() {
   const saveMediaToLibrary = async (targets) => {
     if (targets.length === 0 || !targets[0]) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      // writeOnly requests only save-to-library access, matching
+      // NSPhotoLibraryAddUsageDescription — the correct, more reliable
+      // permission for a save-only feature like this one, rather than
+      // requesting full read+write library access we never actually need.
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow photo library access to save media.');
         return;
@@ -595,7 +599,10 @@ export default function ChatScreen() {
     setActionSheetMessage(null);
     updateDoc(doc(db, 'conversations', conversationId, 'messages', item.id), {
       deletedFor: arrayUnion(user.uid),
-    }).catch(e => console.error(e));
+    }).catch(e => {
+      console.error(e);
+      Alert.alert('Error', 'Could not delete this message. Please try again.');
+    });
   };
 
   // Only ever offered to the sender (see the menu's own conditional
@@ -620,7 +627,10 @@ export default function ChatScreen() {
               media: null,
               imageUrl: null,
               replyTo: null,
-            }).catch(e => console.error(e));
+            }).catch(e => {
+              console.error(e);
+              Alert.alert('Error', 'Could not unsend this message. Please try again.');
+            });
           },
         },
       ]
@@ -668,9 +678,10 @@ export default function ChatScreen() {
     );
   };
 
-  const openViewer = (itemMedia, index) => {
+  const openViewer = (itemMedia, index, sourceMessage) => {
     setViewerMedia(itemMedia);
     setViewerIndex(index);
+    setViewerSourceMessage(sourceMessage);
   };
 
   const renderItem = ({ item, index }) => {
@@ -749,7 +760,7 @@ export default function ChatScreen() {
               </View>
             )}
             {hasMedia && itemMedia.length === 1 && (
-              <TouchableOpacity onPress={() => openViewer(itemMedia, 0)} onLongPress={() => handleLongPressMessage(item, 0)}>
+              <TouchableOpacity onPress={() => openViewer(itemMedia, 0, item)} onLongPress={() => handleLongPressMessage(item, 0)}>
                 <Image source={{ uri: itemMedia[0].thumbnailUrl || itemMedia[0].url }} style={styles.msgImage} />
                 {itemMedia[0].type === 'video' && (
                   <View style={styles.videoPlayBadge} pointerEvents="none">
@@ -763,7 +774,7 @@ export default function ChatScreen() {
                 {itemMedia.slice(0, MAX_GRID_PREVIEW).map((m, i) => {
                   const isLastVisible = i === MAX_GRID_PREVIEW - 1 && itemMedia.length > MAX_GRID_PREVIEW;
                   return (
-                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i)} onLongPress={() => handleLongPressMessage(item, i)} style={styles.mediaGridCell}>
+                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i, item)} onLongPress={() => handleLongPressMessage(item, i)} style={styles.mediaGridCell}>
                       <Image source={{ uri: m.thumbnailUrl || m.url }} style={styles.mediaGridImage} />
                       {m.type === 'video' && !isLastVisible && (
                         <View style={styles.videoPlayBadgeSmall} pointerEvents="none">
@@ -971,8 +982,15 @@ export default function ChatScreen() {
       <MediaViewerModal
         media={viewerMedia}
         initialIndex={viewerIndex}
-        onClose={() => setViewerMedia(null)}
+        onClose={() => { setViewerMedia(null); setViewerSourceMessage(null); }}
         onDownload={(item) => saveMediaToLibrary([item])}
+        onLongPress={(item, index) => {
+          if (!viewerSourceMessage) return;
+          const msg = viewerSourceMessage;
+          setViewerMedia(null);
+          setViewerSourceMessage(null);
+          handleLongPressMessage(msg, index);
+        }}
       />
 
       {/* Long-press message action sheet — Reply, Report (only on the
@@ -988,14 +1006,6 @@ export default function ChatScreen() {
               <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
             </View>
             <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
-              {actionSheetMediaIndex !== null && (
-                <TouchableOpacity style={styles.menuItem} onPress={handleReplyToPhotoFromSheet}>
-                  <View style={styles.menuItemIcon}>
-                    <Ionicons name="chatbox-ellipses-outline" size={20} color={Colors.brandGreen} />
-                  </View>
-                  <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>Reply to this Photo</Text>
-                </TouchableOpacity>
-              )}
               <TouchableOpacity style={styles.menuItem} onPress={handleReplyFromSheet}>
                 <View style={styles.menuItemIcon}>
                   <Ionicons name="arrow-undo-outline" size={20} color={Colors.brandGreen} />

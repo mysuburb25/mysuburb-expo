@@ -23,7 +23,16 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // tapped. Left out entirely by any caller that doesn't need it (this
 // component is shared across several screens, most of which have no
 // reason to offer downloading).
-export default function MediaViewerModal({ media, initialIndex = 0, onClose, onDownload }) {
+//
+// onLongPress is also optional — when provided, long-pressing the
+// currently-displayed photo/video calls onLongPress(currentItem,
+// currentIndex). This is what lets chat's action sheet (reply to this
+// photo, download, etc.) work from inside the full-screen viewer too —
+// not just via the grid's own per-thumbnail long-press, which only
+// covers the first few visible thumbnails in a large multi-photo
+// message. Without this, anything beyond the grid's visible items was
+// only ever reachable by viewing, with no way to act on it.
+export default function MediaViewerModal({ media, initialIndex = 0, onClose, onDownload, onLongPress }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const visible = !!media && media.length > 0;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -86,7 +95,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
               initialScrollIndex={initialIndex}
               getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
               onMomentumScrollEnd={onScrollEnd}
-              renderItem={({ item, index }) => <MediaPage item={item} isActive={index === currentIndex} onClose={onClose} />}
+              renderItem={({ item, index }) => <MediaPage item={item} isActive={index === currentIndex} onClose={onClose} onLongPress={onLongPress ? () => onLongPress(item, index) : undefined} />}
             />
           </Animated.View>
         )}
@@ -112,7 +121,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
 // is a hook — it can't be called conditionally or inside a .map/render-
 // item callback directly. Every page gets its own instance; photo pages
 // simply never touch the player.
-function MediaPage({ item, isActive, onClose }) {
+function MediaPage({ item, isActive, onClose, onLongPress }) {
   const videoViewRef = useRef(null);
   const isVideo = item.type === 'video';
   const [isPlaying, setIsPlaying] = useState(false);
@@ -157,7 +166,7 @@ function MediaPage({ item, isActive, onClose }) {
             also triggered the outer TouchableOpacity's onClose, which is
             why pressing play appeared to close the viewer and navigate
             back to the post instead of actually playing. */}
-        <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} onLongPress={onLongPress}>
           <VideoView
             ref={videoViewRef}
             style={styles.video}
@@ -166,11 +175,6 @@ function MediaPage({ item, isActive, onClose }) {
             allowsFullscreen
             contentFit="contain"
           />
-          {!isPlaying && (
-            <View style={styles.playOverlay} pointerEvents="none">
-              <Ionicons name="play-circle" size={64} color="rgba(255,255,255,0.92)" />
-            </View>
-          )}
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -178,7 +182,7 @@ function MediaPage({ item, isActive, onClose }) {
 
   return (
     <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.page}>
-      <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+      <TouchableOpacity activeOpacity={1} onPress={() => {}} onLongPress={onLongPress}>
         <Image source={{ uri: item.url }} style={styles.image} resizeMode="contain" />
       </TouchableOpacity>
     </TouchableOpacity>

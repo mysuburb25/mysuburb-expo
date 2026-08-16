@@ -216,6 +216,18 @@ service cloud.firestore {
           return request.auth.uid in recipientDoc.data.get('blockedUserIds', []);
         }
 
+        // One-way only, matching isValidViewIncrement's pattern above — a
+        // message can be added to deletedFor (hidden from that person's
+        // own view) but never removed, since there's no "undo delete for
+        // me" flow in the app.
+        function isValidDeletedForAdd() {
+          let beforeArr = resource.data.get('deletedFor', []);
+          let afterArr = request.resource.data.get('deletedFor', []);
+          return !(request.auth.uid in beforeArr)
+            && request.auth.uid in afterArr
+            && afterArr.size() == beforeArr.size() + 1;
+        }
+
         allow read: if isParticipant();
 
         allow create: if isParticipant()
@@ -223,7 +235,22 @@ service cloud.firestore {
                       && !recipientHasBlockedSender();
 
         allow update: if isParticipant()
-                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+                      && (
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+                           ||
+                           // Sender unsending their own message — clears its
+                           // content and marks it unsent. One-way: unsent
+                           // must be true, there's no un-unsend.
+                           (request.auth.uid == resource.data.senderId
+                             && request.resource.data.diff(resource.data).affectedKeys()
+                                  .hasOnly(['unsent', 'text', 'media', 'imageUrl', 'replyTo'])
+                             && request.resource.data.unsent == true)
+                           ||
+                           // Any participant hiding a message from their own
+                           // view only — the other person is unaffected.
+                           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+                             && isValidDeletedForAdd())
+                         );
 
         allow delete: if false;
       }

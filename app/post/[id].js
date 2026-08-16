@@ -17,7 +17,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import addEventToCalendar from '../../utils/addEventToCalendar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { getOrderedMedia } from '../../utils/mediaOrder';
-import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 
@@ -372,22 +371,6 @@ export default function PostDetailScreen() {
     }
   };
 
-  // Copies the post's own text (title/content + description, for
-  // whichever fields this post actually has) — available to anyone who
-  // can view the post, not just the owner, since copying is a read-only
-  // action.
-  const handleCopyPostText = async () => {
-    setShowPostMenu(false);
-    const parts = [post.content, post.description].filter(Boolean);
-    if (parts.length === 0) return;
-    try {
-      await Clipboard.setStringAsync(parts.join('\n\n'));
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Could not copy text.');
-    }
-  };
-
   // Downloads one or more { type, url } media items to the device's
   // photo library. Requires photo library write permission, requested
   // here rather than at app startup, since it's only ever needed at the
@@ -396,7 +379,11 @@ export default function PostDetailScreen() {
   const saveMediaToLibrary = async (targets) => {
     if (!targets || targets.length === 0 || !targets[0]) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      // writeOnly requests only save-to-library access, matching
+      // NSPhotoLibraryAddUsageDescription — the correct, more reliable
+      // permission for a save-only feature like this one, rather than
+      // requesting full read+write library access we never actually need.
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow photo library access to save media.');
         return;
@@ -1191,12 +1178,6 @@ export default function PostDetailScreen() {
               <Text style={styles.menuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select</Text>
             </View>
             <View style={[styles.menuPad, { paddingBottom: 32 + insets.bottom }]}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleCopyPostText}>
-              <View style={styles.menuItemIcon}>
-                <Ionicons name="copy-outline" size={20} color={Colors.brandGreen} />
-              </View>
-              <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Copy Text</Text>
-            </TouchableOpacity>
             {isOwner ? (
               <>
                 {(post.category === 'marketplace' || post.category === 'lostfound') && (
