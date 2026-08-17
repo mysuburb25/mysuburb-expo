@@ -194,7 +194,7 @@ function MediaPage({ item, isActive, onClose }) {
             back to the post instead of actually playing. Native controls
             already provide their own play button — no custom overlay
             needed here, which previously caused a double play button. */}
-        <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.mediaWrap}>
           <VideoView
             ref={videoViewRef}
             style={styles.video}
@@ -210,7 +210,7 @@ function MediaPage({ item, isActive, onClose }) {
 
   return (
     <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.page}>
-      <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+      <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.mediaWrap}>
         <Image source={{ uri: item.url }} style={styles.image} resizeMode="contain" />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -219,9 +219,10 @@ function MediaPage({ item, isActive, onClose }) {
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)' },
-  page: { width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center' },
-  image: { width: SCREEN_WIDTH, height: '90%' },
-  video: { width: SCREEN_WIDTH, height: '90%' },
+  page: { width: SCREEN_WIDTH, height: '100%', justifyContent: 'center', alignItems: 'center' },
+  mediaWrap: { width: '100%', height: '100%' },
+  image: { width: '100%', flex: 1 },
+  video: { width: '100%', flex: 1 },
   closeBtn: { position: 'absolute', top: 56, right: 20, padding: 8 },
   downloadBtn: { position: 'absolute', top: 56, right: 64, padding: 8 },
   counter: { position: 'absolute', top: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12 },

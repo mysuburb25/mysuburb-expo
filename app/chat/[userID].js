@@ -802,7 +802,7 @@ export default function ChatScreen() {
               </View>
             )}
             {hasMedia && itemMedia.length === 1 && (
-              <TouchableOpacity onPress={() => openViewer(itemMedia, 0, item)} onLongPress={() => handleLongPressMessage(item, 0)}>
+              <TouchableOpacity onPress={() => openViewer(itemMedia, 0, item)} onLongPress={() => handleLongPressMessage(item)}>
                 <Image source={{ uri: itemMedia[0].thumbnailUrl || itemMedia[0].url }} style={styles.msgImage} />
                 {itemMedia[0].type === 'video' && (
                   <View style={styles.videoPlayBadge} pointerEvents="none">
@@ -816,7 +816,7 @@ export default function ChatScreen() {
                 {itemMedia.slice(0, MAX_GRID_PREVIEW).map((m, i) => {
                   const isLastVisible = i === MAX_GRID_PREVIEW - 1 && itemMedia.length > MAX_GRID_PREVIEW;
                   return (
-                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i, item)} onLongPress={() => handleLongPressMessage(item, i)} style={styles.mediaGridCell}>
+                    <TouchableOpacity key={i} onPress={() => openViewer(itemMedia, i, item)} onLongPress={() => handleLongPressMessage(item)} style={styles.mediaGridCell}>
                       <Image source={{ uri: m.thumbnailUrl || m.url }} style={styles.mediaGridImage} />
                       {m.type === 'video' && !isLastVisible && (
                         <View style={styles.videoPlayBadgeSmall} pointerEvents="none">
