@@ -93,12 +93,12 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
   return (
     <Modal visible={visible} transparent animationType="fade">
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* paddingTop clears both the safe area AND the close/download
+            buttons themselves (top: 56, roughly 44px tall) — without the
+            extra buffer, a video that now fills the full height starts
+            right where those buttons sit, rendering underneath and
+            visually obscuring them. */}
         {visible && (
-          {/* paddingTop clears both the safe area AND the close/download
-              buttons themselves (top: 56, roughly 44px tall) — without
-              the extra buffer, a video that now fills the full height
-              starts right where those buttons sit, rendering underneath
-              and visually obscuring them. */}
           <Animated.View style={{ flex: 1, paddingTop: insets.top + 60, transform: [{ translateY }] }} {...panResponder.panHandlers}>
             <FlatList
               data={media}
