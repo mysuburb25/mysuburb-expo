@@ -69,7 +69,7 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <View style={styles.topHeader}>
         <TouchableOpacity style={styles.profileAvatar} onPress={() => router.push('/(tabs)/profile')}>
-          <Text style={styles.profileAvatarText}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
+          <Text style={styles.profileAvatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{profile?.displayName?.[0]?.toUpperCase() || '?'}</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <AppName style={styles.mySuburb} />
@@ -83,7 +83,7 @@ export default function NotificationsScreen() {
           <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
           {unreadMessageCount > 0 && (
             <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
+              <Text style={styles.bellBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -143,7 +143,7 @@ export default function NotificationsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="notifications-outline" size={48} color={Colors.lightGrey} />
-              <Text style={styles.emptyTitle}>No notifications yet</Text>
+              <Text style={styles.emptyTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>No notifications yet</Text>
               <Text style={styles.emptyText}>We'll let you know when someone likes or comments on your posts!</Text>
             </View>
           }

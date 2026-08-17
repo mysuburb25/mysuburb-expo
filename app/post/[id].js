@@ -695,7 +695,7 @@ export default function PostDetailScreen() {
 
   if (!post) return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Post not found.</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Post not found.</Text>
     </View>
   );
 
@@ -722,7 +722,7 @@ export default function PostDetailScreen() {
       </View>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 10 }}>
         <Ionicons name="eye-off-outline" size={40} color={Colors.lightGrey} />
-        <Text style={{ fontSize: 15, color: Colors.midGrey, textAlign: 'center' }}>
+        <Text style={{ fontSize: 15, color: Colors.midGrey, textAlign: 'center' }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
           This post is no longer available.
         </Text>
       </View>
@@ -984,15 +984,15 @@ export default function PostDetailScreen() {
                   {isLostFound && post.lostFoundLocation ? (
                     <TouchableOpacity style={styles.locationRow} onPress={handleGetDirections}>
                       <Ionicons name="location-outline" size={15} color={Colors.brandGreen} />
-                      <Text style={[styles.locationText, styles.eventLocationLink]}>{post.lostFoundLocation}</Text>
+                      <Text style={[styles.locationText, styles.eventLocationLink]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.lostFoundLocation}</Text>
                     </TouchableOpacity>
                   ) : null}
 
                   {post.category === 'marketplace' && (
                     <View style={styles.detailRow}>
-                      {post.price > 0 && <Text style={styles.priceTag}>${post.price?.toFixed(2)}</Text>}
-                      {post.isFree && <View style={styles.freeTag}><Text style={styles.freeTagText}>FREE</Text></View>}
-                      {post.isWanted && <View style={styles.seekingTag}><Text style={styles.seekingTagText}>SEEKING</Text></View>}
+                      {post.price > 0 && <Text style={styles.priceTag} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>${post.price?.toFixed(2)}</Text>}
+                      {post.isFree && <View style={styles.freeTag}><Text style={styles.freeTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>FREE</Text></View>}
+                      {post.isWanted && <View style={styles.seekingTag}><Text style={styles.seekingTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>SEEKING</Text></View>}
                     </View>
                   )}
 
@@ -1000,15 +1000,15 @@ export default function PostDetailScreen() {
                     <View style={styles.footerSideGroup}>
                       <TouchableOpacity style={styles.footerBtn} onPress={handleLike} disabled={liking}>
                         <Ionicons name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? '#E53935' : Colors.charcoal} />
-                        <Text style={[styles.footerText, liked && { color: '#E53935' }]}>{post.likeCount || 0}</Text>
+                        <Text style={[styles.footerText, liked && { color: '#E53935' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.likeCount || 0}</Text>
                       </TouchableOpacity>
                       <View style={styles.footerBtn}>
                         <Ionicons name="chatbubble-outline" size={20} color={Colors.charcoal} />
-                        <Text style={styles.footerText}>{post.commentCount || 0}</Text>
+                        <Text style={styles.footerText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.commentCount || 0}</Text>
                       </View>
                       <View style={styles.footerBtn}>
                         <Ionicons name="eye-outline" size={19} color={Colors.midGrey} />
-                        <Text style={[styles.footerText, { color: Colors.midGrey }]}>{post.viewCount || 0}</Text>
+                        <Text style={[styles.footerText, { color: Colors.midGrey }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{post.viewCount || 0}</Text>
                       </View>
                     </View>
                     <View style={{ flex: 1 }} />
@@ -1044,7 +1044,7 @@ export default function PostDetailScreen() {
                 {comments.length === 0 && (
                   <View style={styles.noComments}>
                     <Ionicons name="chatbubble-outline" size={32} color={Colors.lightGrey} />
-                    <Text style={styles.noCommentsText}>Be the first to comment</Text>
+                    <Text style={styles.noCommentsText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Be the first to comment</Text>
                   </View>
                 )}
               </View>
@@ -1061,11 +1061,11 @@ export default function PostDetailScreen() {
 
           const FooterRow = (
             <View style={styles.commentFooter}>
-              <Text style={styles.commentTime}>{timeAgo(item.createdAt)}</Text>
+              <Text style={styles.commentTime} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{timeAgo(item.createdAt)}</Text>
               {!item.isDeleted && (
                 <TouchableOpacity style={styles.likeRow} onPress={() => handleCommentLike(item)}>
                   <Ionicons name={commentLiked ? 'heart' : 'heart-outline'} size={13} color={commentLiked ? '#E53935' : Colors.midGrey} />
-                  {item.likeCount > 0 && <Text style={[styles.likeCountText, commentLiked && { color: '#E53935' }]}>{item.likeCount}</Text>}
+                  {item.likeCount > 0 && <Text style={[styles.likeCountText, commentLiked && { color: '#E53935' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.likeCount}</Text>}
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={() => startReply(item)}>
@@ -1083,7 +1083,7 @@ export default function PostDetailScreen() {
                     onPress={() => !isMyComment && router.push('/user/' + item.authorId)}
                     disabled={isMyComment}
                   >
-                    <Text style={styles.commentAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
+                    <Text style={styles.commentAvatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.authorName?.[0]?.toUpperCase()}</Text>
                   </TouchableOpacity>
                   <View style={{ flex: 1 }}>
                     <TouchableOpacity onPress={() => !isMyComment && router.push('/user/' + item.authorId)} disabled={isMyComment}>
@@ -1116,7 +1116,7 @@ export default function PostDetailScreen() {
                 onPress={() => !isMyComment && router.push('/user/' + item.authorId)}
                 disabled={isMyComment}
               >
-                <Text style={styles.replyAvatarText}>{item.authorName?.[0]?.toUpperCase()}</Text>
+                <Text style={styles.replyAvatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.authorName?.[0]?.toUpperCase()}</Text>
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
                 <View style={styles.replyBubble}>
@@ -1260,8 +1260,8 @@ export default function PostDetailScreen() {
                   <Ionicons name="people-outline" size={20} color={Colors.brandGreen} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.shareOptionTitle}>Share to a My Suburb User</Text>
-                  <Text style={styles.shareOptionSubtitle}>Send this as a message</Text>
+                  <Text style={styles.shareOptionTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Share to a My Suburb User</Text>
+                  <Text style={styles.shareOptionSubtitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Send this as a message</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
               </TouchableOpacity>
@@ -1270,8 +1270,8 @@ export default function PostDetailScreen() {
                   <Ionicons name="share-social-outline" size={20} color="#0D47A1" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.shareOptionTitle}>Share via Other Apps</Text>
-                  <Text style={styles.shareOptionSubtitle}>WhatsApp, Messages, Email, and more</Text>
+                  <Text style={styles.shareOptionTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Share via Other Apps</Text>
+                  <Text style={styles.shareOptionSubtitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>WhatsApp, Messages, Email, and more</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
               </TouchableOpacity>
@@ -1291,7 +1291,7 @@ export default function PostDetailScreen() {
             <View style={styles.reportHeaderBar}>
               <View style={styles.shareHandle} />
               <Text style={styles.reportTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report this post</Text>
-              <Text style={styles.reportSubtitle}>Why are you reporting this post?</Text>
+              <Text style={styles.reportSubtitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>Why are you reporting this post?</Text>
             </View>
 
             <View style={[styles.reportPad, { paddingBottom: 32 + insets.bottom }]}>
@@ -1357,7 +1357,7 @@ export default function PostDetailScreen() {
             <Text style={styles.successTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Report Submitted</Text>
             <Text style={styles.successMessage}>Thank you for reporting this post. Our team will review it within 24 hours.</Text>
             <TouchableOpacity style={styles.successOkBtn} onPress={() => setShowReportSuccess(false)}>
-              <Text style={styles.successOkBtnText}>OK</Text>
+              <Text style={styles.successOkBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>OK</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1373,7 +1373,7 @@ export default function PostDetailScreen() {
             <Text style={styles.successTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Something Went Wrong</Text>
             <Text style={styles.successMessage}>{errorModalMessage}</Text>
             <TouchableOpacity style={[styles.successOkBtn, { backgroundColor: '#E53935' }]} onPress={() => setErrorModalMessage(null)}>
-              <Text style={styles.successOkBtnText}>OK</Text>
+              <Text style={styles.successOkBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>OK</Text>
             </TouchableOpacity>
           </View>
         </View>

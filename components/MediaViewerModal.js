@@ -115,7 +115,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
         )}
         {media && media.length > 1 && (
           <View style={styles.counter} pointerEvents="none">
-            <Text style={styles.counterText}>{currentIndex + 1} / {media.length}</Text>
+            <Text style={styles.counterText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{currentIndex + 1} / {media.length}</Text>
           </View>
         )}
         {onDownload && (
