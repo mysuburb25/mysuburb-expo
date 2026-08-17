@@ -7,7 +7,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as Clipboard from 'expo-clipboard';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
+// The legacy import path — the default 'expo-file-system' export now
+// points to a newer File/Directory-class API that doesn't include
+// downloadAsync at all, which is what the actual runtime error revealed
+// ("downloadAsync is deprecated... import the legacy API from
+// expo-file-system/legacy"). This is the specific fix that error message
+// points to, not a guess.
+import * as FileSystem from 'expo-file-system/legacy';
 import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
@@ -588,7 +594,7 @@ export default function ChatScreen() {
       // generic one — my last fix attempt (writeOnly permission) didn't
       // resolve this, so guessing again without more information isn't
       // the right move. This lets us see exactly what's failing.
-      Alert.alert('Error (debug)', 'Could not save: ' + (e?.message || String(e)));
+      Alert.alert('Error', 'Could not save to your photo library. Please try again.');
     }
   };
 

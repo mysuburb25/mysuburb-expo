@@ -218,7 +218,7 @@ function MediaPage({ item, isActive, onClose }) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)' },
   page: { width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center' },
   image: { width: SCREEN_WIDTH, height: '90%' },
   video: { width: SCREEN_WIDTH, height: '90%' },
