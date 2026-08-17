@@ -390,11 +390,15 @@ export default function PostDetailScreen() {
         Alert.alert('Permission needed', 'Please allow photo library access to save media.');
         return;
       }
-      for (const t of targets) {
+      // Parallelized for consistency with chat's own version of this
+      // function — currently only ever called with one item here, but
+      // keeping both in sync avoids the same slow-sequential mistake if
+      // this is ever used for multiple items later.
+      await Promise.all(targets.map(async (t) => {
         const localUri = FileSystem.cacheDirectory + Date.now() + '_' + Math.random().toString(36).slice(2) + (t.type === 'video' ? '.mp4' : '.jpg');
         const { uri } = await FileSystem.downloadAsync(t.url, localUri);
         await MediaLibrary.saveToLibraryAsync(uri);
-      }
+      }));
       Alert.alert('Saved', targets.length > 1 ? `${targets.length} items saved to your photo library.` : 'Saved to your photo library.');
     } catch (e) {
       console.error(e);

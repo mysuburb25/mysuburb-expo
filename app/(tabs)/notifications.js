@@ -20,7 +20,7 @@ function timeAgo(date) {
 }
 
 export default function NotificationsScreen() {
-  const { user, profile, setUnreadCount, unreadCount } = useAuth();
+  const { user, profile, setUnreadCount, unreadMessageCount } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   // Only actually shows the spinner if loading takes longer than 200ms —
@@ -75,11 +75,15 @@ export default function NotificationsScreen() {
           <AppName style={styles.mySuburb} />
           <Text style={styles.suburbName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{profile?.suburb}, {profile?.state}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')} style={{ position: 'relative' }}>
-          <Ionicons name="notifications-outline" size={26} color="#fff" />
-          {unreadCount > 0 && (
+        {/* Messages icon — this was previously pointing to notifications
+            (this same screen), which made no sense given you're already
+            on it. Every other tab shows the messages shortcut here, this
+            screen was just missing it. */}
+        <TouchableOpacity onPress={() => router.push('/(tabs)/messages')} style={{ position: 'relative' }}>
+          <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+          {unreadMessageCount > 0 && (
             <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              <Text style={styles.bellBadgeText}>{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</Text>
             </View>
           )}
         </TouchableOpacity>

@@ -582,18 +582,19 @@ export default function ChatScreen() {
         Alert.alert('Permission needed', 'Please allow photo library access to save media.');
         return;
       }
-      for (const t of targets) {
+      // Downloads and saves every target concurrently instead of one at
+      // a time — the same sequential-loop mistake that made uploads slow
+      // before that fix, just never applied here too. "Download All" on
+      // 8 photos was taking as long as 8 downloads in a row; this makes
+      // it closer to the time of the single slowest one.
+      await Promise.all(targets.map(async (t) => {
         const localUri = FileSystem.cacheDirectory + Date.now() + '_' + Math.random().toString(36).slice(2) + (t.type === 'video' ? '.mp4' : '.jpg');
         const { uri } = await FileSystem.downloadAsync(t.url, localUri);
         await MediaLibrary.saveToLibraryAsync(uri);
-      }
+      }));
       Alert.alert('Saved', targets.length > 1 ? `${targets.length} items saved to your photo library.` : 'Saved to your photo library.');
     } catch (e) {
       console.error(e);
-      // Temporarily showing the actual error message rather than a
-      // generic one — my last fix attempt (writeOnly permission) didn't
-      // resolve this, so guessing again without more information isn't
-      // the right move. This lets us see exactly what's failing.
       Alert.alert('Error', 'Could not save to your photo library. Please try again.');
     }
   };
