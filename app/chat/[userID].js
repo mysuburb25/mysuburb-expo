@@ -1063,7 +1063,7 @@ export default function ChatScreen() {
                     <Ionicons name="download-outline" size={20} color={Colors.brandGreen} />
                   </View>
                   <Text style={styles.menuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
-                    Download
+                    {actionSheetMediaIndex === null && getItemMedia(actionSheetMessage || {}).length > 1 ? 'Download All' : 'Download'}
                   </Text>
                 </TouchableOpacity>
               )}

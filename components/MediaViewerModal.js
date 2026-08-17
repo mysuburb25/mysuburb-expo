@@ -94,7 +94,7 @@ export default function MediaViewerModal({ media, initialIndex = 0, onClose, onD
     <Modal visible={visible} transparent animationType="fade">
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {visible && (
-          <Animated.View style={{ flex: 1, transform: [{ translateY }] }} {...panResponder.panHandlers}>
+          <Animated.View style={{ flex: 1, paddingTop: insets.top, transform: [{ translateY }] }} {...panResponder.panHandlers}>
             <FlatList
               data={media}
               horizontal
