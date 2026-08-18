@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -11,6 +11,7 @@ import AppName from '../components/AppName';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
+  { key: 'users', label: 'Users' },
   { key: 'reports', label: 'Reports' },
   { key: 'suspended', label: 'Suspended' },
 ];
@@ -28,6 +29,17 @@ export default function AdminDashboardScreen() {
   // --- Overview / stats ---
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
+
+  // --- Users (full list) ---
+  // Fetched lazily — only when this tab is actually opened, rather than
+  // unconditionally alongside the other tabs' data on every focus. The
+  // Overview tab's own user count already comes from a cheap
+  // getCountFromServer call; pulling every user's full document on each
+  // visit regardless of whether the tab is even viewed would get more
+  // expensive as the user base grows, for a list that isn't always needed.
+  const [allUsers, setAllUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [usersLoaded, setUsersLoaded] = useState(false);
 
   // --- Reports ---
   const [reportStatus, setReportStatus] = useState('open'); // 'open' | 'resolved'
@@ -82,6 +94,21 @@ export default function AdminDashboardScreen() {
     finally { setLoadingStats(false); }
   }, []);
 
+  // Capped at 200 — matches the same cost-conscious reasoning as
+  // Reports' own limit(30). Fine for the app's current size; worth
+  // revisiting with proper pagination once the user base grows well
+  // beyond this.
+  const fetchAllUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const q = query(collection(db, 'users'), orderBy('displayName', 'asc'), limit(200));
+      const snap = await getDocs(q);
+      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setUsersLoaded(true);
+    } catch (e) { console.error(e); }
+    finally { setLoadingUsers(false); }
+  }, []);
+
   const fetchReports = useCallback(async (status) => {
     setLoadingReports(true);
     try {
@@ -93,7 +120,19 @@ export default function AdminDashboardScreen() {
       );
       const snap = await getDocs(q);
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
+      // Temporary — confirms the function actually completed, so we can
+      // tell apart "it errored" from "it's genuinely hanging and never
+      // resolves at all" (the latter wouldn't reach this line or the
+      // catch block below).
+      Alert.alert('Reports Loaded (debug)', `Fetched ${snap.docs.length} ${status} reports.`);
+    } catch (e) {
+      console.error(e);
+      // Temporary — surfacing the actual error since there's no console
+      // access to check otherwise. This is what actually revealed the
+      // real cause of a similar stuck-spinner bug earlier (a deprecated
+      // API method), rather than guessing blindly again.
+      Alert.alert('Reports Error (debug)', e?.message || String(e));
+    }
     finally { setLoadingReports(false); }
   }, []);
 
@@ -102,7 +141,11 @@ export default function AdminDashboardScreen() {
     try {
       const snap = await getDocs(query(collection(db, 'users'), where('isSuspended', '==', true)));
       setSuspendedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
+      Alert.alert('Suspended Loaded (debug)', `Fetched ${snap.docs.length} suspended users.`);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Suspended Users Error (debug)', e?.message || String(e));
+    }
     finally { setLoadingSuspended(false); }
   }, []);
 
@@ -112,10 +155,20 @@ export default function AdminDashboardScreen() {
     fetchSuspendedUsers();
   }, [fetchStats, fetchReports, fetchSuspendedUsers, reportStatus]));
 
+  // Lazy-load: only fetches the first time the Users tab is actually
+  // opened, not on every screen focus — see fetchAllUsers' own comment
+  // for the cost reasoning.
+  useEffect(() => {
+    if (activeTab === 'users' && !usersLoaded) {
+      fetchAllUsers();
+    }
+  }, [activeTab, usersLoaded, fetchAllUsers]);
+
   const handleRefresh = () => {
     fetchStats();
     fetchReports(reportStatus);
     fetchSuspendedUsers();
+    if (activeTab === 'users') fetchAllUsers();
   };
 
   const handleRemovePost = (report) => {
@@ -307,11 +360,14 @@ export default function AdminDashboardScreen() {
             <ActivityIndicator color="#1B4F72" style={{ marginTop: 40 }} size="large" />
           ) : (
             <View style={styles.statsGrid}>
-              <View style={[styles.statCard, { backgroundColor: '#C2D9E8' }]}>
+              {/* Total Users is now a shortcut into the new Users tab —
+                  tapping it takes you straight to the full list rather
+                  than just showing a static count. */}
+              <TouchableOpacity style={[styles.statCard, { backgroundColor: '#C2D9E8' }]} onPress={() => setActiveTab('users')}>
                 <Ionicons name="people-outline" size={22} color="#1B4F72" />
                 <Text style={styles.statNumber}>{stats?.totalUsers ?? 0}</Text>
                 <Text style={styles.statLabel}>Total Users</Text>
-              </View>
+              </TouchableOpacity>
               <View style={[styles.statCard, { backgroundColor: Colors.brandGreenPale }]}>
                 <Ionicons name="documents-outline" size={22} color={Colors.brandGreen} />
                 <Text style={styles.statNumber}>{stats?.totalPosts ?? 0}</Text>
@@ -358,6 +414,44 @@ export default function AdminDashboardScreen() {
               </View>
             </View>
           )
+        )}
+
+        {/* USERS */}
+        {activeTab === 'users' && (
+          <View style={styles.section}>
+            {loadingUsers ? (
+              <ActivityIndicator color="#1B4F72" style={{ marginTop: 30 }} />
+            ) : allUsers.length === 0 ? (
+              <View style={styles.empty}>
+                <Ionicons name="people-outline" size={48} color={Colors.lightGrey} />
+                <Text style={styles.emptyText}>No users found</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.userListCount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {allUsers.length}{allUsers.length >= 200 ? '+' : ''} user{allUsers.length === 1 ? '' : 's'}
+                </Text>
+                {allUsers.map(u => (
+                  <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => router.push('/user/' + u.id)}>
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{u.displayName?.[0]?.toUpperCase() || '?'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.userName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{u.displayName || 'Unknown'}</Text>
+                      <Text style={styles.userEmail} numberOfLines={1}>{u.email || 'No email'}</Text>
+                      <Text style={styles.userSuburb} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{u.suburb ? `${u.suburb}, ${u.state}` : 'No suburb set'}</Text>
+                    </View>
+                    {u.isSuspended && (
+                      <View style={styles.userSuspendedBadge}>
+                        <Text style={styles.userSuspendedBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Suspended</Text>
+                      </View>
+                    )}
+                    <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+          </View>
         )}
 
         {/* REPORTS */}
@@ -599,6 +693,17 @@ const styles = StyleSheet.create({
   statRowNumber: { fontSize: 16, fontWeight: '800', color: Colors.brandGreen },
 
   section: { padding: 16, gap: 12 },
+
+  userListCount: { fontSize: 13, fontWeight: '700', color: Colors.midGrey, marginBottom: 2 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#D5D5D5' },
+  userAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#C2D9E8', justifyContent: 'center', alignItems: 'center' },
+  userAvatarText: { fontSize: 16, fontWeight: '800', color: '#1B4F72' },
+  userName: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
+  userEmail: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
+  userSuburb: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
+  userSuspendedBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  userSuspendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#E65100' },
+
   reportStatusRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   reportStatusChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
   reportStatusChipActive: { backgroundColor: '#C2D9E8', borderColor: '#1B4F72' },
