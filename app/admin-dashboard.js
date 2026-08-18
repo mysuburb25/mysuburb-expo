@@ -110,6 +110,11 @@ export default function AdminDashboardScreen() {
   }, []);
 
   const fetchReports = useCallback(async (status) => {
+    // Temporary — confirms the function is actually being invoked at
+    // all, before we even reach the query. If this never shows, the
+    // problem is upstream (useFocusEffect not calling it), not the
+    // query/fetch itself.
+    Alert.alert('fetchReports called (debug)', 'status: ' + status);
     setLoadingReports(true);
     try {
       const q = query(
@@ -137,6 +142,7 @@ export default function AdminDashboardScreen() {
   }, []);
 
   const fetchSuspendedUsers = useCallback(async () => {
+    Alert.alert('fetchSuspendedUsers called (debug)', 'starting fetch...');
     setLoadingSuspended(true);
     try {
       const snap = await getDocs(query(collection(db, 'users'), where('isSuspended', '==', true)));
@@ -459,11 +465,12 @@ export default function AdminDashboardScreen() {
           <View style={styles.section}>
             <View style={styles.reportStatusRow}>
               <TouchableOpacity
-                style={[styles.reportStatusChip, reportStatus === 'open' && styles.reportStatusChipActive]}
+                style={[styles.reportStatusChip, reportStatus === 'open' && styles.reportStatusChipActiveOpen]}
                 onPress={() => setReportStatus('open')}
               >
+                <Ionicons name="alert-circle" size={14} color={reportStatus === 'open' ? '#E53935' : Colors.midGrey} />
                 <Text
-                  style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActive]}
+                  style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActiveOpen]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
@@ -472,11 +479,12 @@ export default function AdminDashboardScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.reportStatusChip, reportStatus === 'resolved' && styles.reportStatusChipActive]}
+                style={[styles.reportStatusChip, reportStatus === 'resolved' && styles.reportStatusChipActiveResolved]}
                 onPress={() => setReportStatus('resolved')}
               >
+                <Ionicons name="checkmark-circle" size={14} color={reportStatus === 'resolved' ? Colors.brandGreen : Colors.midGrey} />
                 <Text
-                  style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActive]}
+                  style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActiveResolved]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
@@ -705,10 +713,15 @@ const styles = StyleSheet.create({
   userSuspendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#E65100' },
 
   reportStatusRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  reportStatusChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 16, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
-  reportStatusChipActive: { backgroundColor: '#C2D9E8', borderColor: '#1B4F72' },
-  reportStatusChipText: { fontSize: 13, fontWeight: '600', color: Colors.midGrey },
-  reportStatusChipTextActive: { color: '#1B4F72', fontWeight: '700' },
+  // Smaller and left-aligned (not full-width like the main tab bar
+  // above), with an icon and meaning-based colors — this reads as a
+  // filter within the Reports tab, not a second row of navigation tabs.
+  reportStatusChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#E5E5E5' },
+  reportStatusChipActiveOpen: { backgroundColor: '#FFEBEE', borderColor: '#E53935' },
+  reportStatusChipActiveResolved: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
+  reportStatusChipText: { fontSize: 12, fontWeight: '600', color: Colors.midGrey },
+  reportStatusChipTextActiveOpen: { color: '#E53935', fontWeight: '700' },
+  reportStatusChipTextActiveResolved: { color: Colors.brandGreen, fontWeight: '700' },
 
   reportCard: { backgroundColor: Colors.white, borderRadius: 16, padding: 14, gap: 10, borderWidth: 1.5, borderColor: '#D5D5D5' },
   reportCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
