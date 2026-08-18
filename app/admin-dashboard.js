@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, updateDoc, addDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, onSnapshot, updateDoc, addDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
@@ -15,17 +15,6 @@ const TABS = [
   { key: 'reports', label: 'Reports' },
   { key: 'suspended', label: 'Suspended' },
 ];
-
-// Temporary diagnostic helper — races a promise against a fixed
-// timeout, so a genuinely hanging Firestore call can be definitively
-// distinguished from one that's just slow. A normal getDocs() call
-// should resolve or reject in well under this window.
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`TIMEOUT after ${ms}ms: ${label}`)), ms)),
-  ]);
-}
 
 function formatDate(date) {
   if (!date) return '';
@@ -120,57 +109,49 @@ export default function AdminDashboardScreen() {
     finally { setLoadingUsers(false); }
   }, []);
 
-  const fetchReports = useCallback(async (status) => {
-    // Temporary — confirms the function is actually being invoked at
-    // all, before we even reach the query. If this never shows, the
-    // problem is upstream (useFocusEffect not calling it), not the
-    // query/fetch itself.
-    Alert.alert('fetchReports called (debug)', 'status: ' + status);
+  // Live listeners instead of one-time getDocs() calls — the same
+  // pattern already proven reliable in chat throughout this app. The
+  // one-time getDocs() version of these two queries specifically was
+  // hanging indefinitely (confirmed via a 10-second timeout race,
+  // ruling out "just slow"), while onSnapshot on the exact same
+  // collections/filters works normally elsewhere in the app. Switching
+  // to it here sidesteps whatever that one-time-query-specific issue
+  // was, and also means reports/suspended users now update live rather
+  // than needing a manual refetch.
+  useEffect(() => {
     setLoadingReports(true);
-    try {
-      const q = query(
-        collection(db, 'reports'),
-        where('status', '==', status),
-        orderBy('createdAt', 'desc'),
-        limit(30)
-      );
-      const snap = await withTimeout(getDocs(q), 10000, 'fetchReports');
+    const q = query(
+      collection(db, 'reports'),
+      where('status', '==', reportStatus),
+      orderBy('createdAt', 'desc'),
+      limit(30)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      // Temporary — confirms the function actually completed, so we can
-      // tell apart "it errored" from "it's genuinely hanging and never
-      // resolves at all" (the latter wouldn't reach this line or the
-      // catch block below).
-      Alert.alert('Reports Loaded (debug)', `Fetched ${snap.docs.length} ${status} reports.`);
-    } catch (e) {
+      setLoadingReports(false);
+    }, (e) => {
       console.error(e);
-      // Temporary — surfacing the actual error since there's no console
-      // access to check otherwise. This is what actually revealed the
-      // real cause of a similar stuck-spinner bug earlier (a deprecated
-      // API method), rather than guessing blindly again.
-      Alert.alert('Reports Error (debug)', e?.message || String(e));
-    }
-    finally { setLoadingReports(false); }
-  }, []);
+      setLoadingReports(false);
+    });
+    return () => unsubscribe();
+  }, [reportStatus]);
 
-  const fetchSuspendedUsers = useCallback(async () => {
-    Alert.alert('fetchSuspendedUsers called (debug)', 'starting fetch...');
+  useEffect(() => {
     setLoadingSuspended(true);
-    try {
-      const snap = await withTimeout(getDocs(query(collection(db, 'users'), where('isSuspended', '==', true))), 10000, 'fetchSuspendedUsers');
+    const q = query(collection(db, 'users'), where('isSuspended', '==', true));
+    const unsubscribe = onSnapshot(q, (snap) => {
       setSuspendedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      Alert.alert('Suspended Loaded (debug)', `Fetched ${snap.docs.length} suspended users.`);
-    } catch (e) {
+      setLoadingSuspended(false);
+    }, (e) => {
       console.error(e);
-      Alert.alert('Suspended Users Error (debug)', e?.message || String(e));
-    }
-    finally { setLoadingSuspended(false); }
+      setLoadingSuspended(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   useFocusEffect(useCallback(() => {
     fetchStats();
-    fetchReports(reportStatus);
-    fetchSuspendedUsers();
-  }, [fetchStats, fetchReports, fetchSuspendedUsers, reportStatus]));
+  }, [fetchStats]));
 
   // Lazy-load: only fetches the first time the Users tab is actually
   // opened, not on every screen focus — see fetchAllUsers' own comment
@@ -181,10 +162,11 @@ export default function AdminDashboardScreen() {
     }
   }, [activeTab, usersLoaded, fetchAllUsers]);
 
+  // Reports and Suspended no longer need manual refetching here — their
+  // onSnapshot listeners above keep them live automatically. Stats and
+  // the Users list (a one-time snapshot, not a live listener) still do.
   const handleRefresh = () => {
     fetchStats();
-    fetchReports(reportStatus);
-    fetchSuspendedUsers();
     if (activeTab === 'users') fetchAllUsers();
   };
 
@@ -261,7 +243,8 @@ export default function AdminDashboardScreen() {
             try {
               await updateDoc(doc(db, 'users', target.id), { isSuspended: true });
               Alert.alert('User Suspended', `${target.name || 'This user'} has been suspended.`);
-              fetchSuspendedUsers();
+              // No manual refetch needed — the Suspended tab's
+              // onSnapshot listener picks this up automatically.
             } catch (e) { Alert.alert('Error', e.message); }
           }
         }
