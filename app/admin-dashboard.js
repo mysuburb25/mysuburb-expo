@@ -16,6 +16,17 @@ const TABS = [
   { key: 'suspended', label: 'Suspended' },
 ];
 
+// Temporary diagnostic helper — races a promise against a fixed
+// timeout, so a genuinely hanging Firestore call can be definitively
+// distinguished from one that's just slow. A normal getDocs() call
+// should resolve or reject in well under this window.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`TIMEOUT after ${ms}ms: ${label}`)), ms)),
+  ]);
+}
+
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
@@ -123,7 +134,7 @@ export default function AdminDashboardScreen() {
         orderBy('createdAt', 'desc'),
         limit(30)
       );
-      const snap = await getDocs(q);
+      const snap = await withTimeout(getDocs(q), 10000, 'fetchReports');
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       // Temporary — confirms the function actually completed, so we can
       // tell apart "it errored" from "it's genuinely hanging and never
@@ -145,7 +156,7 @@ export default function AdminDashboardScreen() {
     Alert.alert('fetchSuspendedUsers called (debug)', 'starting fetch...');
     setLoadingSuspended(true);
     try {
-      const snap = await getDocs(query(collection(db, 'users'), where('isSuspended', '==', true)));
+      const snap = await withTimeout(getDocs(query(collection(db, 'users'), where('isSuspended', '==', true))), 10000, 'fetchSuspendedUsers');
       setSuspendedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       Alert.alert('Suspended Loaded (debug)', `Fetched ${snap.docs.length} suspended users.`);
     } catch (e) {
@@ -465,12 +476,12 @@ export default function AdminDashboardScreen() {
           <View style={styles.section}>
             <View style={styles.reportStatusRow}>
               <TouchableOpacity
-                style={[styles.reportStatusChip, reportStatus === 'open' && styles.reportStatusChipActiveOpen]}
+                style={[styles.reportStatusChipOpen, reportStatus === 'open' && styles.reportStatusChipActiveOpen]}
                 onPress={() => setReportStatus('open')}
               >
-                <Ionicons name="alert-circle" size={14} color={reportStatus === 'open' ? '#E53935' : Colors.midGrey} />
+                <Ionicons name="alert-circle" size={14} color="#E53935" />
                 <Text
-                  style={[styles.reportStatusChipText, reportStatus === 'open' && styles.reportStatusChipTextActiveOpen]}
+                  style={[styles.reportStatusChipTextOpen, reportStatus === 'open' && styles.reportStatusChipTextActiveOpen]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
@@ -479,12 +490,12 @@ export default function AdminDashboardScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.reportStatusChip, reportStatus === 'resolved' && styles.reportStatusChipActiveResolved]}
+                style={[styles.reportStatusChipResolved, reportStatus === 'resolved' && styles.reportStatusChipActiveResolved]}
                 onPress={() => setReportStatus('resolved')}
               >
-                <Ionicons name="checkmark-circle" size={14} color={reportStatus === 'resolved' ? Colors.brandGreen : Colors.midGrey} />
+                <Ionicons name="checkmark-circle" size={14} color={Colors.brandGreen} />
                 <Text
-                  style={[styles.reportStatusChipText, reportStatus === 'resolved' && styles.reportStatusChipTextActiveResolved]}
+                  style={[styles.reportStatusChipTextResolved, reportStatus === 'resolved' && styles.reportStatusChipTextActiveResolved]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
@@ -716,12 +727,19 @@ const styles = StyleSheet.create({
   // Smaller and left-aligned (not full-width like the main tab bar
   // above), with an icon and meaning-based colors — this reads as a
   // filter within the Reports tab, not a second row of navigation tabs.
-  reportStatusChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#E5E5E5' },
-  reportStatusChipActiveOpen: { backgroundColor: '#FFEBEE', borderColor: '#E53935' },
-  reportStatusChipActiveResolved: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen },
-  reportStatusChipText: { fontSize: 12, fontWeight: '600', color: Colors.midGrey },
-  reportStatusChipTextActiveOpen: { color: '#E53935', fontWeight: '700' },
-  reportStatusChipTextActiveResolved: { color: Colors.brandGreen, fontWeight: '700' },
+  // Muted-but-always-visible base color per chip (not neutral gray),
+  // with a bolder, more saturated version layered on top when that
+  // chip is the active filter — so the meaning (open=red,
+  // resolved=green) is visible at a glance either way, not just once
+  // you've clicked something.
+  reportStatusChipOpen: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFCDD2' },
+  reportStatusChipResolved: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#F1F8F4', borderWidth: 1, borderColor: '#C8E6C9' },
+  reportStatusChipActiveOpen: { backgroundColor: '#FFEBEE', borderColor: '#E53935', borderWidth: 1.5 },
+  reportStatusChipActiveResolved: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen, borderWidth: 1.5 },
+  reportStatusChipTextOpen: { fontSize: 12, fontWeight: '600', color: '#C62828' },
+  reportStatusChipTextResolved: { fontSize: 12, fontWeight: '600', color: '#2E7D32' },
+  reportStatusChipTextActiveOpen: { color: '#E53935', fontWeight: '800' },
+  reportStatusChipTextActiveResolved: { color: Colors.brandGreen, fontWeight: '800' },
 
   reportCard: { backgroundColor: Colors.white, borderRadius: 16, padding: 14, gap: 10, borderWidth: 1.5, borderColor: '#D5D5D5' },
   reportCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
