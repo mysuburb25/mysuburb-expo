@@ -1013,14 +1013,16 @@ export default function ChatScreen() {
                 }
               </TouchableOpacity>
             </View>
-            {/* Safe-area bottom inset as its own spacer, not folded into
-                inputRow's own padding — keeping it separate means the row
-                stays compact and its content (input, buttons) stays
-                symmetrically centered within it, rather than the row
-                growing tall with the safe-area space and pushing the
-                actual content up into the top portion of it. Same green
-                background keeps the two visually seamless as one bar. */}
-            <View style={{ height: insets.bottom, backgroundColor: Colors.brandGreen }} />
+            {/* Removed the previous insets.bottom-based spacer here.
+                inputRow itself now has a hard fixed height, and that
+                alone still didn't stop the bar growing on Android when
+                the keyboard opened — pointing at insets.bottom itself as
+                an unstable value on Android (very plausibly recalculating
+                against the window's resized bounds under
+                softwareKeyboardLayoutMode:"resize", rather than staying
+                fixed to the physical device edge). Removing this
+                dynamic dependency entirely, rather than continuing to
+                build on top of a value that isn't behaving predictably. */}
           </View>
         </>
       )}
