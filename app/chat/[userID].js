@@ -1023,7 +1023,7 @@ export default function ChatScreen() {
                 fixed). A static value sidesteps that entirely — it won't
                 perfectly match every device's exact gesture bar height,
                 but it won't destabilize either, which matters more here. */}
-            {Platform.OS === 'android' && <View style={{ height: 36, backgroundColor: Colors.brandGreen }} />}
+            {Platform.OS === 'android' && <View style={{ height: 50, backgroundColor: Colors.brandGreen }} />}
           </View>
         </>
       )}
