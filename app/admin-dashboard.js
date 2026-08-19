@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -39,7 +39,6 @@ export default function AdminDashboardScreen() {
   // expensive as the user base grows, for a list that isn't always needed.
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [usersLoaded, setUsersLoaded] = useState(false);
 
   // --- Reports ---
   const [reportStatus, setReportStatus] = useState('open'); // 'open' | 'resolved'
@@ -98,32 +97,23 @@ export default function AdminDashboardScreen() {
   // Reports' own limit(30). Fine for the app's current size; worth
   // revisiting with proper pagination once the user base grows well
   // beyond this.
-  const fetchAllUsers = useCallback(async () => {
+  const [userSortBy, setUserSortBy] = useState('alphabetical'); // 'alphabetical' | 'newest'
+  const fetchAllUsers = useCallback(async (sortBy) => {
     setLoadingUsers(true);
     try {
-      const q = query(collection(db, 'users'), orderBy('displayName', 'asc'), limit(200));
+      const q = sortBy === 'newest'
+        ? query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200))
+        : query(collection(db, 'users'), orderBy('displayName', 'asc'), limit(200));
       const snap = await getDocs(q);
       setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setUsersLoaded(true);
     } catch (e) { console.error(e); }
     finally { setLoadingUsers(false); }
   }, []);
 
-  // Live listeners instead of one-time getDocs() calls — the same
-  // pattern already proven reliable in chat throughout this app. The
-  // one-time getDocs() version of these two queries specifically was
-  // hanging indefinitely (confirmed via a 10-second timeout race,
-  // ruling out "just slow"), while onSnapshot on the exact same
-  // collections/filters works normally elsewhere in the app. Switching
-  // to it here sidesteps whatever that one-time-query-specific issue
-  // was, and also means reports/suspended users now update live rather
-  // than needing a manual refetch.
+  // Live listeners instead of one-time getDocs() calls — proven pattern
+  // from chat throughout this app.
   useEffect(() => {
     setLoadingReports(true);
-    // Temporary — confirms exactly which UID is active when the
-    // listener is attached, ruling out any mismatch with what we
-    // verified directly in Firestore.
-    Alert.alert('Reports listener attaching (debug)', 'user.uid: ' + user?.uid);
     const q = query(
       collection(db, 'reports'),
       where('status', '==', reportStatus),
@@ -133,27 +123,22 @@ export default function AdminDashboardScreen() {
     const unsubscribe = onSnapshot(q, (snap) => {
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingReports(false);
-      Alert.alert('Reports snapshot received (debug)', `${snap.docs.length} docs, fromCache: ${snap.metadata.fromCache}`);
     }, (e) => {
       console.error(e);
       setLoadingReports(false);
-      Alert.alert('Reports listener error (debug)', e?.code + ': ' + e?.message);
     });
     return () => unsubscribe();
   }, [reportStatus]);
 
   useEffect(() => {
     setLoadingSuspended(true);
-    Alert.alert('Suspended listener attaching (debug)', 'user.uid: ' + user?.uid);
     const q = query(collection(db, 'users'), where('isSuspended', '==', true));
     const unsubscribe = onSnapshot(q, (snap) => {
       setSuspendedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingSuspended(false);
-      Alert.alert('Suspended snapshot received (debug)', `${snap.docs.length} docs, fromCache: ${snap.metadata.fromCache}`);
     }, (e) => {
       console.error(e);
       setLoadingSuspended(false);
-      Alert.alert('Suspended listener error (debug)', e?.code + ': ' + e?.message);
     });
     return () => unsubscribe();
   }, []);
@@ -162,21 +147,24 @@ export default function AdminDashboardScreen() {
     fetchStats();
   }, [fetchStats]));
 
-  // Lazy-load: only fetches the first time the Users tab is actually
-  // opened, not on every screen focus — see fetchAllUsers' own comment
-  // for the cost reasoning.
+  // Fetches the first time the Users tab is opened, and re-fetches only
+  // if the sort order has actually changed since the last fetch —
+  // switching away and back to the tab without changing sort doesn't
+  // trigger a wasteful refetch of the same 200 documents.
+  const lastFetchedSortRef = useRef(null);
   useEffect(() => {
-    if (activeTab === 'users' && !usersLoaded) {
-      fetchAllUsers();
+    if (activeTab === 'users' && lastFetchedSortRef.current !== userSortBy) {
+      lastFetchedSortRef.current = userSortBy;
+      fetchAllUsers(userSortBy);
     }
-  }, [activeTab, usersLoaded, fetchAllUsers]);
+  }, [activeTab, userSortBy, fetchAllUsers]);
 
   // Reports and Suspended no longer need manual refetching here — their
   // onSnapshot listeners above keep them live automatically. Stats and
   // the Users list (a one-time snapshot, not a live listener) still do.
   const handleRefresh = () => {
     fetchStats();
-    if (activeTab === 'users') fetchAllUsers();
+    if (activeTab === 'users') fetchAllUsers(userSortBy);
   };
 
   const handleRemovePost = (report) => {
@@ -428,6 +416,36 @@ export default function AdminDashboardScreen() {
         {/* USERS */}
         {activeTab === 'users' && (
           <View style={styles.section}>
+            <View style={styles.userSortRow}>
+              <TouchableOpacity
+                style={[styles.userSortChip, userSortBy === 'alphabetical' && styles.userSortChipActive]}
+                onPress={() => setUserSortBy('alphabetical')}
+              >
+                <Ionicons name="text-outline" size={14} color={userSortBy === 'alphabetical' ? '#1B4F72' : Colors.midGrey} />
+                <Text
+                  style={[styles.userSortChipText, userSortBy === 'alphabetical' && styles.userSortChipTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  A–Z
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.userSortChip, userSortBy === 'newest' && styles.userSortChipActive]}
+                onPress={() => setUserSortBy('newest')}
+              >
+                <Ionicons name="time-outline" size={14} color={userSortBy === 'newest' ? '#1B4F72' : Colors.midGrey} />
+                <Text
+                  style={[styles.userSortChipText, userSortBy === 'newest' && styles.userSortChipTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  Newest
+                </Text>
+              </TouchableOpacity>
+            </View>
             {loadingUsers ? (
               <ActivityIndicator color="#1B4F72" style={{ marginTop: 30 }} />
             ) : allUsers.length === 0 ? (
@@ -705,6 +723,11 @@ const styles = StyleSheet.create({
 
   section: { padding: 16, gap: 12 },
 
+  userSortRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  userSortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#E5E5E5' },
+  userSortChipActive: { backgroundColor: '#C2D9E8', borderColor: '#1B4F72', borderWidth: 1.5 },
+  userSortChipText: { fontSize: 12, fontWeight: '600', color: Colors.midGrey },
+  userSortChipTextActive: { color: '#1B4F72', fontWeight: '800' },
   userListCount: { fontSize: 13, fontWeight: '700', color: Colors.midGrey, marginBottom: 2 },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#D5D5D5' },
   userAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#C2D9E8', justifyContent: 'center', alignItems: 'center' },
@@ -715,21 +738,17 @@ const styles = StyleSheet.create({
   userSuspendedBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   userSuspendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#E65100' },
 
-  reportStatusRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  // Smaller and left-aligned (not full-width like the main tab bar
-  // above), with an icon and meaning-based colors — this reads as a
-  // filter within the Reports tab, not a second row of navigation tabs.
-  // Muted-but-always-visible base color per chip (not neutral gray),
-  // with a bolder, more saturated version layered on top when that
-  // chip is the active filter — so the meaning (open=red,
-  // resolved=green) is visible at a glance either way, not just once
-  // you've clicked something.
-  reportStatusChipOpen: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFCDD2' },
-  reportStatusChipResolved: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#F1F8F4', borderWidth: 1, borderColor: '#C8E6C9' },
+  reportStatusRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  // Same tab shape as Upcoming/Past in events.js (flex:1, paddingVertical:12,
+  // borderRadius:25, fontSize:17) — only the colors differ, keeping the
+  // existing red-for-open/green-for-resolved theme instead of that
+  // screen's neutral gray/brand-green scheme.
+  reportStatusChipOpen: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: 25, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFCDD2' },
+  reportStatusChipResolved: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: 25, backgroundColor: '#F1F8F4', borderWidth: 1, borderColor: '#C8E6C9' },
   reportStatusChipActiveOpen: { backgroundColor: '#FFEBEE', borderColor: '#E53935', borderWidth: 1.5 },
   reportStatusChipActiveResolved: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen, borderWidth: 1.5 },
-  reportStatusChipTextOpen: { fontSize: 12, fontWeight: '600', color: '#C62828' },
-  reportStatusChipTextResolved: { fontSize: 12, fontWeight: '600', color: '#2E7D32' },
+  reportStatusChipTextOpen: { fontSize: 17, fontWeight: '600', color: '#C62828' },
+  reportStatusChipTextResolved: { fontSize: 17, fontWeight: '600', color: '#2E7D32' },
   reportStatusChipTextActiveOpen: { color: '#E53935', fontWeight: '800' },
   reportStatusChipTextActiveResolved: { color: Colors.brandGreen, fontWeight: '800' },
 
