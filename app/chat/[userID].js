@@ -864,7 +864,16 @@ export default function ChatScreen() {
       // is real but needs a different fix (e.g. confirming/adding
       // android.softwareKeyboardLayoutMode in app.json) rather than
       // removing KeyboardAvoidingView's own handling outright.
-      behavior={Platform.OS === 'android' ? 'height' : undefined}
+      // No KeyboardAvoidingView behavior on either platform now —
+      // Android already handles keyboard resize natively via
+      // softwareKeyboardLayoutMode:"resize" in app.json, and iOS relies
+      // on the custom keyboardHeight spacer below. Having Android ALSO
+      // use KeyboardAvoidingView's own 'height' behavior on top of the
+      // native resize meant two separate mechanisms were both trying to
+      // compensate for the keyboard at once, which is what caused the
+      // composer to change size unpredictably specifically when the
+      // keyboard opened.
+      behavior={undefined}
       // Reverted: keyboardVerticalOffset={insets.top} was an attempt to
       // fix the iOS composer lagging a beat behind the keyboard, but it
       // over-corrected and introduced a persistent visible gap between
@@ -1196,7 +1205,11 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptySubText: { fontSize: 14, color: Colors.midGrey },
-  inputRow: { flexDirection: 'row', padding: 10, gap: 10, backgroundColor: Colors.brandGreen, alignItems: 'center' },
+  // minHeight (not height) guarantees a consistent baseline size
+  // regardless of keyboard state or platform, while still letting the
+  // row grow naturally if someone types a genuinely multi-line message
+  // (the TextInput's own maxHeight:120 still caps that growth).
+  inputRow: { flexDirection: 'row', minHeight: 62, paddingHorizontal: 10, paddingVertical: 8, gap: 10, backgroundColor: Colors.brandGreen, alignItems: 'center' },
   imageBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
