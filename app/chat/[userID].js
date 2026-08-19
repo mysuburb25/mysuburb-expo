@@ -986,31 +986,41 @@ export default function ChatScreen() {
               this, the input row's own edge lands right at the screen
               boundary and can end up partially covered by the system
               nav bar, which is what made the send button look "overlaid". */}
-          <View style={[styles.inputRow, { paddingBottom: 12 + insets.bottom }]}>
-            <TouchableOpacity style={styles.imageBtn} onPress={handlePickMedia} disabled={pendingMedia.length >= MAX_PENDING_MEDIA}>
-              <Ionicons name="camera-outline" size={24} color={pendingMedia.length >= MAX_PENDING_MEDIA ? Colors.lightGrey : Colors.brandGreen} />
-            </TouchableOpacity>
-            <TextInput
-              style={styles.input}
-              placeholder={pendingMedia.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
-              placeholderTextColor={Colors.midGrey}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              maxLength={500}
-              autoCorrect={true}
-              autoCapitalize="sentences"
-            />
-            <TouchableOpacity
-              style={[styles.sendBtn, (!message.trim() && pendingMedia.length === 0 || sending) && styles.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={(!message.trim() && pendingMedia.length === 0) || sending}
-            >
-              {sending
-                ? <ActivityIndicator color={Colors.white} size="small" />
-                : <Ionicons name="send" size={20} color={Colors.brandGreen} />
-              }
-            </TouchableOpacity>
+          <View style={{ backgroundColor: Colors.brandGreen }}>
+            <View style={styles.inputRow}>
+              <TouchableOpacity style={styles.imageBtn} onPress={handlePickMedia} disabled={pendingMedia.length >= MAX_PENDING_MEDIA}>
+                <Ionicons name="camera-outline" size={24} color={pendingMedia.length >= MAX_PENDING_MEDIA ? Colors.lightGrey : Colors.brandGreen} />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.input}
+                placeholder={pendingMedia.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
+                placeholderTextColor={Colors.midGrey}
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                maxLength={500}
+                autoCorrect={true}
+                autoCapitalize="sentences"
+              />
+              <TouchableOpacity
+                style={[styles.sendBtn, (!message.trim() && pendingMedia.length === 0 || sending) && styles.sendBtnDisabled]}
+                onPress={handleSend}
+                disabled={(!message.trim() && pendingMedia.length === 0) || sending}
+              >
+                {sending
+                  ? <ActivityIndicator color={Colors.white} size="small" />
+                  : <Ionicons name="send" size={20} color={Colors.brandGreen} />
+                }
+              </TouchableOpacity>
+            </View>
+            {/* Safe-area bottom inset as its own spacer, not folded into
+                inputRow's own padding — keeping it separate means the row
+                stays compact and its content (input, buttons) stays
+                symmetrically centered within it, rather than the row
+                growing tall with the safe-area space and pushing the
+                actual content up into the top portion of it. Same green
+                background keeps the two visually seamless as one bar. */}
+            <View style={{ height: insets.bottom, backgroundColor: Colors.brandGreen }} />
           </View>
         </>
       )}
