@@ -1196,13 +1196,20 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptySubText: { fontSize: 14, color: Colors.midGrey },
-  // minHeight (not height) guarantees a consistent baseline size
-  // regardless of keyboard state or platform, while still letting the
-  // row grow naturally if someone types a genuinely multi-line message
-  // (the TextInput's own maxHeight:120 still caps that growth).
-  inputRow: { flexDirection: 'row', minHeight: 62, paddingHorizontal: 10, paddingVertical: 8, gap: 10, backgroundColor: Colors.brandGreen, alignItems: 'center' },
+  // Fixed height (not minHeight) — the composer kept growing taller and
+  // misaligning specifically when the keyboard opened on Android, even
+  // with minHeight set, suggesting something in the surrounding
+  // keyboard-avoidance layout was still pushing extra height into this
+  // row specifically. A hard height stops that regardless of the exact
+  // mechanism, since the row now simply cannot expand no matter what
+  // external pressure is applied to it.
+  inputRow: { flexDirection: 'row', height: 62, paddingHorizontal: 10, gap: 10, backgroundColor: Colors.brandGreen, alignItems: 'center' },
   imageBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
-  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
+  // maxHeight reduced to fit within inputRow's own fixed height (62) —
+  // typing beyond this scrolls within the input itself (standard
+  // multiline TextInput behavior) rather than pushing against a row
+  // that's no longer able to grow to accommodate it.
+  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, color: Colors.charcoal, maxHeight: 46 },
   sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { backgroundColor: '#FFD700', opacity: 0.5 },
   // Reply quote shown inside a bubble, above the actual message content
