@@ -421,7 +421,7 @@ export default function AdminDashboardScreen() {
                 style={[styles.userSortChip, userSortBy === 'alphabetical' && styles.userSortChipActive]}
                 onPress={() => setUserSortBy('alphabetical')}
               >
-                <Ionicons name="text-outline" size={14} color={userSortBy === 'alphabetical' ? '#1B4F72' : Colors.midGrey} />
+                <Ionicons name="text-outline" size={14} color={userSortBy === 'alphabetical' ? Colors.charcoal : Colors.midGrey} />
                 <Text
                   style={[styles.userSortChipText, userSortBy === 'alphabetical' && styles.userSortChipTextActive]}
                   numberOfLines={1}
@@ -435,7 +435,7 @@ export default function AdminDashboardScreen() {
                 style={[styles.userSortChip, userSortBy === 'newest' && styles.userSortChipActive]}
                 onPress={() => setUserSortBy('newest')}
               >
-                <Ionicons name="time-outline" size={14} color={userSortBy === 'newest' ? '#1B4F72' : Colors.midGrey} />
+                <Ionicons name="time-outline" size={14} color={userSortBy === 'newest' ? Colors.charcoal : Colors.midGrey} />
                 <Text
                   style={[styles.userSortChipText, userSortBy === 'newest' && styles.userSortChipTextActive]}
                   numberOfLines={1}
@@ -723,11 +723,11 @@ const styles = StyleSheet.create({
 
   section: { padding: 16, gap: 12 },
 
-  userSortRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  userSortChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#E5E5E5' },
-  userSortChipActive: { backgroundColor: '#C2D9E8', borderColor: '#1B4F72', borderWidth: 1.5 },
+  userSortRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 12 },
+  userSortChip: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 7, borderRadius: 25, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#E5E5E5' },
+  userSortChipActive: { backgroundColor: '#EFEFEF', borderColor: Colors.charcoal, borderWidth: 1.5 },
   userSortChipText: { fontSize: 12, fontWeight: '600', color: Colors.midGrey },
-  userSortChipTextActive: { color: '#1B4F72', fontWeight: '800' },
+  userSortChipTextActive: { color: Colors.charcoal, fontWeight: '800' },
   userListCount: { fontSize: 13, fontWeight: '700', color: Colors.midGrey, marginBottom: 2 },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#D5D5D5' },
   userAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#C2D9E8', justifyContent: 'center', alignItems: 'center' },
@@ -738,17 +738,13 @@ const styles = StyleSheet.create({
   userSuspendedBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   userSuspendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#E65100' },
 
-  reportStatusRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  // Same tab shape as Upcoming/Past in events.js (flex:1, paddingVertical:12,
-  // borderRadius:25, fontSize:17) — only the colors differ, keeping the
-  // existing red-for-open/green-for-resolved theme instead of that
-  // screen's neutral gray/brand-green scheme.
-  reportStatusChipOpen: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: 25, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFCDD2' },
-  reportStatusChipResolved: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: 25, backgroundColor: '#F1F8F4', borderWidth: 1, borderColor: '#C8E6C9' },
+  reportStatusRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 12 },
+  reportStatusChipOpen: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 7, borderRadius: 25, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFCDD2' },
+  reportStatusChipResolved: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 7, borderRadius: 25, backgroundColor: '#F1F8F4', borderWidth: 1, borderColor: '#C8E6C9' },
   reportStatusChipActiveOpen: { backgroundColor: '#FFEBEE', borderColor: '#E53935', borderWidth: 1.5 },
   reportStatusChipActiveResolved: { backgroundColor: Colors.brandGreenPale, borderColor: Colors.brandGreen, borderWidth: 1.5 },
-  reportStatusChipTextOpen: { fontSize: 17, fontWeight: '600', color: '#C62828' },
-  reportStatusChipTextResolved: { fontSize: 17, fontWeight: '600', color: '#2E7D32' },
+  reportStatusChipTextOpen: { fontSize: 12, fontWeight: '600', color: '#C62828' },
+  reportStatusChipTextResolved: { fontSize: 12, fontWeight: '600', color: '#2E7D32' },
   reportStatusChipTextActiveOpen: { color: '#E53935', fontWeight: '800' },
   reportStatusChipTextActiveResolved: { color: Colors.brandGreen, fontWeight: '800' },
 
