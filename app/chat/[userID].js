@@ -1013,16 +1013,17 @@ export default function ChatScreen() {
                 }
               </TouchableOpacity>
             </View>
-            {/* Removed the previous insets.bottom-based spacer here.
-                inputRow itself now has a hard fixed height, and that
-                alone still didn't stop the bar growing on Android when
-                the keyboard opened — pointing at insets.bottom itself as
-                an unstable value on Android (very plausibly recalculating
-                against the window's resized bounds under
-                softwareKeyboardLayoutMode:"resize", rather than staying
-                fixed to the physical device edge). Removing this
-                dynamic dependency entirely, rather than continuing to
-                build on top of a value that isn't behaving predictably. */}
+            {/* Android-only, static-height spacer for the gesture nav
+                bar — iOS confirmed working with no spacer at all, so it
+                stays that way. Android needs some bottom clearance, but
+                using insets.bottom here was what caused the original
+                instability (very plausibly recalculating against the
+                window's resized bounds under
+                softwareKeyboardLayoutMode:"resize" rather than staying
+                fixed). A static value sidesteps that entirely — it won't
+                perfectly match every device's exact gesture bar height,
+                but it won't destabilize either, which matters more here. */}
+            {Platform.OS === 'android' && <View style={{ height: 20, backgroundColor: Colors.brandGreen }} />}
           </View>
         </>
       )}
