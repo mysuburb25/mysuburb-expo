@@ -82,8 +82,8 @@ function ConversationRow({ item, user, shareText }) {
           <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
         </View>
         <View style={styles.rowBottom}>
-          <Text style={[styles.preview, unread > 0 && styles.previewUnread]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-            {isLastFromMe ? 'You: ' : ''}{item.lastMessage || 'Start a conversation'}
+          <Text style={[styles.preview, unread > 0 && styles.previewUnread]} numberOfLines={1}>
+            {isLastFromMe ? 'You: ' : ''}{(item.lastMessage || 'Start a conversation').replace(/\s+/g, ' ')}
           </Text>
           {unread > 0 && (
             <View style={styles.unreadBadge}>
