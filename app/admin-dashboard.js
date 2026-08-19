@@ -120,6 +120,10 @@ export default function AdminDashboardScreen() {
   // than needing a manual refetch.
   useEffect(() => {
     setLoadingReports(true);
+    // Temporary — confirms exactly which UID is active when the
+    // listener is attached, ruling out any mismatch with what we
+    // verified directly in Firestore.
+    Alert.alert('Reports listener attaching (debug)', 'user.uid: ' + user?.uid);
     const q = query(
       collection(db, 'reports'),
       where('status', '==', reportStatus),
@@ -129,22 +133,27 @@ export default function AdminDashboardScreen() {
     const unsubscribe = onSnapshot(q, (snap) => {
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingReports(false);
+      Alert.alert('Reports snapshot received (debug)', `${snap.docs.length} docs, fromCache: ${snap.metadata.fromCache}`);
     }, (e) => {
       console.error(e);
       setLoadingReports(false);
+      Alert.alert('Reports listener error (debug)', e?.code + ': ' + e?.message);
     });
     return () => unsubscribe();
   }, [reportStatus]);
 
   useEffect(() => {
     setLoadingSuspended(true);
+    Alert.alert('Suspended listener attaching (debug)', 'user.uid: ' + user?.uid);
     const q = query(collection(db, 'users'), where('isSuspended', '==', true));
     const unsubscribe = onSnapshot(q, (snap) => {
       setSuspendedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoadingSuspended(false);
+      Alert.alert('Suspended snapshot received (debug)', `${snap.docs.length} docs, fromCache: ${snap.metadata.fromCache}`);
     }, (e) => {
       console.error(e);
       setLoadingSuspended(false);
+      Alert.alert('Suspended listener error (debug)', e?.code + ': ' + e?.message);
     });
     return () => unsubscribe();
   }, []);
