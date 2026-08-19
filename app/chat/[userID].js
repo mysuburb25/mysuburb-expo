@@ -864,16 +864,7 @@ export default function ChatScreen() {
       // is real but needs a different fix (e.g. confirming/adding
       // android.softwareKeyboardLayoutMode in app.json) rather than
       // removing KeyboardAvoidingView's own handling outright.
-      // No KeyboardAvoidingView behavior on either platform now —
-      // Android already handles keyboard resize natively via
-      // softwareKeyboardLayoutMode:"resize" in app.json, and iOS relies
-      // on the custom keyboardHeight spacer below. Having Android ALSO
-      // use KeyboardAvoidingView's own 'height' behavior on top of the
-      // native resize meant two separate mechanisms were both trying to
-      // compensate for the keyboard at once, which is what caused the
-      // composer to change size unpredictably specifically when the
-      // keyboard opened.
-      behavior={undefined}
+      behavior={Platform.OS === 'android' ? 'height' : undefined}
       // Reverted: keyboardVerticalOffset={insets.top} was an attempt to
       // fix the iOS composer lagging a beat behind the keyboard, but it
       // over-corrected and introduced a persistent visible gap between
