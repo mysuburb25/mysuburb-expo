@@ -1203,7 +1203,7 @@ export default function EventsScreen() {
                 numberOfLines={2}
                 textAlignVertical="top"
                 autoCapitalize="sentences"
-                onFocus={() => { setShowDatePicker(false); setShowTimePicker(false); setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300); }}
+                onFocus={() => { setShowDatePicker(false); setShowTimePicker(false); }}
               />
               {loadingSuggestions && (
                 <ActivityIndicator size="small" color={Colors.brandGreen} style={{ marginTop: 8 }} />

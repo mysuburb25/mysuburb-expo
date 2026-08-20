@@ -576,7 +576,7 @@ export default function CreatePostScreen() {
         </Text>
       </View>
 
-      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
 
         {tabs && (
           <View style={styles.tabRow}>
@@ -783,7 +783,6 @@ export default function CreatePostScreen() {
                 textAlignVertical="top"
                 autoCapitalize="sentences"
                 autoCorrect={true}
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
               />
               {loadingLfSuggestions && (
                 <ActivityIndicator size="small" color={Colors.brandGreen} style={{ marginTop: 8 }} />

@@ -991,7 +991,6 @@ export default function PostDetailScreen() {
                   {post.category === 'marketplace' && (
                     <View style={styles.detailRow}>
                       {post.price > 0 && <Text style={styles.priceTag} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>${post.price?.toFixed(2)}</Text>}
-                      {post.isFree && <View style={styles.freeTag}><Text style={styles.freeTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>FREE</Text></View>}
                     </View>
                   )}
 
@@ -1445,8 +1444,6 @@ const styles = StyleSheet.create({
   locationText: { fontSize: 14, color: Colors.charcoal },
   detailRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   priceTag: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen },
-  freeTag: { backgroundColor: Colors.white, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  freeTagText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
   soldTag: { backgroundColor: '#757575', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, alignItems: 'center' },
   soldTagText: { fontSize: 14, fontWeight: '800', color: Colors.white },
   footer: { flexDirection: 'row', gap: 12, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
