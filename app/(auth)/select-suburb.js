@@ -196,7 +196,12 @@ export default function SelectSuburbScreen() {
                 onPress={() => openStateModal(index)}
               >
                 <Ionicons name={STATE_ICONS[slots[index].state] || 'map-outline'} size={18} color={Colors.brandGreen} />
-                <Text style={[styles.selectorBtnText, !slots[index].state && { color: Colors.midGrey }]}>
+                <Text
+                  style={[styles.selectorBtnText, !slots[index].state && { color: Colors.midGrey }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
                   {slots[index].state || 'Select state...'}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color={Colors.midGrey} />
@@ -276,14 +281,14 @@ export default function SelectSuburbScreen() {
             onPress={() => setVisibleSlotCount(prev => Math.min(prev + 1, SUBURB_SLOTS.length))}
           >
             <Ionicons name="add-circle-outline" size={16} color={Colors.brandGreen} />
-            <Text style={styles.addMoreText}>Add suburbs</Text>
+            <Text style={styles.addMoreText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Add suburbs</Text>
           </TouchableOpacity>
         )}
 
         {/* Save button */}
         <View style={styles.saveWrap}>
           <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSave} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{isEditing ? 'Save Changes' : 'Continue'}</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{isEditing ? 'Save Changes' : 'Continue'}</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>
