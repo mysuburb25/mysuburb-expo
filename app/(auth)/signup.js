@@ -334,18 +334,25 @@ export default function SignupScreen() {
 
       {/* Birth Month Picker */}
       <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMonthPicker(false)}>
-          {/* Plain View, not TouchableOpacity — wrapping the WheelPicker's
-              FlatList in a Touchable component blocked its scroll gesture
-              (the outer press-detection was intercepting the drag before
-              the FlatList could treat it as a scroll). onStartShouldSetResponder
-              still captures the touch here so tapping inside the sheet
-              doesn't bubble up and trigger the overlay's dismiss-on-tap,
-              without introducing that same gesture conflict. */}
-          <View
-            style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}
-            onStartShouldSetResponder={() => true}
-          >
+        <View style={styles.pickerOverlay}>
+          {/* Full-screen dismiss-touchable positioned behind the sheet as
+              a SIBLING, not a parent — the previous attempts (wrapping
+              the sheet in TouchableOpacity, then in a View with
+              onStartShouldSetResponder) still nested the WheelPicker's
+              FlatList somewhere inside a touchable's responder tree,
+              which kept blocking its scroll gesture regardless of which
+              wrapper approach was used. With the dismiss-touchable and
+              the sheet as siblings, the FlatList sits completely outside
+              any touchable's tree — nothing left to conflict with. The
+              sheet renders after this in JSX order, so it visually
+              stacks on top and naturally intercepts any tap that lands
+              on it before that tap could ever reach this background layer. */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowMonthPicker(false)}
+          />
+          <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Month</Text>
             </View>
@@ -360,16 +367,18 @@ export default function SignupScreen() {
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Birth Year Picker */}
       <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
-        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
-          <View
-            style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}
-            onStartShouldSetResponder={() => true}
-          >
+        <View style={styles.pickerOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowYearPicker(false)}
+          />
+          <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Year</Text>
             </View>
@@ -384,7 +393,7 @@ export default function SignupScreen() {
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </KeyboardAvoidingView>
   );
