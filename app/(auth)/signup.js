@@ -335,7 +335,17 @@ export default function SignupScreen() {
       {/* Birth Month Picker */}
       <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
         <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMonthPicker(false)}>
-          <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]} onPress={() => {}}>
+          {/* Plain View, not TouchableOpacity — wrapping the WheelPicker's
+              FlatList in a Touchable component blocked its scroll gesture
+              (the outer press-detection was intercepting the drag before
+              the FlatList could treat it as a scroll). onStartShouldSetResponder
+              still captures the touch here so tapping inside the sheet
+              doesn't bubble up and trigger the overlay's dismiss-on-tap,
+              without introducing that same gesture conflict. */}
+          <View
+            style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Month</Text>
             </View>
@@ -349,14 +359,17 @@ export default function SignupScreen() {
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowMonthPicker(false)}>
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
 
       {/* Birth Year Picker */}
       <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
         <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
-          <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]} onPress={() => {}}>
+          <View
+            style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Year</Text>
             </View>
@@ -370,7 +383,7 @@ export default function SignupScreen() {
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowYearPicker(false)}>
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
