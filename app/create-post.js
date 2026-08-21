@@ -576,7 +576,7 @@ export default function CreatePostScreen() {
         </Text>
       </View>
 
-      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets={true}>
+      <ScrollView ref={scrollRef} style={styles.body} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
         {tabs && (
           <View style={styles.tabRow}>
@@ -656,7 +656,6 @@ export default function CreatePostScreen() {
                 mentions={contentMentions} onMentionsChange={setContentMentions}
                 suburb={profile.suburb} state={profile.state} currentUserId={user.uid}
                 multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true}
-                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
               />
             </View>
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
@@ -718,7 +717,7 @@ export default function CreatePostScreen() {
               </Text>
             </View>
             <View style={styles.fieldPad}>
-              <MentionInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} mentions={contentMentions} onMentionsChange={setContentMentions} suburb={profile.suburb} state={profile.state} currentUserId={user.uid} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)} />
+              <MentionInput style={[styles.input, styles.inputLarge]} placeholder={COMMUNITY_PLACEHOLDERS[selectedCategory]} placeholderTextColor={Colors.midGrey} value={content} onChangeText={setContent} mentions={contentMentions} onMentionsChange={setContentMentions} suburb={profile.suburb} state={profile.state} currentUserId={user.uid} multiline textAlignVertical="top" autoCapitalize="sentences" autoCorrect={true} />
             </View>
             <MediaPickerSection media={media} onAddMedia={handleAddMedia} onRemoveMedia={removeMedia} />
             <View style={styles.fieldPad}>
