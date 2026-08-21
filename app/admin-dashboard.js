@@ -86,10 +86,14 @@ export default function AdminDashboardScreen() {
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const [
-        totalUsers, totalPosts, homeCount, mpCount, eventsCount,
-        servicesCount, lfCount, openReports, resolvedReports, suspendedCount,
-      ] = await Promise.all([
+      // Promise.allSettled, not Promise.all — with allSettled, one query
+      // failing (e.g. the totalPosts query below needs a Firestore
+      // composite index for isRemoved + createdAt that may not exist
+      // yet) only zeroes out THAT stat, not every other one. Promise.all
+      // would reject the whole batch on a single failure, which is
+      // exactly what was zeroing out every counter, not just the one
+      // query that actually changed.
+      const results = await Promise.allSettled([
         getCountFromServer(collection(db, 'users')),
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE))),
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', 'in', ['updates', 'notices', 'safety']))),
@@ -101,18 +105,18 @@ export default function AdminDashboardScreen() {
         getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'resolved'))),
         getCountFromServer(query(collection(db, 'users'), where('isSuspended', '==', true))),
       ]);
-      setStats({
-        totalUsers: totalUsers.data().count,
-        totalPosts: totalPosts.data().count,
-        home: homeCount.data().count,
-        marketplace: mpCount.data().count,
-        events: eventsCount.data().count,
-        services: servicesCount.data().count,
-        lostfound: lfCount.data().count,
-        openReports: openReports.data().count,
-        resolvedReports: resolvedReports.data().count,
-        suspendedUsers: suspendedCount.data().count,
+
+      const labels = ['totalUsers', 'totalPosts', 'home', 'marketplace', 'events', 'services', 'lostfound', 'openReports', 'resolvedReports', 'suspendedUsers'];
+      const values = {};
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          values[labels[i]] = r.value.data().count;
+        } else {
+          values[labels[i]] = 0;
+          console.error(`Stats query failed for "${labels[i]}":`, r.reason);
+        }
       });
+      setStats(values);
     } catch (e) { console.error(e); }
     finally { setLoadingStats(false); }
   }, []);
