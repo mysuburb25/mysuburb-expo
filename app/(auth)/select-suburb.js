@@ -177,7 +177,7 @@ export default function SelectSuburbScreen() {
       </View>
 
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Select Suburbs</Text>
+        <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Suburbs</Text>
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} automaticallyAdjustKeyboardInsets={true}>
