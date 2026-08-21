@@ -132,9 +132,7 @@ Please explore the app, choose the suburbs you care about, and stay connected wi
 
 Please share it with your friends and help us grow our local community.
 
-📱 iOS: https://apps.apple.com/au/app/mysuburb-community/id6791455586
-
-🤖 Android: https://play.google.com/store/apps/details?id=com.mysuburb.app
+🔗 https://mysuburb.app
 
 Thanks,
 MySuburb`;
@@ -216,7 +214,7 @@ exports.sendWelcomeMessage = onDocumentCreated('users/{userId}', async (event) =
 // real security, just enough friction for a short-lived admin task.
 // Change this value before deploying, and don't share the URL.
 const { onRequest } = require('firebase-functions/v2/https');
-const BACKFILL_KEY = 'change-this-before-deploying';
+const BACKFILL_KEY = 'nxPYEU4LNkxtPohN5rL3hl6RYyCbp8uP';
 
 exports.backfillWelcomeMessages = onRequest({ timeoutSeconds: 540 }, async (req, res) => {
   if (req.query.key !== BACKFILL_KEY) {

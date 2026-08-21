@@ -63,12 +63,19 @@ function isAtLeast18(month, year) {
   return age >= 18;
 }
 
+// Standard, widely-used pattern for catching obviously malformed emails
+// (missing @, missing domain, stray spaces) without being so strict it
+// rejects legitimate edge-case addresses — full RFC 5322 compliance is
+// unnecessary here and would reject real addresses people actually use.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function SignupScreen() {
   const { register, createProfile } = useAuth();
   const insets = useSafeAreaInsets();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -80,10 +87,32 @@ export default function SignupScreen() {
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Validates as soon as the person leaves the email field, rather than
+  // waiting until they tap Create Account — catches an obviously
+  // malformed address (missing @, missing domain) right when they'd
+  // naturally notice it, instead of surfacing it as a late surprise
+  // after they've already filled in the rest of the form.
+  const handleEmailBlur = () => {
+    if (email.trim() && !EMAIL_REGEX.test(email.trim())) {
+      setEmailError('Invalid email');
+    } else {
+      setEmailError('');
+    }
+  };
+
+  const handleEmailChange = (text) => {
+    setEmail(text);
+    // Clears the inline error the moment they start fixing it, rather
+    // than leaving a stale "Invalid email" showing while they're mid-edit
+    // and the field may already be valid again.
+    if (emailError) setEmailError('');
+  };
+
   const handleSignup = async () => {
     if (!firstName.trim()) { Alert.alert('Error', 'Please enter your first name.'); return; }
     if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
     if (!email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
+    if (!EMAIL_REGEX.test(email.trim())) { setEmailError('Invalid email'); Alert.alert('Error', 'Please enter a valid email address.'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
     if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters.'); return; }
     if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match.'); return; }
@@ -116,6 +145,9 @@ export default function SignupScreen() {
     } catch (e) {
       if (e.code === 'auth/email-already-in-use') {
         Alert.alert('Error', 'This email is already registered. Please sign in.');
+      } else if (e.code === 'auth/invalid-email') {
+        setEmailError('Invalid email');
+        Alert.alert('Error', 'Please enter a valid email address.');
       } else {
         Alert.alert('Error', e.message);
       }
@@ -184,19 +216,23 @@ export default function SignupScreen() {
           </View>
 
           {/* Email */}
-          <View style={styles.inputWrap}>
-            <Ionicons name="mail-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+          <View style={[styles.inputWrap, emailError && styles.inputWrapError]}>
+            <Ionicons name="mail-outline" size={18} color={emailError ? '#E53935' : Colors.midGrey} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Email address"
               placeholderTextColor={Colors.midGrey}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={handleEmailChange}
+              onBlur={handleEmailBlur}
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
             />
           </View>
+          {!!emailError && (
+            <Text style={styles.fieldErrorText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{emailError}</Text>
+          )}
 
           {/* Password */}
           <View style={styles.inputWrap}>
@@ -298,8 +334,8 @@ export default function SignupScreen() {
 
       {/* Birth Month Picker */}
       <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
-        <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMonthPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]} onPress={() => {}}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Month</Text>
             </View>
@@ -313,14 +349,14 @@ export default function SignupScreen() {
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowMonthPicker(false)}>
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Birth Year Picker */}
       <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
-        <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]} onPress={() => {}}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Year</Text>
             </View>
@@ -334,8 +370,8 @@ export default function SignupScreen() {
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowYearPicker(false)}>
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -351,6 +387,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.brandGreen, marginBottom: 4, textAlign: 'center' },
   subtitle: { fontSize: 15, color: Colors.midGrey, marginBottom: 20, textAlign: 'center' },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.lightGrey, borderRadius: 12, marginBottom: 12, paddingHorizontal: 14, backgroundColor: '#FAFAFA' },
+  inputWrapError: { borderColor: '#E53935', backgroundColor: '#FFF5F5' },
+  fieldErrorText: { fontSize: 12, color: '#E53935', marginTop: -8, marginBottom: 12, marginLeft: 4, fontWeight: '600' },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, paddingVertical: 14, fontSize: 15, color: Colors.charcoal },
   eyeBtn: { padding: 4 },
@@ -363,7 +401,7 @@ const styles = StyleSheet.create({
   wheelHeaderBar: { flexDirection: 'row', backgroundColor: Colors.brandGreen, paddingVertical: 10 },
   wheelHeaderText: { flex: 1, textAlign: 'center', color: Colors.white, fontSize: 19, fontWeight: '800' },
   wheelRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 0 },
-  dobDoneBtn: { marginTop: 12, marginHorizontal: 20, backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  dobDoneBtn: { marginTop: 12, alignSelf: 'center', width: '50%', backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   dobDoneBtnText: { color: Colors.white, fontSize: 19, fontWeight: '700' },
   pickerItemText: { fontSize: 16, color: Colors.charcoal },
   pickerItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
