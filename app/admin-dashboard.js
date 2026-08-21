@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, onSnapshot, updateDoc, addDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
@@ -12,15 +12,30 @@ import AppName from '../components/AppName';
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'users', label: 'Users' },
+  { key: 'posts', label: 'Posts' },
   { key: 'reports', label: 'Reports' },
   { key: 'suspended', label: 'Suspended' },
 ];
+
+// Excludes the batch of test/junk posts created during development from
+// the dashboard's post counts, without touching them in Firestore at
+// all — they're still there, still visible wherever they always were,
+// just no longer counted. Any post created from this point forward
+// counts normally. Applied consistently across the Total Posts stat AND
+// the category breakdown below it, so the numbers stay internally
+// consistent with each other.
+const POSTS_COUNTER_RESET_DATE = Timestamp.fromDate(new Date('2026-08-21T00:00:00Z'));
 
 function formatDate(date) {
   if (!date) return '';
   const d = date.toDate ? date.toDate() : new Date(date);
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+const CATEGORY_LABELS = {
+  updates: 'Community', notices: 'Community', safety: 'Community',
+  marketplace: 'Buy & Sell', events: 'Events', services: 'Services', lostfound: 'Lost & Found',
+};
 
 export default function AdminDashboardScreen() {
   const { user, profile, unreadCount, unreadMessageCount } = useAuth();
@@ -40,6 +55,13 @@ export default function AdminDashboardScreen() {
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
+  // --- Posts (recent list) ---
+  // Same lazy-fetch-on-tab-open pattern as Users. Capped at 50 (not 200
+  // like Users) since this is specifically meant as a "what's been
+  // posted recently" moderation view, not a full archive.
+  const [allPosts, setAllPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+
   // --- Reports ---
   const [reportStatus, setReportStatus] = useState('open'); // 'open' | 'resolved'
   const [reports, setReports] = useState([]);
@@ -58,7 +80,9 @@ export default function AdminDashboardScreen() {
   // collections grow (unlike getDocs, which reads and bills for every
   // matching document). Both openReports and resolvedReports are
   // fetched here so the Reports tab chips can show live counts without
-  // needing their own separate query.
+  // needing their own separate query. Post-related counts (total +
+  // every category) are all scoped to POSTS_COUNTER_RESET_DATE, so test
+  // posts from before that cutoff never appear in any of these numbers.
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
@@ -67,12 +91,12 @@ export default function AdminDashboardScreen() {
         servicesCount, lfCount, openReports, resolvedReports, suspendedCount,
       ] = await Promise.all([
         getCountFromServer(collection(db, 'users')),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', 'in', ['updates', 'notices', 'safety']))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'marketplace'))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'events'))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'services'))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'lostfound'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', 'in', ['updates', 'notices', 'safety']))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'marketplace'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'events'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'services'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'lostfound'))),
         getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'open'))),
         getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'resolved'))),
         getCountFromServer(query(collection(db, 'users'), where('isSuspended', '==', true))),
@@ -108,6 +132,27 @@ export default function AdminDashboardScreen() {
       setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { console.error(e); }
     finally { setLoadingUsers(false); }
+  }, []);
+
+  // Same pattern as fetchAllUsers, capped at 50 per the "recent posts"
+  // use case rather than a full archive. Alphabetical sorts by the
+  // post's own content/title text — the closest equivalent to a user's
+  // displayName, since posts don't have a dedicated "name" field.
+  // Deliberately NOT scoped to POSTS_COUNTER_RESET_DATE — this tab is
+  // for browsing/moderating whatever's actually been posted, old test
+  // posts included, which is a different purpose from the Overview
+  // tab's "real activity" count.
+  const [postSortBy, setPostSortBy] = useState('newest'); // 'newest' | 'alphabetical'
+  const fetchAllPosts = useCallback(async (sortBy) => {
+    setLoadingPosts(true);
+    try {
+      const q = sortBy === 'alphabetical'
+        ? query(collection(db, 'posts'), where('isRemoved', '==', false), orderBy('content', 'asc'), limit(50))
+        : query(collection(db, 'posts'), where('isRemoved', '==', false), orderBy('createdAt', 'desc'), limit(50));
+      const snap = await getDocs(q);
+      setAllPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error(e); }
+    finally { setLoadingPosts(false); }
   }, []);
 
   // Live listeners instead of one-time getDocs() calls — proven pattern
@@ -159,12 +204,22 @@ export default function AdminDashboardScreen() {
     }
   }, [activeTab, userSortBy, fetchAllUsers]);
 
+  // Same lazy-fetch-once-per-sort-change pattern for Posts.
+  const lastFetchedPostSortRef = useRef(null);
+  useEffect(() => {
+    if (activeTab === 'posts' && lastFetchedPostSortRef.current !== postSortBy) {
+      lastFetchedPostSortRef.current = postSortBy;
+      fetchAllPosts(postSortBy);
+    }
+  }, [activeTab, postSortBy, fetchAllPosts]);
+
   // Reports and Suspended no longer need manual refetching here — their
   // onSnapshot listeners above keep them live automatically. Stats and
-  // the Users list (a one-time snapshot, not a live listener) still do.
+  // the Users/Posts lists (one-time snapshots, not live listeners) still do.
   const handleRefresh = () => {
     fetchStats();
     if (activeTab === 'users') fetchAllUsers(userSortBy);
+    if (activeTab === 'posts') fetchAllPosts(postSortBy);
   };
 
   const handleRemovePost = (report) => {
@@ -332,7 +387,7 @@ export default function AdminDashboardScreen() {
         <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Admin Dashboard</Text>
       </View>
 
-      <View style={styles.tabRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabRowScroll} contentContainerStyle={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
             <Text
@@ -345,7 +400,7 @@ export default function AdminDashboardScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -365,11 +420,11 @@ export default function AdminDashboardScreen() {
                 <Text style={styles.statNumber}>{stats?.totalUsers ?? 0}</Text>
                 <Text style={styles.statLabel}>Total Users</Text>
               </TouchableOpacity>
-              <View style={[styles.statCard, { backgroundColor: Colors.brandGreenPale }]}>
+              <TouchableOpacity style={[styles.statCard, { backgroundColor: Colors.brandGreenPale }]} onPress={() => setActiveTab('posts')}>
                 <Ionicons name="documents-outline" size={22} color={Colors.brandGreen} />
                 <Text style={styles.statNumber}>{stats?.totalPosts ?? 0}</Text>
                 <Text style={styles.statLabel}>Total Posts</Text>
-              </View>
+              </TouchableOpacity>
               <View style={[styles.statCard, { backgroundColor: stats?.openReports > 0 ? '#FFEBEE' : '#F0F0F0' }]}>
                 <Ionicons name="flag-outline" size={22} color={stats?.openReports > 0 ? '#E53935' : Colors.midGrey} />
                 <Text style={[styles.statNumber, stats?.openReports > 0 && { color: '#E53935' }]}>{stats?.openReports ?? 0}</Text>
@@ -473,6 +528,73 @@ export default function AdminDashboardScreen() {
                         <Text style={styles.userSuspendedBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Suspended</Text>
                       </View>
                     )}
+                    <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* POSTS */}
+        {activeTab === 'posts' && (
+          <View style={styles.section}>
+            <View style={styles.userSortRow}>
+              <TouchableOpacity
+                style={[styles.userSortChip, postSortBy === 'alphabetical' && styles.userSortChipActive]}
+                onPress={() => setPostSortBy('alphabetical')}
+              >
+                <Ionicons name="text-outline" size={14} color={postSortBy === 'alphabetical' ? Colors.charcoal : Colors.midGrey} />
+                <Text
+                  style={[styles.userSortChipText, postSortBy === 'alphabetical' && styles.userSortChipTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  A–Z
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.userSortChip, postSortBy === 'newest' && styles.userSortChipActive]}
+                onPress={() => setPostSortBy('newest')}
+              >
+                <Ionicons name="time-outline" size={14} color={postSortBy === 'newest' ? Colors.charcoal : Colors.midGrey} />
+                <Text
+                  style={[styles.userSortChipText, postSortBy === 'newest' && styles.userSortChipTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  Newest
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {loadingPosts ? (
+              <ActivityIndicator color="#1B4F72" style={{ marginTop: 30 }} />
+            ) : allPosts.length === 0 ? (
+              <View style={styles.empty}>
+                <Ionicons name="documents-outline" size={48} color={Colors.lightGrey} />
+                <Text style={styles.emptyText}>No posts found</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.userListCount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {allPosts.length}{allPosts.length >= 50 ? '+' : ''} post{allPosts.length === 1 ? '' : 's'}
+                </Text>
+                {allPosts.map(p => (
+                  <TouchableOpacity key={p.id} style={styles.userRow} onPress={() => router.push('/post/' + p.id)}>
+                    <View style={styles.postCategoryBadge}>
+                      <Text style={styles.postCategoryBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        {CATEGORY_LABELS[p.category] || p.category || '—'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.userName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{p.content || '(no title)'}</Text>
+                      <Text style={styles.userEmail} numberOfLines={1}>{p.authorName || 'Unknown author'}</Text>
+                      <Text style={styles.userSuburb} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                        {p.suburb ? `${p.suburb}, ${p.state}` : 'No suburb'} · {formatDate(p.createdAt)}
+                      </Text>
+                    </View>
                     <Ionicons name="chevron-forward" size={18} color={Colors.lightGrey} />
                   </TouchableOpacity>
                 ))}
@@ -705,8 +827,13 @@ const styles = StyleSheet.create({
   pageHeader: { backgroundColor: '#C2D9E8', paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: '#1B4F72', letterSpacing: 0.2 },
-  tabRow: { flexDirection: 'row', padding: 12, gap: 8, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
+  // Horizontal scroll instead of a fixed row — now that there are 5 tabs
+  // instead of 4, a fixed flex:1-per-tab row would squeeze each label
+  // uncomfortably narrow. Scrolling keeps every tab at a readable,
+  // consistent width regardless of how many are added later.
+  tabRowScroll: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabRow: { flexDirection: 'row', padding: 12, gap: 8 },
+  tabBtn: { paddingVertical: 10, paddingHorizontal: 18, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
   tabBtnActive: { backgroundColor: '#1B4F72', borderColor: '#1B4F72' },
   tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '700' },
   tabTextActive: { color: Colors.white, fontWeight: '800' },
@@ -737,6 +864,12 @@ const styles = StyleSheet.create({
   userSuburb: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
   userSuspendedBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   userSuspendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#E65100' },
+
+  // Fixed width so every post row's title/author/suburb text starts
+  // aligned at the same horizontal position, regardless of how long or
+  // short each post's category label happens to be.
+  postCategoryBadge: { width: 64, paddingVertical: 4, borderRadius: 10, backgroundColor: Colors.brandGreenPale, alignItems: 'center' },
+  postCategoryBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.brandGreen },
 
   reportStatusRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 12 },
   reportStatusChipOpen: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingVertical: 7, borderRadius: 25, backgroundColor: '#FFF5F5', borderWidth: 1, borderColor: '#FFCDD2' },
