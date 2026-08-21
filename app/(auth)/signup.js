@@ -81,8 +81,8 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTC, setAgreedToTC] = useState(false);
   const [showTC, setShowTC] = useState(false);
-  const [birthMonth, setBirthMonth] = useState(null); // 1-12
-  const [birthYear, setBirthYear] = useState(null);
+  const [birthMonth, setBirthMonth] = useState(2); // 1-12, defaults to February
+  const [birthYear, setBirthYear] = useState(CURRENT_YEAR - 1);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [loading, setLoading] = useState(false);
