@@ -18,12 +18,12 @@ const TABS = [
 ];
 
 // Excludes the batch of test/junk posts created during development from
-// the dashboard's post counts, without touching them in Firestore at
-// all — they're still there, still visible wherever they always were,
-// just no longer counted. Any post created from this point forward
-// counts normally. Applied consistently across the Total Posts stat AND
-// the category breakdown below it, so the numbers stay internally
-// consistent with each other.
+// ONLY the Total Posts count on the Overview tab, without touching them
+// in Firestore at all — they're still there, still visible wherever they
+// always were, just not counted in this one number. Deliberately NOT
+// applied to the category breakdown below it (Community/Buy & Sell/
+// Events/Services/Lost & Found) — those weren't asked to be reset and
+// still reflect true totals.
 const POSTS_COUNTER_RESET_DATE = Timestamp.fromDate(new Date('2026-08-21T00:00:00Z'));
 
 function formatDate(date) {
@@ -80,9 +80,9 @@ export default function AdminDashboardScreen() {
   // collections grow (unlike getDocs, which reads and bills for every
   // matching document). Both openReports and resolvedReports are
   // fetched here so the Reports tab chips can show live counts without
-  // needing their own separate query. Post-related counts (total +
-  // every category) are all scoped to POSTS_COUNTER_RESET_DATE, so test
-  // posts from before that cutoff never appear in any of these numbers.
+  // needing their own separate query. Only totalPosts is scoped to
+  // POSTS_COUNTER_RESET_DATE — every category count below it stays
+  // exactly as it was, unscoped.
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
@@ -92,11 +92,11 @@ export default function AdminDashboardScreen() {
       ] = await Promise.all([
         getCountFromServer(collection(db, 'users')),
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', 'in', ['updates', 'notices', 'safety']))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'marketplace'))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'events'))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'services'))),
-        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE), where('category', '==', 'lostfound'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', 'in', ['updates', 'notices', 'safety']))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'marketplace'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'events'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'services'))),
+        getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('category', '==', 'lostfound'))),
         getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'open'))),
         getCountFromServer(query(collection(db, 'reports'), where('status', '==', 'resolved'))),
         getCountFromServer(query(collection(db, 'users'), where('isSuspended', '==', true))),
@@ -141,7 +141,7 @@ export default function AdminDashboardScreen() {
   // Deliberately NOT scoped to POSTS_COUNTER_RESET_DATE — this tab is
   // for browsing/moderating whatever's actually been posted, old test
   // posts included, which is a different purpose from the Overview
-  // tab's "real activity" count.
+  // tab's counter.
   const [postSortBy, setPostSortBy] = useState('newest'); // 'newest' | 'alphabetical'
   const fetchAllPosts = useCallback(async (sortBy) => {
     setLoadingPosts(true);
@@ -387,7 +387,12 @@ export default function AdminDashboardScreen() {
         <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Admin Dashboard</Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabRowScroll} contentContainerStyle={styles.tabRow}>
+      {/* Same fixed row, flex:1-per-tab layout and sizing as before —
+          just with flexWrap added so 5 tabs wrap cleanly onto a second
+          row instead of either squeezing into one cramped row or
+          switching to horizontal scroll (both of which changed how this
+          looked/behaved from the original). */}
+      <View style={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
             <Text
@@ -400,7 +405,7 @@ export default function AdminDashboardScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -827,13 +832,12 @@ const styles = StyleSheet.create({
   pageHeader: { backgroundColor: '#C2D9E8', paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: '#1B4F72', letterSpacing: 0.2 },
-  // Horizontal scroll instead of a fixed row — now that there are 5 tabs
-  // instead of 4, a fixed flex:1-per-tab row would squeeze each label
-  // uncomfortably narrow. Scrolling keeps every tab at a readable,
-  // consistent width regardless of how many are added later.
-  tabRowScroll: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
-  tabRow: { flexDirection: 'row', padding: 12, gap: 8 },
-  tabBtn: { paddingVertical: 10, paddingHorizontal: 18, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
+  // Original fixed row + flex:1-per-tab sizing, unchanged — flexWrap
+  // added so 5 tabs wrap onto a second row (3+2) instead of squeezing
+  // into one row or needing horizontal scroll. Every pill keeps its
+  // original size and behavior; there's just one more of them now.
+  tabRow: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
+  tabBtn: { flexGrow: 1, flexBasis: '30%', paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
   tabBtnActive: { backgroundColor: '#1B4F72', borderColor: '#1B4F72' },
   tabText: { fontSize: 13, color: Colors.midGrey, fontWeight: '700' },
   tabTextActive: { color: Colors.white, fontWeight: '800' },
