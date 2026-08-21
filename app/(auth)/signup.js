@@ -333,7 +333,7 @@ export default function SignupScreen() {
       </Modal>
 
       {/* Birth Month Picker */}
-      <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
+      <Modal visible={showMonthPicker} animationType="none" transparent onRequestClose={() => setShowMonthPicker(false)}>
         <View style={styles.pickerOverlay}>
           {/* Full-screen dismiss-touchable positioned behind the sheet as
               a SIBLING, not a parent — the previous attempts (wrapping
@@ -371,7 +371,7 @@ export default function SignupScreen() {
       </Modal>
 
       {/* Birth Year Picker */}
-      <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
+      <Modal visible={showYearPicker} animationType="none" transparent onRequestClose={() => setShowYearPicker(false)}>
         <View style={styles.pickerOverlay}>
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
