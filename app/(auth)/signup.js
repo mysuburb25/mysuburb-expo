@@ -63,6 +63,12 @@ function isAtLeast18(month, year) {
   return age >= 18;
 }
 
+// Standard, widely-used pattern for catching obviously malformed emails
+// (missing @, missing domain, stray spaces) without being so strict it
+// rejects legitimate edge-case addresses — full RFC 5322 compliance is
+// unnecessary here and would reject real addresses people actually use.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function SignupScreen() {
   const { register, createProfile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -84,6 +90,7 @@ export default function SignupScreen() {
     if (!firstName.trim()) { Alert.alert('Error', 'Please enter your first name.'); return; }
     if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
     if (!email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
+    if (!EMAIL_REGEX.test(email.trim())) { Alert.alert('Error', 'Please enter a valid email address.'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
     if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters.'); return; }
     if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match.'); return; }
@@ -298,8 +305,8 @@ export default function SignupScreen() {
 
       {/* Birth Month Picker */}
       <Modal visible={showMonthPicker} animationType="slide" transparent onRequestClose={() => setShowMonthPicker(false)}>
-        <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowMonthPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]} onPress={() => {}}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Month</Text>
             </View>
@@ -313,14 +320,14 @@ export default function SignupScreen() {
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowMonthPicker(false)}>
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       {/* Birth Year Picker */}
       <Modal visible={showYearPicker} animationType="slide" transparent onRequestClose={() => setShowYearPicker(false)}>
-        <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]}>
+        <TouchableOpacity style={styles.pickerOverlay} activeOpacity={1} onPress={() => setShowYearPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.pickerSheet, { paddingBottom: 24 + insets.bottom }]} onPress={() => {}}>
             <View style={styles.wheelHeaderBar}>
               <Text style={styles.wheelHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Select Year</Text>
             </View>
@@ -334,8 +341,8 @@ export default function SignupScreen() {
             <TouchableOpacity style={styles.dobDoneBtn} onPress={() => setShowYearPicker(false)}>
               <Text style={styles.dobDoneBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Done</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -363,7 +370,7 @@ const styles = StyleSheet.create({
   wheelHeaderBar: { flexDirection: 'row', backgroundColor: Colors.brandGreen, paddingVertical: 10 },
   wheelHeaderText: { flex: 1, textAlign: 'center', color: Colors.white, fontSize: 19, fontWeight: '800' },
   wheelRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 0 },
-  dobDoneBtn: { marginTop: 12, marginHorizontal: 20, backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  dobDoneBtn: { marginTop: 12, alignSelf: 'center', width: '50%', backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   dobDoneBtnText: { color: Colors.white, fontSize: 19, fontWeight: '700' },
   pickerItemText: { fontSize: 16, color: Colors.charcoal },
   pickerItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },

@@ -105,3 +105,184 @@ exports.screenNewPost = onDocumentCreated('posts/{postId}', async (event) => {
     logger.error('screenNewPost error:', e);
   }
 });
+
+// Sends a one-time welcome message to every new user, appearing to come
+// from the existing admin account (mysuburb.admin@gmail.com), shown as
+// "MySuburb". This writes the exact same conversations/messages shape
+// the client's own sendMessage function writes in app/chat/[userId].js
+// (same field names, same conversationId convention), so the result is
+// indistinguishable from a real message sent through the app — it shows
+// up in the Messages tab, increments the unread counter, and triggers
+// a push notification via the sendPushOnNotification trigger above,
+// purely because it's also writing a matching `notifications` doc.
+//
+// Triggers on the user's OWN profile document being created (not a Auth
+// trigger) — this fires at the same point the client finishes writing
+// the signup profile, which is what the existing sendPushOnNotification
+// and screenNewPost triggers both already do for their own collections,
+// so this follows the same established pattern in this file.
+const ADMIN_UID = 'ENNHw4XclOMcjiRkjH8eIXQdV223';
+const ADMIN_NAME = 'MySuburb';
+
+const WELCOME_MESSAGE = `Welcome to MySuburb!
+
+Thanks for signing up and joining our community.
+
+Please explore the app, choose the suburbs you care about, and stay connected with local updates, events, notices, Buy & Sell, Lost & Found and Services.
+
+Please share it with your friends and help us grow our local community.
+
+📱 iOS: https://apps.apple.com/au/app/mysuburb-community/id6791455586
+
+🤖 Android: https://play.google.com/store/apps/details?id=com.mysuburb.app
+
+Thanks,
+MySuburb`;
+
+exports.sendWelcomeMessage = onDocumentCreated('users/{userId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const newUserId = event.params.userId;
+
+  // Guards against ever messaging the admin account itself, in case this
+  // trigger somehow runs for the admin's own profile document.
+  if (newUserId === ADMIN_UID) return;
+
+  const userData = snap.data();
+  const newUserName = userData.displayName || 'Neighbour';
+  const newUserPhoto = userData.photoURL || null;
+
+  // Same sorted-pair convention the client uses for conversation IDs, so
+  // this lands in the exact same thread the person would see if they
+  // opened a chat with this account through the app themselves — not a
+  // separate, duplicate conversation.
+  const conversationId = [ADMIN_UID, newUserId].sort().join('_');
+
+  try {
+    await db.doc(`conversations/${conversationId}`).set({
+      participants: [ADMIN_UID, newUserId],
+      participantNames: { [ADMIN_UID]: ADMIN_NAME, [newUserId]: newUserName },
+      participantPhotos: { [ADMIN_UID]: null, [newUserId]: newUserPhoto },
+      lastMessage: 'Welcome to MySuburb!',
+      lastMessageSenderId: ADMIN_UID,
+      lastMessageAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      unreadCount: { [newUserId]: FieldValue.increment(1) },
+      deletedBy: FieldValue.arrayRemove(ADMIN_UID, newUserId),
+    }, { merge: true });
+
+    await db.collection(`conversations/${conversationId}/messages`).add({
+      senderId: ADMIN_UID,
+      senderName: ADMIN_NAME,
+      text: WELCOME_MESSAGE,
+      createdAt: FieldValue.serverTimestamp(),
+      read: false,
+    });
+
+    // Piggybacks on the existing sendPushOnNotification trigger above —
+    // writing this doc is what actually fires the push notification,
+    // exactly the same way a real chat message already does.
+    await db.collection('notifications').add({
+      userId: newUserId,
+      type: 'message',
+      message: `${ADMIN_NAME} sent you a message`,
+      fromUserId: ADMIN_UID,
+      fromUserName: ADMIN_NAME,
+      conversationId,
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.info(`Welcome message sent to new user ${newUserId}`);
+  } catch (e) {
+    logger.error('sendWelcomeMessage error:', e);
+  }
+});
+
+// ---------------------------------------------------------------------
+// ONE-TIME BACKFILL — sendWelcomeMessage above only fires for NEW
+// signups going forward (onDocumentCreated never fires for documents
+// that already existed before the function was deployed). This sends
+// the same welcome message to every EXISTING user.
+//
+// Meant to be triggered once, manually, by visiting its URL after
+// deploying — then safe to delete this function afterward (or just
+// leave it; the completion guard below means re-visiting the URL by
+// accident does nothing harmful, since anyone already messaged gets
+// skipped rather than messaged twice).
+//
+// HTTPS functions are publicly reachable by default, so BACKFILL_KEY
+// is a basic safeguard against a random visitor triggering it — not
+// real security, just enough friction for a short-lived admin task.
+// Change this value before deploying, and don't share the URL.
+const { onRequest } = require('firebase-functions/v2/https');
+const BACKFILL_KEY = 'change-this-before-deploying';
+
+exports.backfillWelcomeMessages = onRequest({ timeoutSeconds: 540 }, async (req, res) => {
+  if (req.query.key !== BACKFILL_KEY) {
+    res.status(403).send('Forbidden');
+    return;
+  }
+
+  try {
+    const usersSnap = await db.collection('users').get();
+    let sent = 0, skipped = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const newUserId = userDoc.id;
+      if (newUserId === ADMIN_UID) { skipped++; continue; }
+
+      const conversationId = [ADMIN_UID, newUserId].sort().join('_');
+
+      // Skips anyone who already has this conversation — covers both a
+      // second accidental run of this same backfill, AND anyone who
+      // signed up after sendWelcomeMessage went live and already got
+      // the message that way.
+      const existingConvo = await db.doc(`conversations/${conversationId}`).get();
+      if (existingConvo.exists) { skipped++; continue; }
+
+      const userData = userDoc.data();
+      const newUserName = userData.displayName || 'Neighbour';
+      const newUserPhoto = userData.photoURL || null;
+
+      await db.doc(`conversations/${conversationId}`).set({
+        participants: [ADMIN_UID, newUserId],
+        participantNames: { [ADMIN_UID]: ADMIN_NAME, [newUserId]: newUserName },
+        participantPhotos: { [ADMIN_UID]: null, [newUserId]: newUserPhoto },
+        lastMessage: 'Welcome to MySuburb!',
+        lastMessageSenderId: ADMIN_UID,
+        lastMessageAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        unreadCount: { [newUserId]: FieldValue.increment(1) },
+        deletedBy: FieldValue.arrayRemove(ADMIN_UID, newUserId),
+      }, { merge: true });
+
+      await db.collection(`conversations/${conversationId}/messages`).add({
+        senderId: ADMIN_UID,
+        senderName: ADMIN_NAME,
+        text: WELCOME_MESSAGE,
+        createdAt: FieldValue.serverTimestamp(),
+        read: false,
+      });
+
+      await db.collection('notifications').add({
+        userId: newUserId,
+        type: 'message',
+        message: `${ADMIN_NAME} sent you a message`,
+        fromUserId: ADMIN_UID,
+        fromUserName: ADMIN_NAME,
+        conversationId,
+        isRead: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      sent++;
+    }
+
+    logger.info(`Backfill complete: sent ${sent}, skipped ${skipped}`);
+    res.status(200).send(`Backfill complete. Sent: ${sent}, Skipped: ${skipped}`);
+  } catch (e) {
+    logger.error('backfillWelcomeMessages error:', e);
+    res.status(500).send('Backfill failed: ' + e.message);
+  }
+});

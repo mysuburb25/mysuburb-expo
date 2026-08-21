@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { Colors } from '../constants/theme';
 
 const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 3; // odd, so there's a clear single centered row — kept small so there's minimal empty space above the first item
+const VISIBLE_ITEMS = 5; // odd, so there's a clear single centered row — increased from 3 so more options are visible at once without scrolling
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 const CENTER_OFFSET = ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
 
@@ -66,11 +66,17 @@ export default function WheelPicker({ data, selectedValue, onValueChange }) {
               : { opacity: 0.28, transform: [{ scale: 0.85 }] };
           return (
             <View style={styles.item}>
+              {/* No adjustsFontSizeToFit here — combined with the scale
+                  transform above, that prop was an unreliable pairing on
+                  Android specifically (the font-fit measurement doesn't
+                  always account correctly for an applied scale). Content
+                  here is fixed and known (month names, years), so a
+                  static font size sized for the longest string
+                  ("September") is simpler and more reliably renders
+                  without truncation than dynamic shrinking. */}
               <Text
                 style={[styles.itemText, isCentered && styles.itemTextSelected, fadeStyle]}
                 numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
               >
                 {item.label}
               </Text>
@@ -98,6 +104,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   item: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center' },
-  itemText: { fontSize: 16, color: Colors.midGrey, fontWeight: '500' },
-  itemTextSelected: { fontSize: 19, fontWeight: '800', color: Colors.brandGreen },
+  // Base size reduced slightly (16->15, 19->18) as a small safety margin
+  // against the longest string ("September") ever getting tight enough
+  // to clip, now that there's no dynamic shrinking as a fallback.
+  itemText: { fontSize: 15, color: Colors.midGrey, fontWeight: '500' },
+  itemTextSelected: { fontSize: 18, fontWeight: '800', color: Colors.brandGreen },
 });
