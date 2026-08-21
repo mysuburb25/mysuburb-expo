@@ -63,7 +63,7 @@ export default function BlockedUsersScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="ban-outline" size={48} color={Colors.lightGrey} />
-            <Text style={styles.emptyTitle}>No blocked users</Text>
+            <Text style={styles.emptyTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>No blocked users</Text>
             <Text style={styles.emptyText}>Anyone you block will show up here.</Text>
           </View>
         }
