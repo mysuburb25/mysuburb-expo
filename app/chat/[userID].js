@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image, ScrollView, Animated, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal, Image, ScrollView, Animated, Keyboard, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,22 +40,32 @@ function formatDate(date) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 }
 
-// Splits message text around any mysuburb://post/{id} deep links so they
-// can render as real tappable text instead of inert plain text — since
-// we're already inside the app, tapping navigates directly rather than
-// going through the OS-level Linking API.
-const DEEP_LINK_REGEX = /mysuburb:\/\/post\/([a-zA-Z0-9_-]+)/g;
+// Splits message text around any mysuburb://post/{id} deep links OR
+// generic http(s) URLs, so both render as real tappable text instead of
+// inert plain text. Internal deep links navigate directly via router.push
+// since we're already inside the app; external URLs (e.g. a plain
+// https://mysuburb.app link, like the one sent in the automated welcome
+// message) open via the OS-level Linking API instead, since there's no
+// in-app route for an arbitrary external address.
+const LINK_REGEX = /(mysuburb:\/\/post\/[a-zA-Z0-9_-]+)|(https?:\/\/[^\s]+)/g;
 
 function renderMessageText(text, isMe, styles) {
   const parts = [];
   let lastIndex = 0;
   let match;
-  DEEP_LINK_REGEX.lastIndex = 0;
-  while ((match = DEEP_LINK_REGEX.exec(text)) !== null) {
+  LINK_REGEX.lastIndex = 0;
+  while ((match = LINK_REGEX.exec(text)) !== null) {
     if (match.index > lastIndex) {
       parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
     }
-    parts.push({ type: 'link', value: match[0], postId: match[1] });
+    if (match[1]) {
+      // Internal post deep link — group 1
+      const postId = match[1].replace('mysuburb://post/', '');
+      parts.push({ type: 'internalLink', value: match[0], postId });
+    } else {
+      // External http(s) URL — group 2
+      parts.push({ type: 'externalLink', value: match[0] });
+    }
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < text.length) {
@@ -65,15 +75,23 @@ function renderMessageText(text, isMe, styles) {
 
   return (
     <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>
-      {parts.map((part, i) =>
-        part.type === 'link' ? (
-          <Text key={i} style={[styles.bubbleLink, isMe && styles.bubbleLinkMe]} onPress={() => router.push('/post/' + part.postId)}>
-            {part.value}
-          </Text>
-        ) : (
-          <Text key={i}>{part.value}</Text>
-        )
-      )}
+      {parts.map((part, i) => {
+        if (part.type === 'internalLink') {
+          return (
+            <Text key={i} style={[styles.bubbleLink, isMe && styles.bubbleLinkMe]} onPress={() => router.push('/post/' + part.postId)}>
+              {part.value}
+            </Text>
+          );
+        }
+        if (part.type === 'externalLink') {
+          return (
+            <Text key={i} style={[styles.bubbleLink, isMe && styles.bubbleLinkMe]} onPress={() => Linking.openURL(part.value).catch(e => console.error(e))}>
+              {part.value}
+            </Text>
+          );
+        }
+        return <Text key={i}>{part.value}</Text>;
+      })}
     </Text>
   );
 }
