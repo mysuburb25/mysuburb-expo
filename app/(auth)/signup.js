@@ -81,8 +81,8 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTC, setAgreedToTC] = useState(false);
   const [showTC, setShowTC] = useState(false);
-  const [birthMonth, setBirthMonth] = useState(2); // 1-12, defaults to February
-  const [birthYear, setBirthYear] = useState(CURRENT_YEAR - 1);
+  const [birthMonth, setBirthMonth] = useState(null); // 1-12
+  const [birthYear, setBirthYear] = useState(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -359,7 +359,7 @@ export default function SignupScreen() {
             <View style={styles.wheelRow}>
               <WheelPicker
                 data={MONTHS.map((m, i) => ({ label: m, value: i + 1 }))}
-                selectedValue={birthMonth}
+                selectedValue={birthMonth || 2}
                 onValueChange={setBirthMonth}
               />
             </View>
@@ -385,7 +385,7 @@ export default function SignupScreen() {
             <View style={styles.wheelRow}>
               <WheelPicker
                 data={YEARS.map((y) => ({ label: String(y), value: y }))}
-                selectedValue={birthYear}
+                selectedValue={birthYear || (CURRENT_YEAR - 1)}
                 onValueChange={setBirthYear}
               />
             </View>
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   wheelHeaderBar: { flexDirection: 'row', backgroundColor: Colors.brandGreen, paddingVertical: 10 },
   wheelHeaderText: { flex: 1, textAlign: 'center', color: Colors.white, fontSize: 19, fontWeight: '800' },
   wheelRow: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 0 },
-  dobDoneBtn: { marginTop: 12, alignSelf: 'center', width: '50%', backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  dobDoneBtn: { marginTop: 12, marginHorizontal: 20, backgroundColor: Colors.brandGreen, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   dobDoneBtnText: { color: Colors.white, fontSize: 19, fontWeight: '700' },
   pickerItemText: { fontSize: 16, color: Colors.charcoal },
   pickerItemTextActive: { color: Colors.brandGreen, fontWeight: '700' },
