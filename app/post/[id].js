@@ -184,6 +184,12 @@ export default function PostDetailScreen() {
   const [comment, setComment] = useState('');
   const [commentMentions, setCommentMentions] = useState([]);
   const [posting, setPosting] = useState(false);
+  // Same Android workaround as the chat composer — see chat-userId.js
+  // for the full explanation. Forces a clean remount of the comment
+  // input after posting, since Android's native multiline TextInput can
+  // get stuck at its previous larger height after being cleared
+  // programmatically.
+  const [commentResetKey, setCommentResetKey] = useState(0);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
   const [attending, setAttending] = useState(false);
@@ -495,6 +501,7 @@ export default function PostDetailScreen() {
       }
 
       setComment('');
+      setCommentResetKey(k => k + 1);
       setCommentMentions([]);
       setReplyTarget(null);
       Keyboard.dismiss();
@@ -1153,6 +1160,7 @@ export default function PostDetailScreen() {
           comment and a reply, since they share this same input. */}
       <View style={[styles.commentInputRow, { paddingBottom: 12 + insets.bottom }]}>
         <MentionInput
+          key={commentResetKey}
           ref={inputRef}
           style={styles.input}
           placeholder={replyTarget ? `Reply to ${replyTarget.authorName}...` : 'Write a comment...'}

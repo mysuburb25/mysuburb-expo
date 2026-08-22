@@ -141,6 +141,16 @@ export default function ChatScreen() {
   // rather than reintroducing the flexible-height layout that caused the
   // original bug.
   const [composerInputHeight, setComposerInputHeight] = useState(28);
+  // Incremented every time a message is sent, used as the TextInput's
+  // key below. Changing a component's key forces React to fully
+  // unmount and remount it — this is the reliable workaround for a
+  // well-known Android quirk where a multiline TextInput, after having
+  // its text cleared programmatically (as opposed to the user deleting
+  // characters themselves), fails to re-measure and visually shrink
+  // back down even though the underlying value and height state are
+  // both correctly reset. A fresh native view has no stale measurement
+  // to get stuck on.
+  const [composerResetKey, setComposerResetKey] = useState(0);
   const flatListRef = useRef(null);
   // iOS-only: KeyboardAvoidingView's built-in 'padding' behavior visibly
   // lagged a beat behind the keyboard's own animation (the keyboard would
@@ -346,6 +356,7 @@ export default function ChatScreen() {
     const mediaToSend = pendingMedia;
     setMessage('');
     setComposerInputHeight(28);
+    setComposerResetKey(k => k + 1);
     setPendingMedia([]);
     setSending(true);
     try {
@@ -1032,7 +1043,18 @@ export default function ChatScreen() {
                 <Ionicons name="camera-outline" size={24} color={pendingMedia.length >= MAX_PENDING_MEDIA ? Colors.lightGrey : Colors.brandGreen} />
               </TouchableOpacity>
               <TextInput
-                style={[styles.input, { height: composerInputHeight + 16 }]}
+                key={composerResetKey}
+                // minHeight/maxHeight instead of an exact forced height —
+                // this lets the OS's own native text layout handle
+                // growing and shrinking directly, the same reliable
+                // pattern already proven correct in the comment box on
+                // post/[id].js. Forcing an exact height via React state
+                // on every render was adding an extra layer of
+                // indirection (wait for onContentSizeChange -> update
+                // state -> re-render -> apply new height) that was
+                // capping out too early on iOS and likely contributing
+                // to Android's stuck-large-after-clearing symptom too.
+                style={[styles.input, { minHeight: 28, maxHeight: 96 }]}
                 placeholder={pendingMedia.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
                 placeholderTextColor={Colors.midGrey}
                 value={message}
@@ -1041,13 +1063,11 @@ export default function ChatScreen() {
                 maxLength={500}
                 autoCorrect={true}
                 autoCapitalize="sentences"
-                // Grows the row with the text up to a cap (~4 lines),
-                // then the TextInput's own standard multiline behavior
-                // takes over and scrolls internally beyond that — same
-                // pattern as any other growing chat composer, just with
-                // the cap enforced here via Math.min rather than a CSS
-                // maxHeight, so the wrapping row's height stays in sync
-                // with it via the same state value.
+                // Still tracked for the wrapping row's own height (see
+                // inputRow above) — that row needs an explicit number for
+                // the Android keyboard-stability reason explained further
+                // down, so it can't rely on CSS min/max-height the way
+                // the TextInput itself now does.
                 onContentSizeChange={(e) => {
                   const next = Math.min(Math.max(28, e.nativeEvent.contentSize.height), 92);
                   setComposerInputHeight(next);
