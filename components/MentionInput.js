@@ -80,7 +80,18 @@ const MentionInput = forwardRef(function MentionInput({
     <View style={{ flex: 1 }}>
       <TextInput
         ref={ref}
-        style={style}
+        // The wrapping View above keeps flex:1 to fill the row
+        // horizontally, but the incoming `style` prop (from wherever
+        // this is used) also often contains flex:1 of its own — that
+        // double-flex nesting is a known cause of multiline TextInput
+        // auto-grow breaking specifically on Android, where the height
+        // tracking that powers onContentSizeChange gets unreliable
+        // inside a doubly-flexed parent chain. Overriding flex to
+        // undefined here (last in the array, so it wins) and using an
+        // explicit width instead keeps the same visual sizing on both
+        // platforms while removing the nested-flex conflict Android was
+        // choking on.
+        style={[style, { flex: undefined, width: '100%' }]}
         value={value}
         onChangeText={handleChangeText}
         {...rest}

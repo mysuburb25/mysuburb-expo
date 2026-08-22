@@ -1010,13 +1010,14 @@ export default function ChatScreen() {
               </ScrollView>
             </View>
           )}
-          {/* paddingBottom includes the safe-area inset (on top of the
-              base 12) so the send button and camera button always sit
-              fully above any on-screen Android navigation bar — without
-              this, the input row's own edge lands right at the screen
-              boundary and can end up partially covered by the system
-              nav bar, which is what made the send button look "overlaid". */}
-          <View style={{ backgroundColor: Colors.brandGreen }}>
+          {/* paddingBottom on iOS specifically compensates for switching
+              alignItems to 'flex-end' below — that removed the small
+              cushion 'center' used to leave beneath the buttons, which
+              was previously enough on its own to clear the home
+              indicator without any explicit safe-area padding here.
+              Android keeps its own separate static spacer further down,
+              unrelated to this. */}
+          <View style={{ backgroundColor: Colors.brandGreen, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0 }}>
             {/* Height is now an explicit, computed number (base row
                 padding + the input's own tracked content height) instead
                 of the old flat 62 constant — this is what lets the row
