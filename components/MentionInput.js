@@ -1,5 +1,5 @@
 import { useState, useRef, forwardRef } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Colors } from '../constants/theme';
@@ -80,16 +80,7 @@ const MentionInput = forwardRef(function MentionInput({
     <View style={{ flex: 1 }}>
       <TextInput
         ref={ref}
-        // The wrapping View above keeps flex:1 to fill the row
-        // horizontally, but the incoming `style` prop also often
-        // contains flex:1 of its own — that double-flex nesting is a
-        // known cause of multiline TextInput auto-grow breaking
-        // specifically on Android. Scoped to Android only: applying the
-        // same width:'100%' override on iOS (which never had this bug)
-        // meant the input had to re-resolve its width against the
-        // parent on every layout change, which is what was causing a
-        // visible flash/blink each time a new line was typed there.
-        style={Platform.OS === 'android' ? [style, { flex: undefined, width: '100%' }] : style}
+        style={style}
         value={value}
         onChangeText={handleChangeText}
         {...rest}

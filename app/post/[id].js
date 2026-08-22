@@ -4,8 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp, updateDoc, increment, arrayUnion } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../config/firebase';
+import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
 import AppName from '../../components/AppName';
@@ -19,8 +18,6 @@ import addEventToCalendar from '../../utils/addEventToCalendar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { getOrderedMedia } from '../../utils/mediaOrder';
 import * as MediaLibrary from 'expo-media-library';
-import * as ImagePicker from 'expo-image-picker';
-import * as VideoThumbnails from 'expo-video-thumbnails';
 // See chat-userId.js for the full explanation — downloadAsync only
 // exists on the legacy API path in this SDK version.
 import * as FileSystem from 'expo-file-system/legacy';
@@ -207,19 +204,9 @@ export default function PostDetailScreen() {
   const [errorModalMessage, setErrorModalMessage] = useState(null);
   const [deletingPost, setDeletingPost] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(null); // index into post.images, or null when closed
-  const [commentMediaViewer, setCommentMediaViewer] = useState(null); // { media, index } for a comment's own attachments, or null when closed
   const [replyTarget, setReplyTarget] = useState(null); // { id, authorName } or null
   const [addingToCalendar, setAddingToCalendar] = useState(false);
   const [addedToCalendar, setAddedToCalendar] = useState(false);
-  // Staged photo/video attachments for the comment currently being
-  // composed — same shape and staging pattern as chat's pendingMedia:
-  // nothing uploads until Send is actually tapped, and everything
-  // staged together lands on one comment document as a single media
-  // array, not separate comments.
-  const [pendingCommentMedia, setPendingCommentMedia] = useState([]);
-  const MAX_PENDING_COMMENT_MEDIA = 8;
-  const MAX_COMMENT_VIDEO_DURATION_SEC = 120;
-  const MAX_COMMENT_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
   const inputRef = useRef(null);
   const flatListRef = useRef(null);
 
@@ -458,112 +445,10 @@ export default function PostDetailScreen() {
 
   const cancelReply = () => setReplyTarget(null);
 
-  // Single "Add Photo or Video" entry point for comments — same pattern
-  // as chat's handlePickMedia, just staging into pendingCommentMedia
-  // instead.
-  const handlePickCommentMedia = () => {
-    if (pendingCommentMedia.length >= MAX_PENDING_COMMENT_MEDIA) return;
-    const remaining = MAX_PENDING_COMMENT_MEDIA - pendingCommentMedia.length;
-    Alert.alert('Add Photo or Video', 'Choose an option', [
-      {
-        text: 'Take Photo or Video',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow camera access.'); return; }
-          const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
-            videoMaxDuration: MAX_COMMENT_VIDEO_DURATION_SEC,
-            quality: 0.7,
-          });
-          if (!result.canceled) await routeCommentAsset(result.assets[0]);
-        },
-      },
-      {
-        text: 'Choose from Library',
-        onPress: async () => {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo library access.'); return; }
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All,
-            quality: 0.7,
-            allowsMultipleSelection: true,
-            selectionLimit: remaining,
-          });
-          if (!result.canceled) {
-            for (const asset of result.assets.slice(0, remaining)) {
-              await routeCommentAsset(asset);
-            }
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const routeCommentAsset = async (asset) => {
-    if (asset.type === 'video') {
-      const durationSec = (asset.duration || 0) / 1000;
-      if (durationSec > MAX_COMMENT_VIDEO_DURATION_SEC) {
-        Alert.alert('Video skipped', `That video is ${Math.round(durationSec)}s, which is over the ${MAX_COMMENT_VIDEO_DURATION_SEC}s limit, so it wasn't added.`);
-        return;
-      }
-      if (asset.fileSize && asset.fileSize > MAX_COMMENT_VIDEO_SIZE_BYTES) {
-        Alert.alert('Video skipped', `That video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB, which is over the ${MAX_COMMENT_VIDEO_SIZE_BYTES / (1024 * 1024)}MB limit, so it wasn't added.`);
-        return;
-      }
-      let thumbnailUri = null;
-      try {
-        const thumb = await VideoThumbnails.getThumbnailAsync(asset.uri, { time: 0 });
-        thumbnailUri = thumb.uri;
-      } catch (e) {
-        console.error('Comment video thumbnail generation failed:', e);
-      }
-      setPendingCommentMedia(prev => [...prev, { kind: 'video', uri: asset.uri, thumbnailUri }]);
-    } else {
-      setPendingCommentMedia(prev => [...prev, { kind: 'image', uri: asset.uri }]);
-    }
-  };
-
-  const removePendingCommentMedia = (index) => {
-    setPendingCommentMedia(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Uploads every staged comment attachment concurrently (not
-  // sequentially) — same reasoning as chat's own upload logic: running
-  // them in parallel keeps the wait close to the time of the single
-  // slowest upload rather than the sum of all of them.
-  const uploadCommentMedia = async (commentId, media) => {
-    const uploaded = await Promise.all(media.map(async (item, i) => {
-      const response = await fetch(item.uri);
-      const blob = await response.blob();
-      const ext = item.kind === 'video' ? 'mp4' : 'jpg';
-      const fileName = `${Date.now()}_${i}.${ext}`;
-      const storageRef = ref(storage, `commentMedia/${commentId}/${fileName}`);
-      await uploadBytes(storageRef, blob, item.kind === 'video' ? { contentType: blob.type || 'video/mp4' } : undefined);
-      const url = await getDownloadURL(storageRef);
-
-      let thumbnailUrl = null;
-      if (item.kind === 'video' && item.thumbnailUri) {
-        try {
-          const thumbResponse = await fetch(item.thumbnailUri);
-          const thumbBlob = await thumbResponse.blob();
-          const thumbRef = ref(storage, `commentMedia/${commentId}/thumb_${Date.now()}_${i}.jpg`);
-          await uploadBytes(thumbRef, thumbBlob);
-          thumbnailUrl = await getDownloadURL(thumbRef);
-        } catch (e) {
-          console.error('Comment video thumbnail upload failed:', e);
-        }
-      }
-      return { type: item.kind === 'video' ? 'video' : 'photo', url, thumbnailUrl };
-    }));
-    return uploaded;
-  };
-
   const handleComment = async () => {
-    if (!comment.trim() && pendingCommentMedia.length === 0) return;
+    if (!comment.trim()) return;
     setPosting(true);
     const parentCommentId = replyTarget?.id || null;
-    const mediaToSend = pendingCommentMedia;
     try {
       const newCommentRef = await addDoc(collection(db, 'comments'), {
         postId: id, content: comment.trim(),
@@ -573,16 +458,6 @@ export default function PostDetailScreen() {
         mentions: commentMentions,
         mentionedUserIds: commentMentions.map(m => m.uid),
       });
-
-      // Uploaded after the comment doc exists, since the storage path
-      // is keyed by the comment's own id — then attached via a follow-up
-      // update, same two-step create-then-attach flow chat's own
-      // sendMessage uses for media.
-      if (mediaToSend.length > 0) {
-        const uploadedMedia = await uploadCommentMedia(newCommentRef.id, mediaToSend);
-        await updateDoc(doc(db, 'comments', newCommentRef.id), { media: uploadedMedia });
-      }
-
       await updateDoc(doc(db, 'posts', id), { commentCount: increment(1) });
 
       if (parentCommentId) {
@@ -625,20 +500,16 @@ export default function PostDetailScreen() {
         } catch (e) { console.error('mention notification error:', e); }
       }
 
-      Keyboard.dismiss();
-      inputRef.current?.blur();
       setComment('');
       setCommentResetKey(k => k + 1);
       setCommentMentions([]);
-      setPendingCommentMedia([]);
       setReplyTarget(null);
+      Keyboard.dismiss();
+      inputRef.current?.blur();
       setPost(prev => ({ ...prev, commentCount: (prev.commentCount || 0) + 1 }));
       await fetchComments();
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch (e) {
-      Alert.alert('Error', e.message);
-      setPendingCommentMedia(mediaToSend);
-    }
+    } catch (e) { Alert.alert('Error', e.message); }
     finally { setPosting(false); }
   };
 
@@ -1226,23 +1097,7 @@ export default function PostDetailScreen() {
                     {item.isDeleted ? (
                       <Text style={[styles.commentContent, styles.deletedText]}>{item.content}</Text>
                     ) : (
-                      <>
-                        {!!item.content && renderTextWithMentions(item.content, item.mentions, styles.commentContent, styles.mentionLink)}
-                        {item.media && item.media.length > 0 && (
-                          <View style={styles.commentMediaRow}>
-                            {item.media.map((m, mi) => (
-                              <TouchableOpacity key={mi} onPress={() => setCommentMediaViewer({ media: item.media, index: mi })}>
-                                <Image source={{ uri: m.thumbnailUrl || m.url }} style={styles.commentMediaThumb} />
-                                {m.type === 'video' && (
-                                  <View style={styles.commentMediaPlayBadge} pointerEvents="none">
-                                    <Ionicons name="play" size={14} color="#fff" />
-                                  </View>
-                                )}
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </>
+                      renderTextWithMentions(item.content, item.mentions, styles.commentContent, styles.mentionLink)
                     )}
                     {FooterRow}
                   </View>
@@ -1276,23 +1131,7 @@ export default function PostDetailScreen() {
                   {item.isDeleted ? (
                     <Text style={[styles.replyText, styles.deletedText]}>{item.content}</Text>
                   ) : (
-                    <>
-                      {!!item.content && renderTextWithMentions(item.content, item.mentions, styles.replyText, styles.mentionLink)}
-                      {item.media && item.media.length > 0 && (
-                        <View style={styles.commentMediaRow}>
-                          {item.media.map((m, mi) => (
-                            <TouchableOpacity key={mi} onPress={() => setCommentMediaViewer({ media: item.media, index: mi })}>
-                              <Image source={{ uri: m.thumbnailUrl || m.url }} style={styles.commentMediaThumbSmall} />
-                              {m.type === 'video' && (
-                                <View style={styles.commentMediaPlayBadgeSmall} pointerEvents="none">
-                                  <Ionicons name="play" size={11} color="#fff" />
-                                </View>
-                              )}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </>
+                    renderTextWithMentions(item.content, item.mentions, styles.replyText, styles.mentionLink)
                   )}
                 </View>
                 {FooterRow}
@@ -1317,41 +1156,14 @@ export default function PostDetailScreen() {
         </View>
       )}
 
-      {/* Staged photo/video preview — same horizontal scroll strip
-          pattern as chat's own pendingImageBar, shown only while
-          something is actually staged. */}
-      {pendingCommentMedia.length > 0 && (
-        <View style={styles.pendingCommentMediaBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {pendingCommentMedia.map((item, i) => (
-              <View key={i} style={styles.pendingCommentThumbWrap}>
-                <Image source={{ uri: item.kind === 'video' ? (item.thumbnailUri || item.uri) : item.uri }} style={styles.pendingCommentThumb} />
-                {item.kind === 'video' && (
-                  <View style={styles.pendingCommentVideoBadge} pointerEvents="none">
-                    <Ionicons name="play" size={12} color="#fff" />
-                  </View>
-                )}
-                <TouchableOpacity style={styles.pendingCommentRemoveBtn} onPress={() => removePendingCommentMedia(i)}>
-                  <Ionicons name="close-circle" size={18} color="#E53935" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
       {/* Comment Input — @mention autocomplete works in both a fresh
-          comment and a reply, since they share this same input. Camera
-          button added to the left, matching chat's exact layout. */}
+          comment and a reply, since they share this same input. */}
       <View style={[styles.commentInputRow, { paddingBottom: 12 + insets.bottom }]}>
-        <TouchableOpacity style={styles.commentImageBtn} onPress={handlePickCommentMedia} disabled={pendingCommentMedia.length >= MAX_PENDING_COMMENT_MEDIA}>
-          <Ionicons name="camera-outline" size={22} color={pendingCommentMedia.length >= MAX_PENDING_COMMENT_MEDIA ? Colors.lightGrey : Colors.white} />
-        </TouchableOpacity>
         <MentionInput
           key={commentResetKey}
           ref={inputRef}
           style={styles.input}
-          placeholder={replyTarget ? `Reply to ${replyTarget.authorName}...` : (pendingCommentMedia.length > 0 ? 'Add a caption (optional)...' : 'Write a comment...')}
+          placeholder={replyTarget ? `Reply to ${replyTarget.authorName}...` : 'Write a comment...'}
           placeholderTextColor={Colors.midGrey}
           value={comment}
           onChangeText={setComment}
@@ -1365,11 +1177,7 @@ export default function PostDetailScreen() {
           autoCapitalize="sentences"
           spellCheck={true}
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!comment.trim() && pendingCommentMedia.length === 0 || posting) && { opacity: 0.7 }]}
-          onPress={handleComment}
-          disabled={(!comment.trim() && pendingCommentMedia.length === 0) || posting}
-        >
+        <TouchableOpacity style={[styles.sendBtn, posting && { opacity: 0.7 }]} onPress={handleComment} disabled={posting}>
           {posting ? <ActivityIndicator color="#fff" size="small" /> : <Ionicons name="send" size={18} color="#fff" />}
         </TouchableOpacity>
       </View>
@@ -1443,12 +1251,7 @@ export default function PostDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <MediaViewerModal
-        media={commentMediaViewer ? commentMediaViewer.media : (viewerIndex !== null ? orderedMedia : null)}
-        initialIndex={commentMediaViewer ? commentMediaViewer.index : (viewerIndex ?? 0)}
-        onClose={() => { setViewerIndex(null); setCommentMediaViewer(null); }}
-        onDownload={(item) => saveMediaToLibrary([item])}
-      />
+      <MediaViewerModal media={viewerIndex !== null ? orderedMedia : null} initialIndex={viewerIndex ?? 0} onClose={() => setViewerIndex(null)} onDownload={(item) => saveMediaToLibrary([item])} />
 
       {/* Share modal */}
       <Modal visible={showShareModal} transparent animationType="slide" onDismiss={handleShareModalDismiss}>
@@ -1699,37 +1502,6 @@ const styles = StyleSheet.create({
   // this cap, which is exactly the desired behavior.
   input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 96 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  // Camera button for attaching photos/videos to a comment — same size
-  // and circular shape as chat's imageBtn, but on a white/translucent
-  // fill against the green row instead of a solid white circle, so it
-  // doesn't visually compete with the yellow send button.
-  commentImageBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  pendingCommentMediaBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.brandGreenPale, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
-  pendingCommentThumbWrap: { position: 'relative' },
-  pendingCommentThumb: { width: 52, height: 52, borderRadius: 10 },
-  pendingCommentVideoBadge: {
-    position: 'absolute', top: '50%', left: '50%', marginTop: -10, marginLeft: -10,
-    width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  pendingCommentRemoveBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 9 },
-  // Attached media shown within a posted comment/reply — small square
-  // thumbnails in a wrapping row, tappable to open the shared full-screen
-  // viewer. Reply thumbnails are slightly smaller to match the more
-  // compact threaded reply style they sit inside.
-  commentMediaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  commentMediaThumb: { width: 72, height: 72, borderRadius: 10, backgroundColor: Colors.lightGrey },
-  commentMediaThumbSmall: { width: 56, height: 56, borderRadius: 8, backgroundColor: Colors.lightGrey },
-  commentMediaPlayBadge: {
-    position: 'absolute', top: '50%', left: '50%', marginTop: -12, marginLeft: -12,
-    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  commentMediaPlayBadgeSmall: {
-    position: 'absolute', top: '50%', left: '50%', marginTop: -10, marginLeft: -10,
-    width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center',
-  },
   imagesWrap: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },
   postVideo: { width: '100%', height: 220, borderRadius: 12, backgroundColor: '#000' },
