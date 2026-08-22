@@ -108,7 +108,8 @@
     }
   }
 
-  .hero-copy .eyebrow {
+  .hero-copy .eyebrow,
+  .hero-top-cta .eyebrow {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -129,10 +130,11 @@
   }
 
   .hero h1 {
-    font-size: clamp(34px, 5vw, 54px);
-    line-height: 1.08;
+    font-size: clamp(27px, 3.6vw, 47px);
+    line-height: 1.15;
     color: var(--green-deep);
     margin-bottom: 22px;
+    white-space: nowrap;
   }
 
   .hero h1 em {
@@ -183,6 +185,47 @@
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 28px;
+  }
+
+  /* ---------- Top CTA (eyebrow + store buttons, full-width centered) ---------- */
+
+  .hero-top-cta {
+    padding: 28px 24px 36px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .store-row-top {
+    justify-content: center;
+    margin-bottom: 0;
+  }
+
+  .store-btn-lg {
+    padding: 15px 26px 15px 20px;
+    border-radius: 14px;
+    font-size: 1.08em;
+  }
+
+  .store-btn-lg .store-sub {
+    font-size: 11px;
+  }
+
+  .store-btn-lg .store-main {
+    font-size: 17px;
+  }
+
+  /* Applied via JS once the visitor's platform (iOS/Android) is detected
+     from their browser — a gentle visual nudge toward the matching
+     store, not a redirect. Deliberately subtle: a soft gold glow and a
+     touch of scale, not a jarring change, since we don't want to imply
+     the other button doesn't work or draw attention away from the page
+     itself for desktop visitors (who never get this class applied). */
+  .store-btn-detected {
+    box-shadow: 0 0 0 3px rgba(255,215,0,0.55), 0 10px 20px -8px rgba(45,106,79,0.4);
+    transform: scale(1.045);
   }
 
   .store-btn {
@@ -622,11 +665,24 @@
   </div>
 </div>
 
+<div class="hero-top-cta">
+  <span class="eyebrow"><span class="dot"></span> Now live across Australia</span>
+  <div class="store-row store-row-top" id="download">
+    <a href="https://apps.apple.com/au/app/mysuburb-community/id6791455586" class="store-btn store-btn-lg" data-platform="ios" aria-label="Download on the App Store">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M17.05 12.536c-.03-2.99 2.44-4.42 2.55-4.49-1.39-2.03-3.56-2.31-4.33-2.34-1.85-.19-3.6 1.09-4.54 1.09-.94 0-2.39-1.06-3.93-1.03-2.02.03-3.89 1.18-4.93 2.99-2.1 3.65-.54 9.04 1.51 12 1 1.44 2.2 3.06 3.77 3 1.52-.06 2.09-.98 3.92-.98 1.83 0 2.34.98 3.94.95 1.63-.03 2.66-1.47 3.65-2.92 1.15-1.67 1.62-3.29 1.64-3.37-.04-.02-3.14-1.2-3.17-4.9zM14.14 3.55c.83-1 1.39-2.4 1.24-3.79-1.2.05-2.65.8-3.51 1.8-.77.88-1.44 2.3-1.26 3.65 1.32.1 2.68-.67 3.53-1.66z"/></svg>
+      <span><span class="store-sub">Download on the</span><span class="store-main">App Store</span></span>
+    </a>
+    <a href="https://play.google.com/store/apps/details?id=com.mysuburb.app" class="store-btn store-btn-lg" data-platform="android" aria-label="Get it on Google Play">
+      <svg width="26" height="26" viewBox="0 0 24 24"><path fill="#00D9FF" d="M3.6 2.3c-.4.4-.6.9-.6 1.6v16.2c0 .7.2 1.2.6 1.6l.1.1L13 12.3v-.2L3.7 2.2l-.1.1z"/><path fill="#FFD800" d="M16.1 15.4l-3.1-3.1v-.2l3.1-3.1.1.1 3.7 2.1c1 .6 1 1.5 0 2.1l-3.8 2.1z"/><path fill="#FF3D3D" d="M16.2 15.4L13 12.2 3.6 21.6c.4.4 1 .4 1.7.1l10.9-6.3"/><path fill="#00E676" d="M16.2 8.9L5.3 2.6c-.7-.4-1.3-.3-1.7.1L13 12l3.2-3.1z"/></svg>
+      <span><span class="store-sub">GET IT ON</span><span class="store-main">Google Play</span></span>
+    </a>
+  </div>
+</div>
+
 <section class="hero">
   <div class="wrap">
     <div class="hero-copy">
-      <span class="eyebrow"><span class="dot"></span> Now live across Australia</span>
-      <h1>Your suburbs. Your<br><em>community</em>. Your choice.</h1>
+      <h1>Connect. <em>Share.</em> Discover.</h1>
       <p class="hero-sub">MySuburb connects you with people in <strong>your chosen suburbs</strong> — for local updates, buying and selling, events, trusted services, and lost &amp; found. All in one place.</p>
       <ul class="hero-features">
         <li><span class="hero-feature-icon">📍</span> <b>Community Hub</b> — Local updates, notices &amp; safety alerts</li>
@@ -636,16 +692,6 @@
         <li><span class="hero-feature-icon">🔎</span> <b>Lost &amp; Found</b> — Find lost pets &amp; items. Help bring them home</li>
         <li><span class="hero-feature-icon">💬</span> <b>Messages</b> — Connect directly with people in your local communities</li>
       </ul>
-      <div class="store-row" id="download">
-        <a href="https://apps.apple.com/au/app/mysuburb-community/id6791455586" class="store-btn" aria-label="Download on the App Store">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.05 12.536c-.03-2.99 2.44-4.42 2.55-4.49-1.39-2.03-3.56-2.31-4.33-2.34-1.85-.19-3.6 1.09-4.54 1.09-.94 0-2.39-1.06-3.93-1.03-2.02.03-3.89 1.18-4.93 2.99-2.1 3.65-.54 9.04 1.51 12 1 1.44 2.2 3.06 3.77 3 1.52-.06 2.09-.98 3.92-.98 1.83 0 2.34.98 3.94.95 1.63-.03 2.66-1.47 3.65-2.92 1.15-1.67 1.62-3.29 1.64-3.37-.04-.02-3.14-1.2-3.17-4.9zM14.14 3.55c.83-1 1.39-2.4 1.24-3.79-1.2.05-2.65.8-3.51 1.8-.77.88-1.44 2.3-1.26 3.65 1.32.1 2.68-.67 3.53-1.66z"/></svg>
-          <span><span class="store-sub">Download on the</span><span class="store-main">App Store</span></span>
-        </a>
-        <a href="https://play.google.com/store/apps/details?id=com.mysuburb.app" class="store-btn" aria-label="Get it on Google Play">
-          <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#00D9FF" d="M3.6 2.3c-.4.4-.6.9-.6 1.6v16.2c0 .7.2 1.2.6 1.6l.1.1L13 12.3v-.2L3.7 2.2l-.1.1z"/><path fill="#FFD800" d="M16.1 15.4l-3.1-3.1v-.2l3.1-3.1.1.1 3.7 2.1c1 .6 1 1.5 0 2.1l-3.8 2.1z"/><path fill="#FF3D3D" d="M16.2 15.4L13 12.2 3.6 21.6c.4.4 1 .4 1.7.1l10.9-6.3"/><path fill="#00E676" d="M16.2 8.9L5.3 2.6c-.7-.4-1.3-.3-1.7.1L13 12l3.2-3.1z"/></svg>
-          <span><span class="store-sub">GET IT ON</span><span class="store-main">Google Play</span></span>
-        </a>
-      </div>
     </div>
 
     <div class="hero-visual">
@@ -742,11 +788,11 @@
     <h2>Your suburb is waiting.</h2>
     <p>Free to join, free to use, no ads — just neighbours helping neighbours.</p>
     <div class="cta-store-row">
-      <a href="https://apps.apple.com/au/app/mysuburb-community/id6791455586" class="store-btn" aria-label="Download on the App Store">
+      <a href="https://apps.apple.com/au/app/mysuburb-community/id6791455586" class="store-btn" data-platform="ios" aria-label="Download on the App Store">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.05 12.536c-.03-2.99 2.44-4.42 2.55-4.49-1.39-2.03-3.56-2.31-4.33-2.34-1.85-.19-3.6 1.09-4.54 1.09-.94 0-2.39-1.06-3.93-1.03-2.02.03-3.89 1.18-4.93 2.99-2.1 3.65-.54 9.04 1.51 12 1 1.44 2.2 3.06 3.77 3 1.52-.06 2.09-.98 3.92-.98 1.83 0 2.34.98 3.94.95 1.63-.03 2.66-1.47 3.65-2.92 1.15-1.67 1.62-3.29 1.64-3.37-.04-.02-3.14-1.2-3.17-4.9zM14.14 3.55c.83-1 1.39-2.4 1.24-3.79-1.2.05-2.65.8-3.51 1.8-.77.88-1.44 2.3-1.26 3.65 1.32.1 2.68-.67 3.53-1.66z"/></svg>
         <span><span class="store-sub">Download on the</span><span class="store-main">App Store</span></span>
       </a>
-      <a href="https://play.google.com/store/apps/details?id=com.mysuburb.app" class="store-btn" aria-label="Get it on Google Play">
+      <a href="https://play.google.com/store/apps/details?id=com.mysuburb.app" class="store-btn" data-platform="android" aria-label="Get it on Google Play">
         <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#00D9FF" d="M3.6 2.3c-.4.4-.6.9-.6 1.6v16.2c0 .7.2 1.2.6 1.6l.1.1L13 12.3v-.2L3.7 2.2l-.1.1z"/><path fill="#FFD800" d="M16.1 15.4l-3.1-3.1v-.2l3.1-3.1.1.1 3.7 2.1c1 .6 1 1.5 0 2.1l-3.8 2.1z"/><path fill="#FF3D3D" d="M16.2 15.4L13 12.2 3.6 21.6c.4.4 1 .4 1.7.1l10.9-6.3"/><path fill="#00E676" d="M16.2 8.9L5.3 2.6c-.7-.4-1.3-.3-1.7.1L13 12l3.2-3.1z"/></svg>
         <span><span class="store-sub">GET IT ON</span><span class="store-main">Google Play</span></span>
       </a>
@@ -759,10 +805,31 @@
     <div class="footer-copy">© 2026 MySuburb. Made for Australian neighbourhoods.</div>
     <div class="footer-links">
       <a href="/support.html">Support</a>
-      <a href="mailto:mysuburb25@gmail.com">Contact</a>
+      <a href="mailto:support@mysuburb.app">Contact</a>
     </div>
   </div>
 </footer>
+
+<script>
+  // Gentle nudge, not a redirect: highlights whichever store button
+  // matches the visitor's own device, based on their browser's user
+  // agent string. Desktop visitors (neither pattern matches) see no
+  // change at all — both buttons stay exactly as they are today.
+  (function() {
+    var ua = navigator.userAgent || '';
+    var platform = null;
+    if (/iPhone|iPad|iPod/i.test(ua)) {
+      platform = 'ios';
+    } else if (/Android/i.test(ua)) {
+      platform = 'android';
+    }
+    if (platform) {
+      document.querySelectorAll('[data-platform="' + platform + '"]').forEach(function(btn) {
+        btn.classList.add('store-btn-detected');
+      });
+    }
+  })();
+</script>
 
 </body>
 </html>

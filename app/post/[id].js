@@ -1486,7 +1486,13 @@ const styles = StyleSheet.create({
   replyBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.brandGreenPale, borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   replyBannerText: { fontSize: 13, color: Colors.brandGreen, fontWeight: '600', flex: 1, marginRight: 8 },
   commentInputRow: { flexDirection: 'row', padding: 12, gap: 10, backgroundColor: Colors.brandGreen, borderTopWidth: 1, borderTopColor: Colors.brandGreen, alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 120 },
+  // maxHeight reduced from 120 to 96 to match the requested "~4 lines,
+  // then scroll internally" more precisely — this input's row has no
+  // fixed/locked height of its own (unlike the chat composer), so this
+  // is the only change needed here: the TextInput already grows
+  // naturally with typed content and scrolls internally once it hits
+  // this cap, which is exactly the desired behavior.
+  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: Colors.charcoal, maxHeight: 96 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   imagesWrap: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   postImage: { width: '100%', height: 200, borderRadius: 12, backgroundColor: Colors.lightGrey },

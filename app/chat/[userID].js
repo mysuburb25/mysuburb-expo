@@ -130,6 +130,17 @@ export default function ChatScreen() {
   const [viewerMedia, setViewerMedia] = useState(null); // full media array for the tapped message, or null when closed
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerSourceMessage, setViewerSourceMessage] = useState(null); // the message the currently-open viewer's media belongs to, so long-pressing inside the viewer can still open the right action sheet
+  // Tracks the TextInput's own natural content height so the composer
+  // row can grow with it (up to a cap), then scroll internally beyond
+  // that. Deliberately a plain number driven by state, not a CSS
+  // min/max-height on the row itself — the row's height was previously
+  // hard-locked to a fixed number specifically to fix an Android keyboard
+  // instability bug (see inputRow style below). An explicit, single
+  // concrete height value at any given moment preserves that same
+  // stability property while still letting it change as content grows,
+  // rather than reintroducing the flexible-height layout that caused the
+  // original bug.
+  const [composerInputHeight, setComposerInputHeight] = useState(28);
   const flatListRef = useRef(null);
   // iOS-only: KeyboardAvoidingView's built-in 'padding' behavior visibly
   // lagged a beat behind the keyboard's own animation (the keyboard would
@@ -334,6 +345,7 @@ export default function ChatScreen() {
     const text = message.trim();
     const mediaToSend = pendingMedia;
     setMessage('');
+    setComposerInputHeight(28);
     setPendingMedia([]);
     setSending(true);
     try {
@@ -1005,12 +1017,21 @@ export default function ChatScreen() {
               boundary and can end up partially covered by the system
               nav bar, which is what made the send button look "overlaid". */}
           <View style={{ backgroundColor: Colors.brandGreen }}>
-            <View style={styles.inputRow}>
+            {/* Height is now an explicit, computed number (base row
+                padding + the input's own tracked content height) instead
+                of the old flat 62 constant — this is what lets the row
+                grow with the text while keeping the same "always a
+                concrete number, never a CSS min/max-height" property
+                that made the original Android fix stable. alignItems
+                switched to 'flex-end' so the camera/send buttons stay
+                anchored to the bottom of the row as it grows upward,
+                matching how every other growing chat composer behaves. */}
+            <View style={[styles.inputRow, { height: composerInputHeight + 34, alignItems: 'flex-end' }]}>
               <TouchableOpacity style={styles.imageBtn} onPress={handlePickMedia} disabled={pendingMedia.length >= MAX_PENDING_MEDIA}>
                 <Ionicons name="camera-outline" size={24} color={pendingMedia.length >= MAX_PENDING_MEDIA ? Colors.lightGrey : Colors.brandGreen} />
               </TouchableOpacity>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { height: composerInputHeight + 16 }]}
                 placeholder={pendingMedia.length > 0 ? 'Add a caption (optional)...' : `Message ${userName}...`}
                 placeholderTextColor={Colors.midGrey}
                 value={message}
@@ -1019,6 +1040,17 @@ export default function ChatScreen() {
                 maxLength={500}
                 autoCorrect={true}
                 autoCapitalize="sentences"
+                // Grows the row with the text up to a cap (~4 lines),
+                // then the TextInput's own standard multiline behavior
+                // takes over and scrolls internally beyond that — same
+                // pattern as any other growing chat composer, just with
+                // the cap enforced here via Math.min rather than a CSS
+                // maxHeight, so the wrapping row's height stays in sync
+                // with it via the same state value.
+                onContentSizeChange={(e) => {
+                  const next = Math.min(Math.max(28, e.nativeEvent.contentSize.height), 92);
+                  setComposerInputHeight(next);
+                }}
               />
               <TouchableOpacity
                 style={[styles.sendBtn, (!message.trim() && pendingMedia.length === 0 || sending) && styles.sendBtnDisabled]}
@@ -1217,21 +1249,19 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptySubText: { fontSize: 14, color: Colors.midGrey },
-  // Fixed height (not minHeight) — the composer kept growing taller and
-  // misaligning specifically when the keyboard opened on Android, even
-  // with minHeight set, suggesting something in the surrounding
-  // keyboard-avoidance layout was still pushing extra height into this
-  // row specifically. A hard height stops that regardless of the exact
-  // mechanism, since the row now simply cannot expand no matter what
-  // external pressure is applied to it.
-  inputRow: { flexDirection: 'row', height: 62, paddingHorizontal: 10, gap: 10, backgroundColor: Colors.brandGreen, alignItems: 'center' },
-  imageBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
-  // maxHeight reduced to fit within inputRow's own fixed height (62) —
-  // typing beyond this scrolls within the input itself (standard
-  // multiline TextInput behavior) rather than pushing against a row
-  // that's no longer able to grow to accommodate it.
-  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, color: Colors.charcoal, maxHeight: 46 },
-  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
+  // Base row style — height and alignItems are now overridden inline at
+  // render time (see the JSX above) since they depend on the composer's
+  // current tracked content height. flexDirection/padding/gap/background
+  // stay fixed here since those never need to change.
+  inputRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 10, backgroundColor: Colors.brandGreen },
+  imageBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  // height is now set inline per-render from composerInputHeight (see
+  // JSX above) instead of a static maxHeight — this is what lets it grow
+  // with typed content up to the ~4-line cap enforced in
+  // onContentSizeChange, then scroll internally beyond that, exactly
+  // like a normal expanding chat composer.
+  input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, color: Colors.charcoal },
+  sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
   sendBtnDisabled: { backgroundColor: '#FFD700', opacity: 0.5 },
   // Reply quote shown inside a bubble, above the actual message content
   replyQuote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FAFAFA', borderLeftWidth: 3, borderLeftColor: Colors.brandGreen, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 6 },
