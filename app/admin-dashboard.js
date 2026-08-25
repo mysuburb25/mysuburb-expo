@@ -17,13 +17,6 @@ const TABS = [
   { key: 'suspended', label: 'Suspended' },
 ];
 
-// Excludes the batch of test/junk posts created during development from
-// ONLY the Total Posts count on the Overview tab, without touching them
-// in Firestore at all — they're still there, still visible wherever they
-// always were, just not counted in this one number. Deliberately NOT
-// applied to the category breakdown below it (Community/Buy & Sell/
-// Events/Services/Lost & Found) — those weren't asked to be reset and
-// still reflect true totals.
 const POSTS_COUNTER_RESET_DATE = Timestamp.fromDate(new Date('2026-08-21T00:00:00Z'));
 
 function formatDate(date) {
@@ -41,29 +34,16 @@ export default function AdminDashboardScreen() {
   const { user, profile, unreadCount, unreadMessageCount } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
-  // --- Overview / stats ---
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
 
-  // --- Users (full list) ---
-  // Fetched lazily — only when this tab is actually opened, rather than
-  // unconditionally alongside the other tabs' data on every focus. The
-  // Overview tab's own user count already comes from a cheap
-  // getCountFromServer call; pulling every user's full document on each
-  // visit regardless of whether the tab is even viewed would get more
-  // expensive as the user base grows, for a list that isn't always needed.
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
-  // --- Posts (recent list) ---
-  // Same lazy-fetch-on-tab-open pattern as Users. Capped at 50 (not 200
-  // like Users) since this is specifically meant as a "what's been
-  // posted recently" moderation view, not a full archive.
   const [allPosts, setAllPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
 
-  // --- Reports ---
-  const [reportStatus, setReportStatus] = useState('open'); // 'open' | 'resolved'
+  const [reportStatus, setReportStatus] = useState('open');
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [showWarnModal, setShowWarnModal] = useState(false);
@@ -71,28 +51,12 @@ export default function AdminDashboardScreen() {
   const [warnMessage, setWarnMessage] = useState('');
   const [sendingWarning, setSendingWarning] = useState(false);
 
-  // --- Suspended users ---
   const [suspendedUsers, setSuspendedUsers] = useState([]);
   const [loadingSuspended, setLoadingSuspended] = useState(true);
 
-  // Stats use getCountFromServer — a count-only query that doesn't read
-  // full documents, so it stays cheap regardless of how large the
-  // collections grow (unlike getDocs, which reads and bills for every
-  // matching document). Both openReports and resolvedReports are
-  // fetched here so the Reports tab chips can show live counts without
-  // needing their own separate query. Only totalPosts is scoped to
-  // POSTS_COUNTER_RESET_DATE — every category count below it stays
-  // exactly as it was, unscoped.
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      // Promise.allSettled, not Promise.all — with allSettled, one query
-      // failing (e.g. the totalPosts query below needs a Firestore
-      // composite index for isRemoved + createdAt that may not exist
-      // yet) only zeroes out THAT stat, not every other one. Promise.all
-      // would reject the whole batch on a single failure, which is
-      // exactly what was zeroing out every counter, not just the one
-      // query that actually changed.
       const results = await Promise.allSettled([
         getCountFromServer(collection(db, 'users')),
         getCountFromServer(query(collection(db, 'posts'), where('isRemoved', '==', false), where('createdAt', '>=', POSTS_COUNTER_RESET_DATE))),
@@ -121,11 +85,10 @@ export default function AdminDashboardScreen() {
     finally { setLoadingStats(false); }
   }, []);
 
-  // Capped at 200 — matches the same cost-conscious reasoning as
-  // Reports' own limit(30). Fine for the app's current size; worth
-  // revisiting with proper pagination once the user base grows well
-  // beyond this.
-  const [userSortBy, setUserSortBy] = useState('alphabetical'); // 'alphabetical' | 'newest'
+  // Default changed to 'newest' — the most recently joined users are
+  // what admins want to see first when opening this tab, not an
+  // alphabetical list.
+  const [userSortBy, setUserSortBy] = useState('newest'); // 'newest' | 'alphabetical'
   const fetchAllUsers = useCallback(async (sortBy) => {
     setLoadingUsers(true);
     try {
@@ -138,14 +101,6 @@ export default function AdminDashboardScreen() {
     finally { setLoadingUsers(false); }
   }, []);
 
-  // Same pattern as fetchAllUsers, capped at 50 per the "recent posts"
-  // use case rather than a full archive. Alphabetical sorts by the
-  // post's own content/title text — the closest equivalent to a user's
-  // displayName, since posts don't have a dedicated "name" field.
-  // Deliberately NOT scoped to POSTS_COUNTER_RESET_DATE — this tab is
-  // for browsing/moderating whatever's actually been posted, old test
-  // posts included, which is a different purpose from the Overview
-  // tab's counter.
   const [postSortBy, setPostSortBy] = useState('newest'); // 'newest' | 'alphabetical'
   const fetchAllPosts = useCallback(async (sortBy) => {
     setLoadingPosts(true);
@@ -159,8 +114,6 @@ export default function AdminDashboardScreen() {
     finally { setLoadingPosts(false); }
   }, []);
 
-  // Live listeners instead of one-time getDocs() calls — proven pattern
-  // from chat throughout this app.
   useEffect(() => {
     setLoadingReports(true);
     const q = query(
@@ -196,10 +149,6 @@ export default function AdminDashboardScreen() {
     fetchStats();
   }, [fetchStats]));
 
-  // Fetches the first time the Users tab is opened, and re-fetches only
-  // if the sort order has actually changed since the last fetch —
-  // switching away and back to the tab without changing sort doesn't
-  // trigger a wasteful refetch of the same 200 documents.
   const lastFetchedSortRef = useRef(null);
   useEffect(() => {
     if (activeTab === 'users' && lastFetchedSortRef.current !== userSortBy) {
@@ -208,7 +157,6 @@ export default function AdminDashboardScreen() {
     }
   }, [activeTab, userSortBy, fetchAllUsers]);
 
-  // Same lazy-fetch-once-per-sort-change pattern for Posts.
   const lastFetchedPostSortRef = useRef(null);
   useEffect(() => {
     if (activeTab === 'posts' && lastFetchedPostSortRef.current !== postSortBy) {
@@ -217,9 +165,6 @@ export default function AdminDashboardScreen() {
     }
   }, [activeTab, postSortBy, fetchAllPosts]);
 
-  // Reports and Suspended no longer need manual refetching here — their
-  // onSnapshot listeners above keep them live automatically. Stats and
-  // the Users/Posts lists (one-time snapshots, not live listeners) still do.
   const handleRefresh = () => {
     fetchStats();
     if (activeTab === 'users') fetchAllUsers(userSortBy);
@@ -276,11 +221,6 @@ export default function AdminDashboardScreen() {
     ]);
   };
 
-  // Works for either kind of report — a post-content report always has
-  // postAuthorId; a Report a Problem submission about someone's
-  // behaviour (Safety concern / Inappropriate content) has
-  // reportedUserId instead, from the optional "Who is this about?"
-  // search field.
   const getTargetUser = (report) => ({
     id: report.postAuthorId || report.reportedUserId || null,
     name: report.postAuthorName || report.reportedUserName || null,
@@ -299,8 +239,6 @@ export default function AdminDashboardScreen() {
             try {
               await updateDoc(doc(db, 'users', target.id), { isSuspended: true });
               Alert.alert('User Suspended', `${target.name || 'This user'} has been suspended.`);
-              // No manual refetch needed — the Suspended tab's
-              // onSnapshot listener picks this up automatically.
             } catch (e) { Alert.alert('Error', e.message); }
           }
         }
@@ -391,11 +329,6 @@ export default function AdminDashboardScreen() {
         <Text style={styles.pageTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Admin Dashboard</Text>
       </View>
 
-      {/* Same fixed row, flex:1-per-tab layout and sizing as before —
-          just with flexWrap added so 5 tabs wrap cleanly onto a second
-          row instead of either squeezing into one cramped row or
-          switching to horizontal scroll (both of which changed how this
-          looked/behaved from the original). */}
       <View style={styles.tabRow}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]} onPress={() => setActiveTab(t.key)}>
@@ -415,15 +348,11 @@ export default function AdminDashboardScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} tintColor="#1B4F72" />}
       >
-        {/* OVERVIEW */}
         {activeTab === 'overview' && (
           loadingStats ? (
             <ActivityIndicator color="#1B4F72" style={{ marginTop: 40 }} size="large" />
           ) : (
             <View style={styles.statsGrid}>
-              {/* Total Users is now a shortcut into the new Users tab —
-                  tapping it takes you straight to the full list rather
-                  than just showing a static count. */}
               <TouchableOpacity style={[styles.statCard, { backgroundColor: '#C2D9E8' }]} onPress={() => setActiveTab('users')}>
                 <Ionicons name="people-outline" size={22} color="#1B4F72" />
                 <Text style={styles.statNumber}>{stats?.totalUsers ?? 0}</Text>
@@ -477,24 +406,11 @@ export default function AdminDashboardScreen() {
           )
         )}
 
-        {/* USERS */}
         {activeTab === 'users' && (
           <View style={styles.section}>
+            {/* Newest chip now renders first, matching the new default
+                sort. */}
             <View style={styles.userSortRow}>
-              <TouchableOpacity
-                style={[styles.userSortChip, userSortBy === 'alphabetical' && styles.userSortChipActive]}
-                onPress={() => setUserSortBy('alphabetical')}
-              >
-                <Ionicons name="text-outline" size={14} color={userSortBy === 'alphabetical' ? Colors.charcoal : Colors.midGrey} />
-                <Text
-                  style={[styles.userSortChipText, userSortBy === 'alphabetical' && styles.userSortChipTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
-                  A–Z
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.userSortChip, userSortBy === 'newest' && styles.userSortChipActive]}
                 onPress={() => setUserSortBy('newest')}
@@ -507,6 +423,20 @@ export default function AdminDashboardScreen() {
                   minimumFontScale={0.8}
                 >
                   Newest
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.userSortChip, userSortBy === 'alphabetical' && styles.userSortChipActive]}
+                onPress={() => setUserSortBy('alphabetical')}
+              >
+                <Ionicons name="text-outline" size={14} color={userSortBy === 'alphabetical' ? Colors.charcoal : Colors.midGrey} />
+                <Text
+                  style={[styles.userSortChipText, userSortBy === 'alphabetical' && styles.userSortChipTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  A–Z
                 </Text>
               </TouchableOpacity>
             </View>
@@ -545,24 +475,10 @@ export default function AdminDashboardScreen() {
           </View>
         )}
 
-        {/* POSTS */}
         {activeTab === 'posts' && (
           <View style={styles.section}>
+            {/* Same pill-order swap as Users — Newest first. */}
             <View style={styles.userSortRow}>
-              <TouchableOpacity
-                style={[styles.userSortChip, postSortBy === 'alphabetical' && styles.userSortChipActive]}
-                onPress={() => setPostSortBy('alphabetical')}
-              >
-                <Ionicons name="text-outline" size={14} color={postSortBy === 'alphabetical' ? Colors.charcoal : Colors.midGrey} />
-                <Text
-                  style={[styles.userSortChipText, postSortBy === 'alphabetical' && styles.userSortChipTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
-                  A–Z
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.userSortChip, postSortBy === 'newest' && styles.userSortChipActive]}
                 onPress={() => setPostSortBy('newest')}
@@ -575,6 +491,20 @@ export default function AdminDashboardScreen() {
                   minimumFontScale={0.8}
                 >
                   Newest
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.userSortChip, postSortBy === 'alphabetical' && styles.userSortChipActive]}
+                onPress={() => setPostSortBy('alphabetical')}
+              >
+                <Ionicons name="text-outline" size={14} color={postSortBy === 'alphabetical' ? Colors.charcoal : Colors.midGrey} />
+                <Text
+                  style={[styles.userSortChipText, postSortBy === 'alphabetical' && styles.userSortChipTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  A–Z
                 </Text>
               </TouchableOpacity>
             </View>
@@ -598,7 +528,9 @@ export default function AdminDashboardScreen() {
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.userName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{p.content || '(no title)'}</Text>
+                      {/* Dedicated bold style for the post's own content
+                          line, distinct from the shared userName style. */}
+                      <Text style={styles.postContentText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{p.content || '(no title)'}</Text>
                       <Text style={styles.userEmail} numberOfLines={1}>{p.authorName || 'Unknown author'}</Text>
                       <Text style={styles.userSuburb} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                         {p.suburb ? `${p.suburb}, ${p.state}` : 'No suburb'} · {formatDate(p.createdAt)}
@@ -612,7 +544,6 @@ export default function AdminDashboardScreen() {
           </View>
         )}
 
-        {/* REPORTS */}
         {activeTab === 'reports' && (
           <View style={styles.section}>
             <View style={styles.reportStatusRow}>
@@ -763,7 +694,6 @@ export default function AdminDashboardScreen() {
           </View>
         )}
 
-        {/* SUSPENDED USERS */}
         {activeTab === 'suspended' && (
           <View style={styles.section}>
             {loadingSuspended ? (
@@ -836,10 +766,6 @@ const styles = StyleSheet.create({
   pageHeader: { backgroundColor: '#C2D9E8', paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   pageHeaderIconBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   pageTitle: { fontSize: 21, fontWeight: '800', color: '#1B4F72', letterSpacing: 0.2 },
-  // Original fixed row + flex:1-per-tab sizing, unchanged — flexWrap
-  // added so 5 tabs wrap onto a second row (3+2) instead of squeezing
-  // into one row or needing horizontal scroll. Every pill keeps its
-  // original size and behavior; there's just one more of them now.
   tabRow: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.lightGrey },
   tabBtn: { flexGrow: 1, flexBasis: '30%', paddingVertical: 10, alignItems: 'center', borderRadius: 25, backgroundColor: '#F0F0F0', borderWidth: 1.5, borderColor: Colors.midGrey },
   tabBtnActive: { backgroundColor: '#1B4F72', borderColor: '#1B4F72' },
@@ -868,14 +794,13 @@ const styles = StyleSheet.create({
   userAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#C2D9E8', justifyContent: 'center', alignItems: 'center' },
   userAvatarText: { fontSize: 16, fontWeight: '800', color: '#1B4F72' },
   userName: { fontSize: 15, fontWeight: '700', color: Colors.charcoal },
+  // Dedicated bold style for a post's own content line on the Posts tab.
+  postContentText: { fontSize: 15, fontWeight: '800', color: Colors.charcoal },
   userEmail: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
   userSuburb: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
   userSuspendedBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   userSuspendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#E65100' },
 
-  // Fixed width so every post row's title/author/suburb text starts
-  // aligned at the same horizontal position, regardless of how long or
-  // short each post's category label happens to be.
   postCategoryBadge: { width: 64, paddingVertical: 4, borderRadius: 10, backgroundColor: Colors.brandGreenPale, alignItems: 'center' },
   postCategoryBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.brandGreen },
 
