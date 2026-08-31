@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   // fixed value doesn't depend on the container's current height at
   // all, so there's nothing to recalculate when the keyboard opens —
   // the ScrollView just scrolls normally instead.
-  scroll: { flexGrow: 1, padding: 28, paddingTop: 130 },
+  scroll: { flexGrow: 1, padding: 28, paddingTop: 180 },
   header: { alignItems: 'center', marginBottom: 48 },
   appName: { fontSize: 48, fontWeight: '800', color: Colors.white, letterSpacing: 1 },
   tagline: { fontSize: 16, color: '#FFD700', marginTop: 8, fontWeight: '500' },
