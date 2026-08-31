@@ -1,7 +1,21 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const logger = require('firebase-functions/logger');
+// Wrapped defensively — this is the only genuinely new import in this
+// file. If it fails for any reason (e.g. an older firebase-admin
+// version that doesn't support this modular path), it must NOT be
+// allowed to throw at the top level, since that would prevent the
+// entire file from loading and take down every function below,
+// including the four already running in production. Storage support
+// simply degrades to "unavailable" in that case instead.
+let getStorage = null;
+try {
+  ({ getStorage } = require('firebase-admin/storage'));
+} catch (e) {
+  logger.error('firebase-admin/storage unavailable — healthcheck will skip the Storage check:', e.message);
+}
 const { findProhibitedTerm } = require('./contentModeration');
 
 initializeApp();
@@ -20,12 +34,8 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
   if (!userId || !message) return;
 
   try {
-    // Read the recipient's push token using the Admin SDK, which bypasses
-    // Firestore security rules entirely — this is exactly why the token is
-    // stored in a private subcollection only the owner can read via the
-    // client SDK, but the server can always read regardless.
     const tokenSnap = await db.doc(`users/${userId}/private/push`).get();
-    if (!tokenSnap.exists) return; // user has never registered a device
+    if (!tokenSnap.exists) return;
 
     const { token } = tokenSnap.data();
     if (!token) return;
@@ -54,21 +64,6 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
   }
 });
 
-// Server-side backstop for prohibited-item screening. The client already
-// blocks obvious cases in app/create-post.js before a post is ever
-// submitted, but that check can be bypassed by anyone writing to
-// Firestore directly (an old app version, a modified build, or a raw API
-// call) — this trigger runs on EVERY new post regardless of how it was
-// created, so it can't be skipped that way.
-//
-// On a match, this does NOT delete the post outright. It hides it from
-// normal feeds (isRemoved: true) and files an auto-flagged entry in the
-// same `reports` collection the Moderation dashboard already reads from
-// (see app/moderation.js), so a human still makes the final call. This
-// avoids permanently losing content or banning someone over a false
-// positive (e.g. "I'm not a smoker, this stolen base looks amazing" for
-// a rug's "stolen valuables" vibe — deliberately far-fetched, but the
-// point is: keyword matches aren't proof of intent).
 exports.screenNewPost = onDocumentCreated('posts/{postId}', async (event) => {
   const snap = event.data;
   if (!snap) return;
@@ -106,21 +101,6 @@ exports.screenNewPost = onDocumentCreated('posts/{postId}', async (event) => {
   }
 });
 
-// Sends a one-time welcome message to every new user, appearing to come
-// from the existing admin account (mysuburb.admin@gmail.com), shown as
-// "MySuburb". This writes the exact same conversations/messages shape
-// the client's own sendMessage function writes in app/chat/[userId].js
-// (same field names, same conversationId convention), so the result is
-// indistinguishable from a real message sent through the app — it shows
-// up in the Messages tab, increments the unread counter, and triggers
-// a push notification via the sendPushOnNotification trigger above,
-// purely because it's also writing a matching `notifications` doc.
-//
-// Triggers on the user's OWN profile document being created (not a Auth
-// trigger) — this fires at the same point the client finishes writing
-// the signup profile, which is what the existing sendPushOnNotification
-// and screenNewPost triggers both already do for their own collections,
-// so this follows the same established pattern in this file.
 const ADMIN_UID = 'ENNHw4XclOMcjiRkjH8eIXQdV223';
 const ADMIN_NAME = 'MySuburb';
 
@@ -142,18 +122,12 @@ exports.sendWelcomeMessage = onDocumentCreated('users/{userId}', async (event) =
   if (!snap) return;
   const newUserId = event.params.userId;
 
-  // Guards against ever messaging the admin account itself, in case this
-  // trigger somehow runs for the admin's own profile document.
   if (newUserId === ADMIN_UID) return;
 
   const userData = snap.data();
   const newUserName = userData.displayName || 'Neighbour';
   const newUserPhoto = userData.photoURL || null;
 
-  // Same sorted-pair convention the client uses for conversation IDs, so
-  // this lands in the exact same thread the person would see if they
-  // opened a chat with this account through the app themselves — not a
-  // separate, duplicate conversation.
   const conversationId = [ADMIN_UID, newUserId].sort().join('_');
 
   try {
@@ -177,9 +151,6 @@ exports.sendWelcomeMessage = onDocumentCreated('users/{userId}', async (event) =
       read: false,
     });
 
-    // Piggybacks on the existing sendPushOnNotification trigger above —
-    // writing this doc is what actually fires the push notification,
-    // exactly the same way a real chat message already does.
     await db.collection('notifications').add({
       userId: newUserId,
       type: 'message',
@@ -197,23 +168,6 @@ exports.sendWelcomeMessage = onDocumentCreated('users/{userId}', async (event) =
   }
 });
 
-// ---------------------------------------------------------------------
-// ONE-TIME BACKFILL — sendWelcomeMessage above only fires for NEW
-// signups going forward (onDocumentCreated never fires for documents
-// that already existed before the function was deployed). This sends
-// the same welcome message to every EXISTING user.
-//
-// Meant to be triggered once, manually, by visiting its URL after
-// deploying — then safe to delete this function afterward (or just
-// leave it; the completion guard below means re-visiting the URL by
-// accident does nothing harmful, since anyone already messaged gets
-// skipped rather than messaged twice).
-//
-// HTTPS functions are publicly reachable by default, so BACKFILL_KEY
-// is a basic safeguard against a random visitor triggering it — not
-// real security, just enough friction for a short-lived admin task.
-// Change this value before deploying, and don't share the URL.
-const { onRequest } = require('firebase-functions/v2/https');
 const BACKFILL_KEY = 'nxPYEU4LNkxtPohN5rL3hl6RYyCbp8uP';
 
 exports.backfillWelcomeMessages = onRequest({ timeoutSeconds: 540 }, async (req, res) => {
@@ -232,10 +186,6 @@ exports.backfillWelcomeMessages = onRequest({ timeoutSeconds: 540 }, async (req,
 
       const conversationId = [ADMIN_UID, newUserId].sort().join('_');
 
-      // Skips anyone who already has this conversation — covers both a
-      // second accidental run of this same backfill, AND anyone who
-      // signed up after sendWelcomeMessage went live and already got
-      // the message that way.
       const existingConvo = await db.doc(`conversations/${conversationId}`).get();
       if (existingConvo.exists) { skipped++; continue; }
 
@@ -283,4 +233,48 @@ exports.backfillWelcomeMessages = onRequest({ timeoutSeconds: 540 }, async (req,
     logger.error('backfillWelcomeMessages error:', e);
     res.status(500).send('Backfill failed: ' + e.message);
   }
+});
+
+// ---------------------------------------------------------------------
+// HEALTHCHECK — added for automated uptime monitoring (e.g. Instatus).
+// A real write-then-read against Firestore, plus a bucket-existence
+// check against Storage, so this actually reflects whether the two
+// backend pieces the app depends on most are working — not just
+// whether this function itself is reachable. Returns HTTP 200 when
+// everything's healthy, 503 when something's degraded, so a monitoring
+// service can alert correctly without needing to parse the JSON body.
+exports.healthcheck = onRequest(async (req, res) => {
+  const checks = { firestore: false, storage: false };
+  const errors = [];
+
+  try {
+    const ref = db.collection('_healthchecks').doc('latest');
+    await ref.set({ checkedAt: FieldValue.serverTimestamp() });
+    const snap = await ref.get();
+    checks.firestore = snap.exists;
+  } catch (e) {
+    errors.push(`Firestore: ${e.message}`);
+  }
+
+  try {
+    if (!getStorage) throw new Error('Storage module not available');
+    const bucket = getStorage().bucket();
+    const [exists] = await bucket.exists();
+    checks.storage = exists;
+  } catch (e) {
+    errors.push(`Storage: ${e.message}`);
+  }
+
+  const allHealthy = checks.firestore && checks.storage;
+
+  if (!allHealthy) {
+    logger.warn('Healthcheck failed:', errors);
+  }
+
+  res.status(allHealthy ? 200 : 503).json({
+    status: allHealthy ? 'ok' : 'degraded',
+    checks,
+    errors: errors.length > 0 ? errors : undefined,
+    timestamp: new Date().toISOString(),
+  });
 });
