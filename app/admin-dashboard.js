@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, onSnapshot, updateDoc, addDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
@@ -53,6 +54,13 @@ export default function AdminDashboardScreen() {
 
   const [suspendedUsers, setSuspendedUsers] = useState([]);
   const [loadingSuspended, setLoadingSuspended] = useState(true);
+
+  // Direct user-actions menu, reachable from tapping a row on the Users
+  // tab itself — separate from the existing Reports-tab suspend flow,
+  // since this one doesn't require a report to exist first.
+  const [showUserActionsModal, setShowUserActionsModal] = useState(false);
+  const [selectedUserForActions, setSelectedUserForActions] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -292,6 +300,72 @@ export default function AdminDashboardScreen() {
     ]);
   };
 
+  // Suspend or unsuspend a user directly from the Users tab, without
+  // needing a report to exist first — separate from handleUnsuspend
+  // above (which is reached from the Suspended tab, backed by a live
+  // onSnapshot listener) since allUsers here is a one-time fetch and
+  // needs its own optimistic update to reflect the change immediately,
+  // rather than waiting for the next manual refresh.
+  const handleToggleSuspendDirect = (user) => {
+    const isSuspending = !user.isSuspended;
+    setShowUserActionsModal(false);
+    Alert.alert(
+      `${isSuspending ? 'Suspend' : 'Unsuspend'} ${user.displayName || 'this user'}?`,
+      isSuspending
+        ? 'They will be signed out and unable to use the app until you unsuspend them.'
+        : 'They will be able to use the app again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: isSuspending ? 'Suspend' : 'Unsuspend',
+          style: isSuspending ? 'destructive' : 'default',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'users', user.id), { isSuspended: isSuspending });
+              setAllUsers(prev => prev.map(u => u.id === user.id ? { ...u, isSuspended: isSuspending } : u));
+            } catch (e) { Alert.alert('Error', e.message); }
+          }
+        }
+      ]
+    );
+  };
+
+  // Permanently deletes another user's account entirely — their Auth
+  // login and Firestore profile — via the adminDeleteUser Cloud
+  // Function. This can't be done directly from the client the way
+  // suspend/unsuspend can: only the Admin SDK (server-side only) is
+  // able to delete an account other than the one currently signed in.
+  // Deleting the profile doc server-side also automatically triggers
+  // the existing cleanupUserDataOnDelete function, so this gets the
+  // same private-message/media cleanup a self-service deletion does.
+  const handleDeleteUserAccount = (user) => {
+    setShowUserActionsModal(false);
+    Alert.alert(
+      `Permanently delete ${user.displayName || 'this user'}?`,
+      "This deletes their login, profile, and all their private messages. This cannot be undone. Their posts and comments will remain but will no longer be linked to their account.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            setDeletingUser(true);
+            try {
+              const adminDeleteUser = httpsCallable(getFunctions(), 'adminDeleteUser');
+              await adminDeleteUser({ targetUid: user.id });
+              setAllUsers(prev => prev.filter(u => u.id !== user.id));
+              setSuspendedUsers(prev => prev.filter(u => u.id !== user.id));
+              fetchStats();
+              Alert.alert('Deleted', `${user.displayName || 'The user'}'s account has been permanently deleted.`);
+            } catch (e) {
+              Alert.alert('Error', e.message || 'Could not delete this user. Please try again.');
+            } finally {
+              setDeletingUser(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
@@ -453,7 +527,7 @@ export default function AdminDashboardScreen() {
                   {allUsers.length}{allUsers.length >= 200 ? '+' : ''} user{allUsers.length === 1 ? '' : 's'}
                 </Text>
                 {allUsers.map(u => (
-                  <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => router.push('/user/' + u.id)}>
+                  <TouchableOpacity key={u.id} style={styles.userRow} onPress={() => { setSelectedUserForActions(u); setShowUserActionsModal(true); }}>
                     <View style={styles.userAvatar}>
                       <Text style={styles.userAvatarText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{u.displayName?.[0]?.toUpperCase() || '?'}</Text>
                     </View>
@@ -723,6 +797,57 @@ export default function AdminDashboardScreen() {
         )}
       </ScrollView>
 
+      <Modal visible={showUserActionsModal} transparent animationType="fade">
+        <TouchableOpacity style={styles.actionMenuOverlay} activeOpacity={1} onPress={() => setShowUserActionsModal(false)}>
+          <View style={styles.actionMenuSheet}>
+            <View style={styles.actionMenuHeaderBar}>
+              <Text style={styles.actionMenuHeaderText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{selectedUserForActions?.displayName || 'Select'}</Text>
+            </View>
+            <View style={styles.actionMenuPad}>
+              <TouchableOpacity
+                style={styles.actionMenuItem}
+                onPress={() => { setShowUserActionsModal(false); router.push('/user/' + selectedUserForActions.id); }}
+              >
+                <View style={styles.actionMenuItemIcon}>
+                  <Ionicons name="person-outline" size={20} color="#1B4F72" />
+                </View>
+                <Text style={styles.actionMenuItemText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>View Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionMenuItem}
+                onPress={() => handleToggleSuspendDirect(selectedUserForActions)}
+              >
+                <View style={styles.actionMenuItemIconWarn}>
+                  <Ionicons name={selectedUserForActions?.isSuspended ? 'refresh-outline' : 'ban-outline'} size={20} color="#E65100" />
+                </View>
+                <Text style={styles.actionMenuItemTextWarn} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {selectedUserForActions?.isSuspended ? 'Unsuspend' : 'Suspend'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionMenuItem}
+                onPress={() => handleDeleteUserAccount(selectedUserForActions)}
+                disabled={deletingUser}
+              >
+                <View style={styles.actionMenuItemIconDanger}>
+                  {deletingUser
+                    ? <ActivityIndicator color="#E53935" size="small" />
+                    : <Ionicons name="trash-outline" size={20} color="#E53935" />
+                  }
+                </View>
+                <Text style={styles.actionMenuItemTextDanger} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delete Account</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.actionMenuItem, styles.actionMenuCancelBtn]} onPress={() => setShowUserActionsModal(false)}>
+                <Text style={styles.actionMenuCancelText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={showWarnModal} transparent animationType="slide">
         <KeyboardAvoidingView style={styles.warnOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.warnSheet}>
@@ -857,4 +982,23 @@ const styles = StyleSheet.create({
   warnSendBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
   warnCancelBtn: { paddingVertical: 12, alignItems: 'center' },
   warnCancelBtnText: { fontSize: 14, fontWeight: '600', color: Colors.midGrey },
+
+  // User actions menu (Users tab) — same "green header + Select" action
+  // sheet pattern used throughout the rest of the app (chat, post
+  // detail), reused here so it feels consistent rather than introducing
+  // a new visual style just for the admin dashboard.
+  actionMenuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  actionMenuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  actionMenuHeaderBar: { backgroundColor: '#1B4F72', paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },
+  actionMenuHeaderText: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  actionMenuPad: { padding: 16, paddingBottom: 32 },
+  actionMenuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#FAFAFA', borderWidth: 1.5, borderColor: '#EFEFEF', marginBottom: 8 },
+  actionMenuItemIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#C2D9E8', justifyContent: 'center', alignItems: 'center' },
+  actionMenuItemIconWarn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF3E0', justifyContent: 'center', alignItems: 'center' },
+  actionMenuItemIconDanger: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF0F0', justifyContent: 'center', alignItems: 'center' },
+  actionMenuItemText: { fontSize: 16, fontWeight: '700', color: Colors.charcoal },
+  actionMenuItemTextWarn: { fontSize: 16, fontWeight: '700', color: '#E65100' },
+  actionMenuItemTextDanger: { fontSize: 16, fontWeight: '700', color: '#E53935' },
+  actionMenuCancelBtn: { backgroundColor: '#F0F0F0', borderRadius: 14, justifyContent: 'center', marginTop: 8, borderWidth: 0 },
+  actionMenuCancelText: { fontSize: 16, fontWeight: '700', color: '#1B4F72', textAlign: 'center', flex: 1 },
 });

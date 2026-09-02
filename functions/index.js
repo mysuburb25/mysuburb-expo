@@ -1,7 +1,8 @@
 const { onDocumentCreated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
-const { onRequest } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const logger = require('firebase-functions/logger');
 // Wrapped defensively — this is the only genuinely new import in this
 // file. If it fails for any reason (e.g. an older firebase-admin
@@ -356,4 +357,80 @@ exports.cleanupUserDataOnDelete = onDocumentDeleted('users/{userId}', async (eve
   } catch (e) {
     logger.error(`cleanupUserDataOnDelete error for user ${deletedUserId}:`, e);
   }
+});
+
+// ---------------------------------------------------------------------
+// ADMIN DELETE USER — lets an admin remove someone else's account
+// proactively (not just via the existing Reports-tab suspend flow).
+//
+// This has to be a Cloud Function, not client-side code, because the
+// Firebase client SDK can only ever delete the CURRENTLY SIGNED-IN
+// person's own account (as delete-account.js already does for
+// self-service deletion) — there's no client-side API for one account
+// to delete a different account. Only the Admin SDK can do that, which
+// only runs server-side.
+//
+// onCall (rather than onRequest, used elsewhere in this file) is
+// deliberately used here — it automatically verifies the caller's
+// Firebase Auth ID token and exposes their verified uid as
+// request.auth.uid, without needing to manually parse and verify a
+// token from raw HTTP headers the way an onRequest function would.
+// That verified uid is what makes the isAdmin check below trustworthy:
+// it's confirmed by Firebase itself, not just a value the client claims.
+//
+// Deleting the target's Firestore profile doc here also automatically
+// fires the cleanupUserDataOnDelete trigger above — an admin-initiated
+// deletion gets the exact same conversation/message/media cleanup a
+// self-service deletion does, since that trigger fires on the
+// users/{userId} deletion event regardless of what caused it.
+exports.adminDeleteUser = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to do this.');
+  }
+
+  const callerUid = request.auth.uid;
+  const targetUid = request.data?.targetUid;
+
+  if (!targetUid) {
+    throw new HttpsError('invalid-argument', 'No target user specified.');
+  }
+  if (targetUid === callerUid) {
+    throw new HttpsError('invalid-argument', "You can't delete your own account this way — use Delete Account in Settings instead.");
+  }
+
+  // Verifies admin status directly from Firestore rather than trusting
+  // anything the client sent — matches the same profile.isAdmin field
+  // already used throughout the app (see post-detail.js and elsewhere)
+  // for consistency, rather than introducing a different admin-check
+  // mechanism (like Auth custom claims) that nothing else here uses.
+  const callerDoc = await db.collection('users').doc(callerUid).get();
+  if (!callerDoc.exists || callerDoc.data().isAdmin !== true) {
+    throw new HttpsError('permission-denied', 'Only admins can do this.');
+  }
+
+  try {
+    // Auth record deleted first — if this fails (e.g. the account was
+    // already removed), the Firestore profile is left untouched rather
+    // than deleting the profile for a still-existing login.
+    await getAuth().deleteUser(targetUid);
+  } catch (e) {
+    // auth/user-not-found means the Auth record is already gone (or
+    // never existed) — safe to continue on and still clean up whatever
+    // Firestore data remains, rather than getting stuck unable to
+    // finish removing a partially-deleted account.
+    if (e.code !== 'auth/user-not-found') {
+      logger.error(`adminDeleteUser: failed to delete Auth record for ${targetUid}:`, e);
+      throw new HttpsError('internal', 'Could not delete this user\'s login. Please try again.');
+    }
+  }
+
+  try {
+    await db.collection('users').doc(targetUid).delete();
+  } catch (e) {
+    logger.error(`adminDeleteUser: failed to delete profile doc for ${targetUid}:`, e);
+    throw new HttpsError('internal', 'The login was removed, but their profile could not be deleted. Please try again.');
+  }
+
+  logger.info(`Admin ${callerUid} deleted user ${targetUid}`);
+  return { success: true };
 });
