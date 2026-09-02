@@ -1,4 +1,4 @@
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -277,4 +277,83 @@ exports.healthcheck = onRequest(async (req, res) => {
     errors: errors.length > 0 ? errors : undefined,
     timestamp: new Date().toISOString(),
   });
+});
+
+// ---------------------------------------------------------------------
+// CLEANUP ON ACCOUNT DELETION — fires automatically when a user's
+// profile document is deleted (which delete-account.js already does as
+// part of the existing account-deletion flow — no change needed there).
+//
+// Deliberately scoped to PRIVATE content only: conversations, their
+// messages, and chat media. Posts and comments are intentionally left
+// alone — they're public, other people may have replied to them, and
+// the existing deletion flow already handles that case correctly by
+// leaving the content in place but no longer linked to a real account.
+// A private 1:1 conversation has no equivalent "other people are
+// relying on this" reason to keep it once one participant is gone, so
+// it gets removed outright instead.
+//
+// Runs with the Admin SDK, which bypasses Firestore security rules
+// entirely. That's deliberate here, not incidental: a conversation
+// contains messages from BOTH participants, and typical security rules
+// only let someone delete their own messages, not the other person's —
+// running this client-side (from delete-account.js itself) would very
+// plausibly fail partway through on exactly that permission boundary.
+// Server-side cleanup with admin privileges is what makes it possible
+// to reliably remove the whole conversation, not just the leaving
+// user's half of it.
+exports.cleanupUserDataOnDelete = onDocumentDeleted('users/{userId}', async (event) => {
+  const deletedUserId = event.params.userId;
+
+  try {
+    const conversationsSnap = await db.collection('conversations')
+      .where('participants', 'array-contains', deletedUserId)
+      .get();
+
+    for (const convoDoc of conversationsSnap.docs) {
+      const conversationId = convoDoc.id;
+
+      // Delete every message in this conversation — both participants',
+      // not just the deleted user's own — since a private 1:1
+      // conversation with one participant now gone has no remaining
+      // legitimate reason to exist at all.
+      try {
+        const messagesSnap = await db.collection('conversations').doc(conversationId).collection('messages').get();
+        if (!messagesSnap.empty) {
+          const batch = db.batch();
+          messagesSnap.docs.forEach(msgDoc => batch.delete(msgDoc.ref));
+          await batch.commit();
+        }
+      } catch (e) {
+        logger.error(`Failed to delete messages for conversation ${conversationId}:`, e);
+      }
+
+      // Delete any chat media (photos/videos + their thumbnails) stored
+      // for this conversation. Uses the same defensively-imported
+      // getStorage as the healthcheck function above — if Storage is
+      // unavailable for any reason, this is logged and skipped rather
+      // than blocking the rest of the cleanup (the conversation and
+      // message documents still get removed either way).
+      if (getStorage) {
+        try {
+          const bucket = getStorage().bucket();
+          await bucket.deleteFiles({ prefix: `chatMedia/${conversationId}/` });
+        } catch (e) {
+          logger.error(`Failed to delete chat media for conversation ${conversationId}:`, e);
+        }
+      }
+
+      // Delete the conversation document itself last, once its
+      // messages and media are already gone.
+      try {
+        await convoDoc.ref.delete();
+      } catch (e) {
+        logger.error(`Failed to delete conversation doc ${conversationId}:`, e);
+      }
+    }
+
+    logger.info(`Cleaned up ${conversationsSnap.size} conversation(s) for deleted user ${deletedUserId}`);
+  } catch (e) {
+    logger.error(`cleanupUserDataOnDelete error for user ${deletedUserId}:`, e);
+  }
 });

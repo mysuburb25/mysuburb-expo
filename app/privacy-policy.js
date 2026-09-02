@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Privacy Policy</Text>
-        <Text style={styles.updated}>Last updated: 16 July 2026</Text>
+        <Text style={styles.updated}>Last updated: 2 September 2026</Text>
         <Text style={styles.intro}>My Suburb is committed to protecting your privacy. This policy explains how we collect, use, store, and share your information when you use our app, and how you can contact us with questions, requests, or complaints.</Text>
 
         <Text style={styles.heading}>1. Information We Collect</Text>
@@ -39,7 +39,7 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.body}>We do not sell your personal information to third parties.</Text>
         <Text style={styles.body}>Your posts, display name, and suburb are visible to other users who share an active suburb with you. Direct messages are only visible to you and the recipient.</Text>
         <Text style={styles.body}>Your email address is kept private and is never visible to other users. It is stored separately from your public profile information and is only accessible to you and to us.</Text>
-        <Text style={styles.body}>We use Google Firebase (a Google Cloud service) for authentication, data storage, and file storage. Firebase may store and process your data on servers located outside Australia, including in the United States, as part of Google's global infrastructure. If you use location search when creating a post, that search text is sent to Google Places (also a Google service) to return address suggestions. We take reasonable steps to only work with providers that maintain appropriate security and confidentiality standards, but we cannot guarantee that overseas recipients will handle your data exactly as Australian law would require, and Australian privacy law may not apply to acts done overseas.</Text>
+        <Text style={styles.body}>We use Google Firebase (a Google Cloud service) for authentication, data storage, and file storage. Firebase may store and process your data on servers located outside Australia, including in the United States, as part of Google's global infrastructure. If you use location search when creating a post, that search text is sent to Google Places (also a Google service) to return address suggestions. If you have notifications enabled, the content of a notification message (such as a preview of a comment or a message alert) is sent to Expo's push notification service, which delivers it to your device — Expo does not store this content beyond what's needed to deliver it. We take reasonable steps to only work with providers that maintain appropriate security and confidentiality standards, but we cannot guarantee that overseas recipients will handle your data exactly as Australian law would require, and Australian privacy law may not apply to acts done overseas.</Text>
         <Text style={styles.body}>We may disclose your information if required by Australian law, in response to a valid legal request, or where necessary to protect the safety of our users.</Text>
 
         <Text style={styles.heading}>4. Data Storage and Security</Text>
@@ -48,7 +48,8 @@ export default function PrivacyPolicyScreen() {
 
         <Text style={styles.heading}>5. Data Retention and Account Deletion</Text>
         <Text style={styles.body}>We retain your personal information for as long as your account is active, or as needed to provide the app to you.</Text>
-        <Text style={styles.body}>If you delete your account, we remove your profile information and Firebase authentication record. Posts and comments you've made may remain visible to preserve the integrity of conversations they're part of, but they will no longer be linked to an active account or your personal details beyond the display name already shown at the time of posting.</Text>
+        <Text style={styles.body}>If you delete your account, we remove your profile information and Firebase authentication record. We also permanently delete your private conversations, including all messages and any photos or videos sent within them.</Text>
+        <Text style={styles.body}>Posts and comments you've made may remain visible to preserve the integrity of conversations they're part of, but they will no longer be linked to an active account or your personal details beyond the display name already shown at the time of posting.</Text>
         {renderTextWithEmail('If you would like your posts and comments removed as well as your account, contact us at support@mysuburb.app and we will action this within a reasonable time.', 'support@mysuburb.app', styles.body, styles.emailLink)}
 
         <Text style={styles.heading}>6. Your Rights and How to Complain</Text>

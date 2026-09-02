@@ -49,7 +49,20 @@ export default function DeleteAccountScreen() {
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
 
-      // Remove the Firestore profile doc first — if this fails, the Auth
+      // Remove the private/push subcollection doc BEFORE the main profile
+      // doc. deleteDoc only ever removes the exact document it's pointed
+      // at — it does not cascade into subcollections nested underneath
+      // it, even though users/{uid}/private/push's path starts with the
+      // profile doc's own path. Without this explicit second delete, the
+      // push token document would be silently orphaned in Firestore
+      // forever after every account deletion, with nothing left that
+      // ever points to it or cleans it up. Deleting it first, before the
+      // Auth account itself, keeps the same "if something fails partway,
+      // the user can just try again" safety property the existing code
+      // already relies on for the profile doc below.
+      await deleteDoc(doc(db, 'users', user.uid, 'private', 'push'));
+
+      // Remove the Firestore profile doc next — if this fails, the Auth
       // account is untouched and the user can simply try again.
       await deleteDoc(doc(db, 'users', user.uid));
 

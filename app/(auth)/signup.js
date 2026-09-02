@@ -69,6 +69,49 @@ function isAtLeast18(month, year) {
 // unnecessary here and would reject real addresses people actually use.
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Strips anything that isn't a letter, space, apostrophe, or hyphen as the
+// person types — applied live in onChangeText so invalid characters
+// (digits, symbols) never actually appear in the field at all, rather
+// than being typed and then rejected later. \p{L} (a Unicode letter
+// property, not the plain A-Z range) is deliberately used here so this
+// doesn't reject genuinely common Australian names with accented or
+// non-Latin characters (José, Müller, Nguyễn, etc.) — a plain [a-zA-Z]
+// filter would incorrectly block those.
+const filterNameInput = (text) => text.replace(/[^\p{L}\s'-]/gu, '');
+
+// A small, deliberately short list of obvious non-name entries — this
+// isn't trying to be an exhaustive name-validation system (impossible to
+// do perfectly without rejecting real unusual names), just catching the
+// specific lazy/placeholder patterns people actually type: the field's
+// own placeholder text, generic filler words, or keyboard-mash test
+// values. Checked against the name with spaces/punctuation stripped and
+// lowercased, so "First Name", "first-name", and "FIRSTNAME" are all
+// caught by the same single entry.
+const PLACEHOLDER_NAME_WORDS = [
+  'firstname', 'lastname', 'first', 'last', 'name', 'yourname',
+  'test', 'testing', 'asdf', 'asdfasdf', 'qwerty',
+  'none', 'na', 'nil', 'unknown', 'user', 'username', 'xxx',
+];
+
+// Deliberately lenient — this only rejects entries that are almost
+// certainly NOT a real name (too short, the placeholder text itself,
+// generic filler words, or the same character repeated), rather than
+// trying to positively confirm something IS a real name, which isn't
+// something that can be done reliably without an external name-lookup
+// service. A genuine two-letter name or an unusual real name will
+// always pass; only obviously lazy/placeholder entries are blocked.
+function isLikelyRealName(rawName) {
+  const trimmed = rawName.trim();
+  if (trimmed.length < 2) return false;
+  if (!/\p{L}/u.test(trimmed)) return false; // must contain at least one actual letter
+
+  const normalized = trimmed.toLowerCase().replace(/[\s'-]/g, '');
+  if (PLACEHOLDER_NAME_WORDS.includes(normalized)) return false;
+  if (/^(.)\1+$/.test(normalized)) return false; // same character repeated, e.g. "aaaa", "xxxx"
+
+  return true;
+}
+
 export default function SignupScreen() {
   const { register, createProfile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -86,6 +129,11 @@ export default function SignupScreen() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showYearPicker, setShowYearPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Filters on every keystroke — digits/symbols are stripped before they
+  // ever reach state, rather than being allowed in and validated later.
+  const handleFirstNameChange = (text) => setFirstName(filterNameInput(text));
+  const handleLastNameChange = (text) => setLastName(filterNameInput(text));
 
   // Validates as soon as the person leaves the email field, rather than
   // waiting until they tap Create Account — catches an obviously
@@ -110,7 +158,9 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!firstName.trim()) { Alert.alert('Error', 'Please enter your first name.'); return; }
+    if (!isLikelyRealName(firstName)) { Alert.alert('Error', 'Please enter a valid first name.'); return; }
     if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
+    if (!isLikelyRealName(lastName)) { Alert.alert('Error', 'Please enter a valid last name.'); return; }
     if (!email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
     if (!EMAIL_REGEX.test(email.trim())) { setEmailError('Invalid email'); Alert.alert('Error', 'Please enter a valid email address.'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
@@ -195,7 +245,7 @@ export default function SignupScreen() {
               placeholder="First name"
               placeholderTextColor={Colors.midGrey}
               value={firstName}
-              onChangeText={setFirstName}
+              onChangeText={handleFirstNameChange}
               autoCapitalize="words"
               autoCorrect={false}
             />
@@ -209,7 +259,7 @@ export default function SignupScreen() {
               placeholder="Last name"
               placeholderTextColor={Colors.midGrey}
               value={lastName}
-              onChangeText={setLastName}
+              onChangeText={handleLastNameChange}
               autoCapitalize="words"
               autoCorrect={false}
             />
