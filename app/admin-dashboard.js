@@ -145,9 +145,17 @@ export default function AdminDashboardScreen() {
     return () => unsubscribe();
   }, []);
 
+  // Previously only refreshed stats on screen focus — extended to also
+  // re-fetch whichever tab is currently active. Without this, returning
+  // to the Users tab after suspending/deleting someone from their
+  // profile screen (a separate screen, not this one) kept showing
+  // stale data — allUsers/allPosts are one-time fetches, not live
+  // listeners, so nothing was updating them just from navigating back.
   useFocusEffect(useCallback(() => {
     fetchStats();
-  }, [fetchStats]));
+    if (activeTab === 'users') fetchAllUsers(userSortBy);
+    if (activeTab === 'posts') fetchAllPosts(postSortBy);
+  }, [fetchStats, activeTab, userSortBy, postSortBy, fetchAllUsers, fetchAllPosts]));
 
   const lastFetchedSortRef = useRef(null);
   useEffect(() => {
