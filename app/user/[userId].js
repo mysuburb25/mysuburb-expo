@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/theme';
@@ -23,6 +24,7 @@ export default function UserProfileScreen() {
   const [targetUser, setTargetUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewerImageUrl, setViewerImageUrl] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +46,17 @@ export default function UserProfileScreen() {
   const isBlocked = profile?.blockedUsers?.some(b => b.uid === userId) || false;
   const theyBlockedMe = targetUser?.blockedUsers?.some(b => b.uid === user?.uid) || false;
   const messagingDisabled = isBlocked || theyBlockedMe;
+
+  // Admin actions are only ever shown when viewing SOMEONE ELSE's
+  // profile — an admin viewing their own profile never sees Suspend or
+  // Delete here at all, since acting on your own account through this
+  // path would be confusing and risky (self-service account deletion
+  // already exists separately in Settings, requiring password
+  // re-entry — this admin path is deliberately not a substitute for
+  // that). The Cloud Function itself also rejects this case as a
+  // second line of defence, but not showing the option in the first
+  // place is the clearer, safer UX.
+  const showAdminActions = profile?.isAdmin && userId !== user?.uid;
 
   const handleMessage = () => {
     router.push({ pathname: '/chat/' + userId, params: { userId, userName: targetUser?.displayName } });
@@ -69,6 +82,68 @@ export default function UserProfileScreen() {
               await updateUserProfile({ blockedUsers: updated });
             } catch (e) {
               Alert.alert('Error', 'Could not update block status. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Suspend/unsuspend a user's account directly — proactive, doesn't
+  // require a report to exist first (separate from the Reports tab's
+  // own suspend action, which is reached from an actual report).
+  const handleToggleSuspend = () => {
+    const isSuspending = !targetUser.isSuspended;
+    Alert.alert(
+      `${isSuspending ? 'Suspend' : 'Unsuspend'} ${targetUser.displayName}?`,
+      isSuspending
+        ? 'They will be signed out and unable to use the app until you unsuspend them.'
+        : 'They will be able to use the app again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: isSuspending ? 'Suspend' : 'Unsuspend',
+          style: isSuspending ? 'destructive' : 'default',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'users', userId), { isSuspended: isSuspending });
+              setTargetUser(prev => ({ ...prev, isSuspended: isSuspending }));
+            } catch (e) {
+              Alert.alert('Error', 'Could not update this user. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Permanently deletes this user's account entirely — their Auth
+  // login and Firestore profile — via the adminDeleteUser Cloud
+  // Function. This can't be done directly from the client the way
+  // suspend/unsuspend can: only the Admin SDK (server-side only) is
+  // able to delete an account other than the one currently signed in.
+  // Deleting the profile doc server-side also automatically triggers
+  // the existing cleanupUserDataOnDelete function, so this gets the
+  // same private-message/media cleanup a self-service deletion does.
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      `Permanently delete ${targetUser.displayName}?`,
+      "This deletes their login, profile, and all their private messages. This cannot be undone. Their posts and comments will remain but will no longer be linked to their account.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            setDeletingUser(true);
+            try {
+              const adminDeleteUserFn = httpsCallable(getFunctions(), 'adminDeleteUser');
+              await adminDeleteUserFn({ targetUid: userId });
+              Alert.alert('Deleted', `${targetUser.displayName}'s account has been permanently deleted.`, [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (e) {
+              Alert.alert('Error', e.message || 'Could not delete this user. Please try again.');
+            } finally {
+              setDeletingUser(false);
             }
           }
         }
@@ -138,6 +213,13 @@ export default function UserProfileScreen() {
                 <Text style={styles.memberSince}>Member since {formatMemberSince(targetUser.createdAt)}</Text>
               </View>
             )}
+
+            {targetUser.isSuspended && (
+              <View style={styles.suspendedPill}>
+                <Ionicons name="ban" size={12} color="#E65100" />
+                <Text style={styles.suspendedPillText}>Suspended</Text>
+              </View>
+            )}
           </View>
 
           {/* Actions */}
@@ -161,6 +243,30 @@ export default function UserProfileScreen() {
           )}
           {!isBlocked && theyBlockedMe && (
             <Text style={styles.blockedNote}>You can't message this person right now.</Text>
+          )}
+
+          {/* Admin Actions — deliberately visually separate from the
+              regular Message/Block row above (its own labeled section,
+              different background) so it reads clearly as a distinct,
+              more powerful set of controls rather than being confused
+              with the ordinary user-facing actions every viewer sees. */}
+          {showAdminActions && (
+            <View style={styles.adminSection}>
+              <Text style={styles.adminSectionLabel}>Admin Actions</Text>
+              <View style={styles.adminActionsRow}>
+                <TouchableOpacity style={styles.suspendBtn} onPress={handleToggleSuspend}>
+                  <Ionicons name={targetUser.isSuspended ? 'refresh-outline' : 'ban-outline'} size={18} color="#E65100" />
+                  <Text style={styles.suspendBtnText}>{targetUser.isSuspended ? 'Unsuspend' : 'Suspend'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount} disabled={deletingUser}>
+                  {deletingUser
+                    ? <ActivityIndicator color="#E53935" size="small" />
+                    : <Ionicons name="trash-outline" size={18} color="#E53935" />
+                  }
+                  <Text style={styles.deleteBtnText}>Delete Account</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
         </View>
       )}
@@ -194,6 +300,8 @@ const styles = StyleSheet.create({
   location: { fontSize: 14, color: Colors.charcoal, fontWeight: '500' },
   memberPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.white, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
   memberSince: { fontSize: 12, color: Colors.brandGreen, fontWeight: '600' },
+  suspendedPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF3E0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, marginTop: 8 },
+  suspendedPillText: { fontSize: 12, color: '#E65100', fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 12, justifyContent: 'center' },
   messageBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.brandGreen, paddingHorizontal: 22, paddingVertical: 14, borderRadius: 26, flex: 1, justifyContent: 'center' },
   messageBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
@@ -202,4 +310,14 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   blockedNote: { fontSize: 13, color: Colors.midGrey, textAlign: 'center', marginTop: 16 },
   notFoundText: { fontSize: 15, color: Colors.midGrey },
+  // Admin Actions section — a separate, clearly distinct card below the
+  // regular actions, rather than mixed into the same row, so it never
+  // gets mistaken for a normal user-facing control.
+  adminSection: { marginTop: 20, backgroundColor: '#FFF8F0', borderRadius: 16, borderWidth: 1, borderColor: '#FFE0B2', padding: 16 },
+  adminSectionLabel: { fontSize: 12, fontWeight: '800', color: '#E65100', letterSpacing: 0.5, marginBottom: 10, textTransform: 'uppercase' },
+  adminActionsRow: { flexDirection: 'row', gap: 12 },
+  suspendBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.white, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5, borderColor: '#E65100', flex: 1, justifyContent: 'center' },
+  suspendBtnText: { fontSize: 14, fontWeight: '700', color: '#E65100' },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.white, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 22, borderWidth: 1.5, borderColor: '#E53935', flex: 1, justifyContent: 'center' },
+  deleteBtnText: { fontSize: 14, fontWeight: '700', color: '#E53935' },
 });
