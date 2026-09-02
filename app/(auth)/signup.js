@@ -116,7 +116,9 @@ export default function SignupScreen() {
   const { register, createProfile } = useAuth();
   const insets = useSafeAreaInsets();
   const [firstName, setFirstName] = useState('');
+  const [firstNameError, setFirstNameError] = useState('');
   const [lastName, setLastName] = useState('');
+  const [lastNameError, setLastNameError] = useState('');
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [password, setPassword] = useState('');
@@ -132,8 +134,41 @@ export default function SignupScreen() {
 
   // Filters on every keystroke — digits/symbols are stripped before they
   // ever reach state, rather than being allowed in and validated later.
-  const handleFirstNameChange = (text) => setFirstName(filterNameInput(text));
-  const handleLastNameChange = (text) => setLastName(filterNameInput(text));
+  // Also clears any existing error the moment they start editing again,
+  // matching the same pattern handleEmailChange already uses below —
+  // leaving a stale error visible while they're actively fixing it would
+  // be confusing.
+  const handleFirstNameChange = (text) => {
+    setFirstName(filterNameInput(text));
+    if (firstNameError) setFirstNameError('');
+  };
+  const handleLastNameChange = (text) => {
+    setLastName(filterNameInput(text));
+    if (lastNameError) setLastNameError('');
+  };
+
+  // Validates as soon as the person leaves the field, rather than only
+  // at submit time — same reasoning and pattern as handleEmailBlur
+  // below: catches an obviously placeholder/gibberish name right when
+  // they'd naturally notice it (having just moved to the next field),
+  // instead of surfacing it as a late surprise after filling in the
+  // rest of the form. Only validates if something was actually typed —
+  // an empty field on blur isn't an error yet, that's still handled by
+  // the required-field check in handleSignup.
+  const handleFirstNameBlur = () => {
+    if (firstName.trim() && !isLikelyRealName(firstName)) {
+      setFirstNameError('Please enter a valid first name');
+    } else {
+      setFirstNameError('');
+    }
+  };
+  const handleLastNameBlur = () => {
+    if (lastName.trim() && !isLikelyRealName(lastName)) {
+      setLastNameError('Please enter a valid last name');
+    } else {
+      setLastNameError('');
+    }
+  };
 
   // Validates as soon as the person leaves the email field, rather than
   // waiting until they tap Create Account — catches an obviously
@@ -158,9 +193,9 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!firstName.trim()) { Alert.alert('Error', 'Please enter your first name.'); return; }
-    if (!isLikelyRealName(firstName)) { Alert.alert('Error', 'Please enter a valid first name.'); return; }
+    if (!isLikelyRealName(firstName)) { setFirstNameError('Please enter a valid first name'); Alert.alert('Error', 'Please enter a valid first name.'); return; }
     if (!lastName.trim()) { Alert.alert('Error', 'Please enter your last name.'); return; }
-    if (!isLikelyRealName(lastName)) { Alert.alert('Error', 'Please enter a valid last name.'); return; }
+    if (!isLikelyRealName(lastName)) { setLastNameError('Please enter a valid last name'); Alert.alert('Error', 'Please enter a valid last name.'); return; }
     if (!email.trim()) { Alert.alert('Error', 'Please enter your email.'); return; }
     if (!EMAIL_REGEX.test(email.trim())) { setEmailError('Invalid email'); Alert.alert('Error', 'Please enter a valid email address.'); return; }
     if (!password.trim()) { Alert.alert('Error', 'Please enter a password.'); return; }
@@ -238,32 +273,40 @@ export default function SignupScreen() {
           <Text style={styles.subtitle}>Join your suburb community</Text>
 
           {/* First name */}
-          <View style={styles.inputWrap}>
-            <Ionicons name="person-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+          <View style={[styles.inputWrap, firstNameError && styles.inputWrapError]}>
+            <Ionicons name="person-outline" size={18} color={firstNameError ? '#E53935' : Colors.midGrey} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="First name"
               placeholderTextColor={Colors.midGrey}
               value={firstName}
               onChangeText={handleFirstNameChange}
+              onBlur={handleFirstNameBlur}
               autoCapitalize="words"
               autoCorrect={false}
             />
           </View>
+          {!!firstNameError && (
+            <Text style={styles.fieldErrorText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{firstNameError}</Text>
+          )}
 
           {/* Last name */}
-          <View style={styles.inputWrap}>
-            <Ionicons name="person-outline" size={18} color={Colors.midGrey} style={styles.inputIcon} />
+          <View style={[styles.inputWrap, lastNameError && styles.inputWrapError]}>
+            <Ionicons name="person-outline" size={18} color={lastNameError ? '#E53935' : Colors.midGrey} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="Last name"
               placeholderTextColor={Colors.midGrey}
               value={lastName}
               onChangeText={handleLastNameChange}
+              onBlur={handleLastNameBlur}
               autoCapitalize="words"
               autoCorrect={false}
             />
           </View>
+          {!!lastNameError && (
+            <Text style={styles.fieldErrorText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{lastNameError}</Text>
+          )}
 
           {/* Email */}
           <View style={[styles.inputWrap, emailError && styles.inputWrapError]}>
