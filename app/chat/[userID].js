@@ -14,7 +14,7 @@ import * as MediaLibrary from 'expo-media-library';
 // expo-file-system/legacy"). This is the specific fix that error message
 // points to, not a guess.
 import * as FileSystem from 'expo-file-system/legacy';
-import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, doc, getDoc, getDocs, setDoc, updateDoc, writeBatch, increment, arrayRemove, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -40,13 +40,6 @@ function formatDate(date) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 }
 
-// Splits message text around any mysuburb://post/{id} deep links OR
-// generic http(s) URLs, so both render as real tappable text instead of
-// inert plain text. Internal deep links navigate directly via router.push
-// since we're already inside the app; external URLs (e.g. a plain
-// https://mysuburb.app link, like the one sent in the automated welcome
-// message) open via the OS-level Linking API instead, since there's no
-// in-app route for an arbitrary external address.
 const LINK_REGEX = /(mysuburb:\/\/post\/[a-zA-Z0-9_-]+)|(https?:\/\/[^\s]+)/g;
 
 function renderMessageText(text, isMe, styles) {
@@ -59,11 +52,9 @@ function renderMessageText(text, isMe, styles) {
       parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
     }
     if (match[1]) {
-      // Internal post deep link — group 1
       const postId = match[1].replace('mysuburb://post/', '');
       parts.push({ type: 'internalLink', value: match[0], postId });
     } else {
-      // External http(s) URL — group 2
       parts.push({ type: 'externalLink', value: match[0] });
     }
     lastIndex = match.index + match[0].length;
@@ -96,19 +87,13 @@ function renderMessageText(text, isMe, styles) {
   );
 }
 
-// Normalizes a message's media into a single, consistent shape regardless
-// of whether it's a legacy single-photo message (the old imageUrl field)
-// or a newer grouped message (the media array). Every caller downstream —
-// rendering, the viewer, the reply bar — only ever has to deal with one
-// shape, rather than branching on which schema a given message happens
-// to use.
 function getItemMedia(item) {
   if (item.media && item.media.length > 0) return item.media;
   if (item.imageUrl) return [{ type: 'photo', url: item.imageUrl, thumbnailUrl: null }];
   return [];
 }
 
-const MAX_GRID_PREVIEW = 4; // how many thumbnails show before collapsing into a "+N" overlay
+const MAX_GRID_PREVIEW = 4;
 
 export default function ChatScreen() {
   const { userId, userName: userNameParam, prefillText } = useLocalSearchParams();
@@ -123,33 +108,15 @@ export default function ChatScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [theyBlockedMe, setTheyBlockedMe] = useState(false);
   const [otherUserPhotoURL, setOtherUserPhotoURL] = useState(null);
-  const [replyingTo, setReplyingTo] = useState(null); // { messageId, text, senderName, imageUrl }
-  const [actionSheetMessage, setActionSheetMessage] = useState(null); // the message item currently showing its long-press menu, or null
-  const [actionSheetMediaIndex, setActionSheetMediaIndex] = useState(null); // which specific photo/video within actionSheetMessage.media was long-pressed, or null if the long-press wasn't on a specific item
-  const [pendingMedia, setPendingMedia] = useState([]); // [{ kind: 'image'|'video', uri, thumbnailUri? }], staged but not yet sent
-  const [viewerMedia, setViewerMedia] = useState(null); // full media array for the tapped message, or null when closed
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [actionSheetMessage, setActionSheetMessage] = useState(null);
+  const [actionSheetMediaIndex, setActionSheetMediaIndex] = useState(null);
+  const [pendingMedia, setPendingMedia] = useState([]);
+  const [viewerMedia, setViewerMedia] = useState(null);
   const [viewerIndex, setViewerIndex] = useState(0);
-  const [viewerSourceMessage, setViewerSourceMessage] = useState(null); // the message the currently-open viewer's media belongs to, so long-pressing inside the viewer can still open the right action sheet
-  // Tracks the TextInput's own natural content height so the composer
-  // row can grow with it (up to a cap), then scroll internally beyond
-  // that. Deliberately a plain number driven by state, not a CSS
-  // min/max-height on the row itself — the row's height was previously
-  // hard-locked to a fixed number specifically to fix an Android keyboard
-  // instability bug (see inputRow style below). An explicit, single
-  // concrete height value at any given moment preserves that same
-  // stability property while still letting it change as content grows,
-  // rather than reintroducing the flexible-height layout that caused the
-  // original bug.
+  const [viewerSourceMessage, setViewerSourceMessage] = useState(null);
   const [composerInputHeight, setComposerInputHeight] = useState(28);
   const flatListRef = useRef(null);
-  // iOS-only: KeyboardAvoidingView's built-in 'padding' behavior visibly
-  // lagged a beat behind the keyboard's own animation (the keyboard would
-  // finish rising before the composer caught up). Manually listening for
-  // keyboardWillShow/keyboardWillHide and animating with the SAME duration
-  // the OS reports keeps the composer moving in exact lockstep with the
-  // keyboard instead of reacting to it after the fact. Android already
-  // works correctly via KeyboardAvoidingView's 'height' behavior, so this
-  // stays iOS-only to avoid touching what's already confirmed working.
   const keyboardHeight = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -177,14 +144,8 @@ export default function ChatScreen() {
   const iBlockedThem = profile?.blockedUsers?.some(b => b.uid === userId) || false;
   const isBlocked = iBlockedThem || theyBlockedMe;
 
-  // Conversation ID — always sorted so same convo regardless of who starts
   const conversationId = [user.uid, userId].sort().join('_');
   const [isConvoPinned, setIsConvoPinned] = useState(false);
-  // undefined = not yet loaded, null = never cleared. Messages sent
-  // before this timestamp are hidden from this user — this is what
-  // actually enforces "delete conversation" regardless of how the
-  // screen is reached (notification tap, profile "Message" button,
-  // deep link, etc.), not just hiding it from the inbox list.
   const [clearedAt, setClearedAt] = useState(undefined);
 
   useEffect(() => {
@@ -200,25 +161,11 @@ export default function ChatScreen() {
         }
       } catch (e) {
         console.error(e);
-        // Without this, a failed read here (e.g. a permission error while
-        // route params are still settling right after navigation) leaves
-        // clearedAt stuck at undefined forever — which blocks the messages
-        // listener below from ever starting, which means loading never
-        // turns off. The visible result is a spinner that never resolves
-        // and, since the FlatList never mounts to fill the remaining
-        // space, the composer ends up sitting awkwardly mid-screen instead
-        // of anchored to the bottom. Falling back to null here guarantees
-        // the rest of the screen can always finish loading regardless of
-        // what happened with this specific fetch.
         setClearedAt(null);
       }
     })();
   }, [conversationId, user.uid]);
 
-  // If the screen was opened without a userName param (e.g. a deep link),
-  // look the recipient's name up directly so we never write `undefined`
-  // into Firestore, which throws and silently breaks sending. Also checks
-  // whether they've blocked us, since that's only knowable from their doc.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -237,9 +184,6 @@ export default function ChatScreen() {
   }, [userId, userNameParam, user.uid]);
 
   useEffect(() => {
-    // Wait until we know whether this conversation was ever cleared —
-    // otherwise we'd briefly show full history before cutting it down,
-    // which defeats the point.
     if (clearedAt === undefined) return;
 
     const messagesRef = collection(db, 'conversations', conversationId, 'messages');
@@ -247,10 +191,6 @@ export default function ChatScreen() {
       ? query(messagesRef, orderBy('createdAt', 'asc'), where('createdAt', '>', clearedAt))
       : query(messagesRef, orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
-      // Messages the current user has "deleted for me" are filtered out
-      // here rather than at query level (Firestore can't query "array
-      // does NOT contain X" efficiently) — they still exist in Firestore
-      // for the other participant, who never sees this filtering.
       const items = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(m => !(m.deletedFor || []).includes(user.uid));
@@ -264,23 +204,40 @@ export default function ChatScreen() {
         unreadFromThem.forEach(d => batch.update(doc(db, 'conversations', conversationId, 'messages', d.id), { read: true }));
         batch.commit().catch(e => console.error(e));
         setDoc(doc(db, 'conversations', conversationId), { unreadCount: { [user.uid]: 0 } }, { merge: true }).catch(e => console.error(e));
+
+        // Also clears any unread notification docs for THIS conversation
+        // (type: 'message', isRead: false) — without this, opening the
+        // conversation clears its own unread badge here, but the
+        // separate notifications doc that actually feeds the app icon
+        // badge (see AuthContext.js) stays unread indefinitely unless
+        // the person separately visits the bell/Notifications screen,
+        // which is the only other place anything marks a notification
+        // as read. conversationId is already stored on every message
+        // notification doc (see sendMessage below), so this is a
+        // direct, targeted query rather than touching every notification.
+        (async () => {
+          try {
+            const notifQuery = query(
+              collection(db, 'notifications'),
+              where('userId', '==', user.uid),
+              where('conversationId', '==', conversationId),
+              where('isRead', '==', false)
+            );
+            const notifSnap = await getDocs(notifQuery);
+            if (!notifSnap.empty) {
+              const notifBatch = writeBatch(db);
+              notifSnap.docs.forEach(d => notifBatch.update(doc(db, 'notifications', d.id), { isRead: true }));
+              await notifBatch.commit();
+            }
+          } catch (e) {
+            console.error('Failed to mark message notifications as read:', e);
+          }
+        })();
       }
     });
     return unsub;
   }, [conversationId, user.uid, clearedAt]);
 
-  // Shared by both text and media sends — handles the conversation
-  // metadata update, the message document itself, and the notification.
-  // previewText is what shows in the conversation list (e.g. "You: hey"
-  // vs "You: 📷 Photo"). `media` is an array of { type, url, thumbnailUrl }
-  // — every photo/video sent together lands on ONE message document as
-  // one array, rather than each becoming its own separate message.
-  // replyToOverride lets a caller supply the reply-to data directly,
-  // bypassing the replyingTo state entirely — used by the photo viewer's
-  // own reply box, which sends immediately rather than staging through
-  // the main composer. Reading replyingTo via setReplyingTo() followed
-  // immediately by sendMessage() would risk using its stale pre-update
-  // value, since React state updates aren't applied synchronously.
   const sendMessage = async ({ text, media, previewText, replyToOverride }) => {
     await setDoc(doc(db, 'conversations', conversationId), {
       participants: [user.uid, userId],
@@ -291,9 +248,6 @@ export default function ChatScreen() {
       lastMessageAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       unreadCount: { [userId]: increment(1) },
-      // A new message means the conversation is active again for both
-      // people — clears it from "deleted" for either side, so nobody's
-      // left with a hidden conversation that actually has new activity.
       deletedBy: arrayRemove(user.uid, userId),
     }, { merge: true });
 
@@ -332,10 +286,6 @@ export default function ChatScreen() {
     } catch (e) { console.error('notification error:', e); }
   };
 
-  // Picking media only stages it (pendingMedia) — nothing sends
-  // immediately. Everything staged becomes ONE message on Send, shown as
-  // a stack/grid rather than separate bubbles, with any typed caption
-  // attached to that same message.
   const MAX_PENDING_MEDIA = 8;
   const MAX_VIDEO_DURATION_SEC = 120;
   const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
@@ -352,13 +302,6 @@ export default function ChatScreen() {
       if (mediaToSend.length === 0) {
         await sendMessage({ text, previewText: text });
       } else {
-        // Every staged item uploads concurrently instead of one at a
-        // time — this is what actually fixes the slow send. Previously
-        // each photo waited for the previous one to fully finish before
-        // starting, so sending N items took roughly N times as long as a
-        // single upload. Running them in parallel means the total wait
-        // is close to the time of the single slowest upload, not the sum
-        // of all of them.
         const uploaded = await Promise.all(mediaToSend.map(async (item, i) => {
           const response = await fetch(item.uri);
           const blob = await response.blob();
@@ -405,9 +348,6 @@ export default function ChatScreen() {
     }
   };
 
-  // Single "Add Photo or Video" entry point — camera and library both
-  // accept either media type in one go, matching the same pattern used
-  // for event/post creation elsewhere in the app.
   const handlePickMedia = () => {
     if (pendingMedia.length >= MAX_PENDING_MEDIA || isBlocked) return;
     const remaining = MAX_PENDING_MEDIA - pendingMedia.length;
@@ -534,19 +474,12 @@ export default function ChatScreen() {
   };
 
   const handleLongPressMessage = (item, mediaIndex = null) => {
-    if (item.unsent) return; // nothing to do on an already-unsent message
+    if (item.unsent) return;
     Keyboard.dismiss();
     setActionSheetMessage(item);
     setActionSheetMediaIndex(mediaIndex);
   };
 
-  // Single "Reply" — automatically replies to the exact photo/video that
-  // was long-pressed if there was one (shown as that item's own
-  // thumbnail, both while composing and once sent), or to the whole
-  // message otherwise. This used to be two separate menu items (plain
-  // "Reply" and "Reply to this Photo") shown together, which was
-  // confusing since they looked like different actions when one was
-  // really just a more specific version of the other.
   const handleReplyFromSheet = () => {
     const item = actionSheetMessage;
     const mediaIndex = actionSheetMediaIndex;
@@ -589,34 +522,14 @@ export default function ChatScreen() {
     }
   };
 
-  // Downloads either the one specific photo/video that was long-pressed
-  // (when actionSheetMediaIndex is set) or every item in the message
-  // (when the long-press wasn't on any particular item — e.g. it landed
-  // on a caption below a photo grid). Requires photo library write
-  // permission, requested here rather than at app startup, since it's
-  // only ever needed at the moment someone actually tries to download
-  // something.
-  // Shared by the action sheet's Download option and the full-screen
-  // viewer's own download button — both just hand this a list of
-  // { type, url } items and it handles permission, downloading, and
-  // saving to the photo library the same way either time.
   const saveMediaToLibrary = async (targets) => {
     if (targets.length === 0 || !targets[0]) return;
     try {
-      // writeOnly requests only save-to-library access, matching
-      // NSPhotoLibraryAddUsageDescription — the correct, more reliable
-      // permission for a save-only feature like this one, rather than
-      // requesting full read+write library access we never actually need.
       const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow photo library access to save media.');
         return;
       }
-      // Downloads and saves every target concurrently instead of one at
-      // a time — the same sequential-loop mistake that made uploads slow
-      // before that fix, just never applied here too. "Download All" on
-      // 8 photos was taking as long as 8 downloads in a row; this makes
-      // it closer to the time of the single slowest one.
       await Promise.all(targets.map(async (t) => {
         const localUri = FileSystem.cacheDirectory + Date.now() + '_' + Math.random().toString(36).slice(2) + (t.type === 'video' ? '.mp4' : '.jpg');
         const { uri } = await FileSystem.downloadAsync(t.url, localUri);
@@ -639,10 +552,6 @@ export default function ChatScreen() {
     saveMediaToLibrary(targets);
   };
 
-  // Hides the message from the current user's own view only — the other
-  // participant keeps seeing it normally. The message document itself
-  // isn't touched beyond adding this uid to deletedFor; the onSnapshot
-  // listener above is what actually filters it out of what renders.
   const handleDeleteForMe = () => {
     const item = actionSheetMessage;
     setActionSheetMessage(null);
@@ -655,11 +564,6 @@ export default function ChatScreen() {
     });
   };
 
-  // Only ever offered to the sender (see the menu's own conditional
-  // rendering below). Clears the message's actual content and marks it
-  // unsent, rather than deleting the Firestore document outright — this
-  // keeps a "This message was unsent" placeholder in both people's
-  // conversation history instead of leaving a confusing silent gap.
   const handleUnsend = () => {
     const item = actionSheetMessage;
     setActionSheetMessage(null);
@@ -688,10 +592,6 @@ export default function ChatScreen() {
     );
   };
 
-  // Reuses the same reports collection the rest of the app already
-  // writes to (see report-problem.js) — pre-filled with the message's
-  // own context rather than sending the person to a separate form, so
-  // reporting something mid-conversation stays a single quick action.
   const handleReportUser = () => {
     setShowMenu(false);
     Alert.alert(
@@ -733,11 +633,6 @@ export default function ChatScreen() {
     setViewerSourceMessage(sourceMessage);
   };
 
-  // Sends a reply directly from the viewer's own reply box — typed and
-  // sent right there, rather than staging it through the main composer
-  // the way the ordinary Reply option does. Closes the viewer immediately
-  // on send so the person lands back in the conversation and sees their
-  // reply arrive, same as sending any other message.
   const handleSendPhotoReply = async (text, targetItem, targetIndex) => {
     if (!text.trim() || !viewerSourceMessage) return;
     const trimmed = text.trim();
@@ -768,10 +663,6 @@ export default function ChatScreen() {
     const hasMedia = itemMedia.length > 0;
     const isMediaOnly = hasMedia && !item.text;
 
-    // An unsent message keeps its place in the conversation (rather than
-    // vanishing, which would leave a confusing silent gap) but shows only
-    // a neutral placeholder — no text, media, or reply preview, and it's
-    // no longer interactive (no long-press menu, see handleLongPressMessage).
     if (item.unsent) {
       return (
         <>
@@ -885,22 +776,7 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      // Reverted: setting behavior to undefined on Android was based on
-      // an assumption that the OS's native window resize was already
-      // active here — it wasn't, and the result was the composer getting
-      // completely hidden behind the keyboard instead of just animating
-      // slowly. 'height' is back, since a working-but-slightly-slow
-      // composer beats a fully hidden one. The slow-animation complaint
-      // is real but needs a different fix (e.g. confirming/adding
-      // android.softwareKeyboardLayoutMode in app.json) rather than
-      // removing KeyboardAvoidingView's own handling outright.
       behavior={Platform.OS === 'android' ? 'height' : undefined}
-      // Reverted: keyboardVerticalOffset={insets.top} was an attempt to
-      // fix the iOS composer lagging a beat behind the keyboard, but it
-      // over-corrected and introduced a persistent visible gap between
-      // the composer and the keyboard instead. A working screen with the
-      // original timing lag beats a broken one with a gap — this needs a
-      // different, more carefully tested approach before trying again.
     >
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -1010,23 +886,7 @@ export default function ChatScreen() {
               </ScrollView>
             </View>
           )}
-          {/* paddingBottom on iOS specifically compensates for switching
-              alignItems to 'flex-end' below — that removed the small
-              cushion 'center' used to leave beneath the buttons, which
-              was previously enough on its own to clear the home
-              indicator without any explicit safe-area padding here.
-              Android keeps its own separate static spacer further down,
-              unrelated to this. */}
           <View style={{ backgroundColor: Colors.brandGreen, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0 }}>
-            {/* Height is now an explicit, computed number (base row
-                padding + the input's own tracked content height) instead
-                of the old flat 62 constant — this is what lets the row
-                grow with the text while keeping the same "always a
-                concrete number, never a CSS min/max-height" property
-                that made the original Android fix stable. alignItems
-                switched to 'flex-end' so the camera/send buttons stay
-                anchored to the bottom of the row as it grows upward,
-                matching how every other growing chat composer behaves. */}
             <View style={[styles.inputRow, { height: composerInputHeight + 34, alignItems: 'flex-end' }]}>
               <TouchableOpacity style={styles.imageBtn} onPress={handlePickMedia} disabled={pendingMedia.length >= MAX_PENDING_MEDIA}>
                 <Ionicons name="camera-outline" size={24} color={pendingMedia.length >= MAX_PENDING_MEDIA ? Colors.lightGrey : Colors.brandGreen} />
@@ -1041,13 +901,6 @@ export default function ChatScreen() {
                 maxLength={500}
                 autoCorrect={true}
                 autoCapitalize="sentences"
-                // Grows the row with the text up to a cap (~4 lines),
-                // then the TextInput's own standard multiline behavior
-                // takes over and scrolls internally beyond that — same
-                // pattern as any other growing chat composer, just with
-                // the cap enforced here via Math.min rather than a CSS
-                // maxHeight, so the wrapping row's height stays in sync
-                // with it via the same state value.
                 onContentSizeChange={(e) => {
                   const next = Math.min(Math.max(28, e.nativeEvent.contentSize.height), 92);
                   setComposerInputHeight(next);
@@ -1064,27 +917,10 @@ export default function ChatScreen() {
                 }
               </TouchableOpacity>
             </View>
-            {/* Android-only, static-height spacer for the gesture nav
-                bar — iOS confirmed working with no spacer at all, so it
-                stays that way. Android needs some bottom clearance, but
-                using insets.bottom here was what caused the original
-                instability (very plausibly recalculating against the
-                window's resized bounds under
-                softwareKeyboardLayoutMode:"resize" rather than staying
-                fixed). A static value sidesteps that entirely — it won't
-                perfectly match every device's exact gesture bar height,
-                but it won't destabilize either, which matters more here. */}
             {Platform.OS === 'android' && <View style={{ height: 50, backgroundColor: Colors.brandGreen }} />}
           </View>
         </>
       )}
-      {/* Empty spacer sibling, not padding on the composer itself — its
-          height grows to match the keyboard, which is what actually
-          forces the FlatList above (flex: 1) to shrink and the composer
-          to end up sitting right above the keyboard. Padding inside the
-          composer's own wrapper only added invisible space below it
-          without moving anything, which is why that first attempt did
-          nothing visible at all. */}
       <Animated.View style={{ height: keyboardHeight }} />
 
       <MediaViewerModal
@@ -1095,12 +931,6 @@ export default function ChatScreen() {
         onSendReply={(text, item, index) => handleSendPhotoReply(text, item, index)}
       />
 
-      {/* Long-press message action sheet — Reply, Report (only on the
-          other person's messages), Unsend (only on your own), and Delete
-          for me (always available, hides it from your view only). Same
-          green-header "Select" pattern as the conversation's own 3-dot
-          menu below, kept visually consistent across every action sheet
-          in the app. */}
       <Modal visible={!!actionSheetMessage} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => { setActionSheetMessage(null); setActionSheetMediaIndex(null); }}>
           <View style={styles.menuSheet}>
@@ -1221,14 +1051,7 @@ const styles = StyleSheet.create({
   avatarSmallImage: { width: 28, height: 28, borderRadius: 14 },
   avatarSmallText: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   bubble: { maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2, flexShrink: 1 },
-  // Media-only messages skip the colored bubble background/padding
-  // entirely — the photo/video shows edge-to-edge with just rounded
-  // corners, rather than sitting inside a green/white frame like text
-  // messages.
   bubbleImageOnly: { maxWidth: '75%', borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', gap: 2, flexShrink: 1 },
-  // Light yellow highlight on whichever bubble is currently selected as
-  // the reply target — overrides both bubbleMe (green) and bubbleThem
-  // (white) backgrounds so it's clearly visible regardless of sender.
   bubbleReplyHighlight: { backgroundColor: '#FFF9C4', borderWidth: 1.5, borderColor: '#FFD700' },
   bubbleMe: { backgroundColor: Colors.brandGreen, borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: Colors.white, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: Colors.lightGrey },
@@ -1237,12 +1060,6 @@ const styles = StyleSheet.create({
   bubbleLinkMe: { color: '#FFD700' },
   bubbleTextMe: { color: Colors.white },
   bubbleTime: { fontSize: 10, color: Colors.midGrey, alignSelf: 'flex-end' },
-  // Neutral grey regardless of sender, since there's no colored backdrop
-  // behind a media-only message the way bubbleTimeMe's white assumes.
-  // marginRight pushes the text away from the bubble's rounded corner —
-  // without it, the corner's curve (from overflow: hidden + borderRadius
-  // on bubbleImageOnly) was visually clipping into the last character,
-  // even though the text itself was never actually being told to shrink.
   bubbleTimeImageOnly: { color: Colors.midGrey, marginTop: 2, marginRight: 8 },
   bubbleTimeMe: { color: 'rgba(255,255,255,0.7)' },
   bubbleUnsent: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '75%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F0F0F0', borderWidth: 1, borderColor: Colors.lightGrey },
@@ -1250,21 +1067,11 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: 10 },
   emptyText: { fontSize: 18, fontWeight: '700', color: Colors.charcoal },
   emptySubText: { fontSize: 14, color: Colors.midGrey },
-  // Base row style — height and alignItems are now overridden inline at
-  // render time (see the JSX above) since they depend on the composer's
-  // current tracked content height. flexDirection/padding/gap/background
-  // stay fixed here since those never need to change.
   inputRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 10, backgroundColor: Colors.brandGreen },
   imageBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  // height is now set inline per-render from composerInputHeight (see
-  // JSX above) instead of a static maxHeight — this is what lets it grow
-  // with typed content up to the ~4-line cap enforced in
-  // onContentSizeChange, then scroll internally beyond that, exactly
-  // like a normal expanding chat composer.
   input: { flex: 1, backgroundColor: Colors.white, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 15, color: Colors.charcoal },
   sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
   sendBtnDisabled: { backgroundColor: '#FFD700', opacity: 0.5 },
-  // Reply quote shown inside a bubble, above the actual message content
   replyQuote: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FAFAFA', borderLeftWidth: 3, borderLeftColor: Colors.brandGreen, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 6 },
   replyQuoteThumb: { width: 32, height: 32, borderRadius: 6 },
   replyQuoteMe: { backgroundColor: 'rgba(255,255,255,0.15)', borderLeftColor: '#FFD700' },
@@ -1272,7 +1079,6 @@ const styles = StyleSheet.create({
   replyQuoteSenderMe: { color: '#FFD700' },
   replyQuoteText: { fontSize: 12, color: Colors.midGrey },
   replyQuoteTextMe: { color: 'rgba(255,255,255,0.85)' },
-  // Reply preview bar shown above the composer while replying
   replyBar: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.white, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.lightGrey, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 3 },
   replyBarAccent: { width: 4, alignSelf: 'stretch', borderRadius: 2, backgroundColor: Colors.brandGreen },
   replyBarThumb: { width: 38, height: 38, borderRadius: 8 },
@@ -1289,15 +1095,12 @@ const styles = StyleSheet.create({
   pendingImageRemoveBtn: { position: 'absolute', top: -6, right: -6, backgroundColor: Colors.white, borderRadius: 9 },
   replyBarSender: { fontSize: 12, fontWeight: '700', color: Colors.brandGreen },
   replyBarText: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
-  // Single-image/video message + full-screen viewer
   msgImage: { width: 200, height: 200, borderRadius: 12, marginBottom: 4 },
   videoPlayBadge: {
     position: 'absolute', top: '50%', left: '50%', marginTop: -18, marginLeft: -18,
     width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center', alignItems: 'center',
   },
-  // Multi-photo/video grid — 2 columns, up to 4 visible thumbnails, with
-  // a "+N" overlay on the last one if there are more than 4 in total.
   mediaGrid: { width: 200, flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: 4 },
   mediaGridCell: { width: 98.5, height: 98.5, borderRadius: 8, overflow: 'hidden', position: 'relative', backgroundColor: '#00000010' },
   mediaGridImage: { width: '100%', height: '100%' },
@@ -1312,8 +1115,6 @@ const styles = StyleSheet.create({
   blockedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: Colors.lightGrey },
   blockedBannerText: { flex: 1, fontSize: 13, color: Colors.midGrey },
   unblockLink: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
-  // Matches the same "green header + Select" menu pattern used on the
-  // post detail screen and the Messages list's long-press action sheet.
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   menuSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   menuHeaderBar: { backgroundColor: Colors.brandGreen, paddingTop: 14, paddingBottom: 16, paddingHorizontal: 20, alignItems: 'center' },

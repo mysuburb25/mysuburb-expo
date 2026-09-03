@@ -101,23 +101,20 @@ export function AuthProvider({ children }) {
     return unsub;
   }, [user]);
 
-  // Keeps the app icon's home-screen badge number in sync with the
-  // combined total of both unread counts above — so someone can tell
-  // there's something waiting for them without opening the app.
-  // Deliberately just these two counts, not new posts in general:
-  // notifications (comments, likes, admin warnings — anything already
-  // routed to this specific person) plus unread messages. A general
-  // "new posts in your suburb" count was considered and rejected —
-  // that's not personally directed, would climb continuously in an
-  // active suburb, and would make the badge stop meaning anything.
-  // Fires automatically on login (both counts populate), on logout
-  // (both reset to 0, clearing the badge), and on every live update
-  // from the two listeners above — no separate reset logic needed.
+  // Keeps the app icon's home-screen badge number in sync with
+  // unreadCount alone — not unreadCount + unreadMessageCount. Every new
+  // message already creates its own notifications doc (type: 'message',
+  // the same doc that triggers the push notification itself), which is
+  // already included in unreadCount — adding unreadMessageCount on top
+  // double-counted every message, showing "2" for what was actually one
+  // new message. unreadCount alone already captures everything routed
+  // to this specific user: comments, likes, admin warnings, and
+  // messages, with no separate addition needed.
   useEffect(() => {
-    Notifications.setBadgeCountAsync(unreadCount + unreadMessageCount).catch((e) => {
+    Notifications.setBadgeCountAsync(unreadCount).catch((e) => {
       console.error('setBadgeCountAsync error:', e);
     });
-  }, [unreadCount, unreadMessageCount]);
+  }, [unreadCount]);
 
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 

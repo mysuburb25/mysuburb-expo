@@ -99,13 +99,6 @@ service cloud.firestore {
                     && request.resource.data.commentCount == 0;
 
       allow update: if
-        // Owner editing their own post — covers both the original
-        // remove/restore + content/images path, and the newer Edit Post
-        // feature (description, price, and location fields). mentions +
-        // mentionedUserIds are included here since Edit Post can change
-        // who's @mentioned in a Community/Services post's own text.
-        // Kept in one clause since they're all "the owner editing their
-        // own content" and share the same authorization check.
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['isRemoved', 'content', 'images', 'videos', 'mediaOrder', 'description', 'price', 'eventLocation', 'lostFoundLocation', 'marketplaceType', 'isFree', 'isWanted', 'lostFoundType', 'serviceType', 'serviceTab', 'eventDate', 'eventPrice', 'mentions', 'mentionedUserIds']))
@@ -130,17 +123,12 @@ service cloud.firestore {
                .hasOnly(['savedBy'])
           && isValidArrayToggle('savedBy'))
         ||
-        // Anyone except the post's own author can register a view — once
-        // per person, never reversible, and never touching any other field.
         (isSignedIn()
           && request.auth.uid != resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['viewCount', 'viewedBy'])
           && isValidViewIncrement())
         ||
-        // closedAt travels alongside isSold/isResolved so the client can
-        // record exactly when a post was closed (used for the 24-hour
-        // grace period logic, and just generally useful data to have).
         (request.auth.uid == resource.data.authorId
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['isSold', 'closedAt']))
@@ -168,11 +156,6 @@ service cloud.firestore {
           && request.resource.data.content == '[This comment was deleted]'
           && request.resource.data.isDeleted == true)
         ||
-        // Admin removing someone ELSE's comment — same soft-delete shape
-        // as the author path above, but with its own distinct placeholder
-        // text so the UI can show "removed by an admin" rather than the
-        // ordinary self-delete message. isAdmin() already implies
-        // isSignedIn(), so no separate check needed here.
         (isAdmin()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'isDeleted'])
           && request.resource.data.content == '[Deleted by Admin]'
@@ -216,10 +199,6 @@ service cloud.firestore {
           return request.auth.uid in recipientDoc.data.get('blockedUserIds', []);
         }
 
-        // One-way only, matching isValidViewIncrement's pattern above — a
-        // message can be added to deletedFor (hidden from that person's
-        // own view) but never removed, since there's no "undo delete for
-        // me" flow in the app.
         function isValidDeletedForAdd() {
           let beforeArr = resource.data.get('deletedFor', []);
           let afterArr = request.resource.data.get('deletedFor', []);
@@ -238,16 +217,11 @@ service cloud.firestore {
                       && (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
                            ||
-                           // Sender unsending their own message — clears its
-                           // content and marks it unsent. One-way: unsent
-                           // must be true, there's no un-unsend.
                            (request.auth.uid == resource.data.senderId
                              && request.resource.data.diff(resource.data).affectedKeys()
                                   .hasOnly(['unsent', 'text', 'media', 'imageUrl', 'replyTo'])
                              && request.resource.data.unsent == true)
                            ||
-                           // Any participant hiding a message from their own
-                           // view only — the other person is unaffected.
                            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
                              && isValidDeletedForAdd())
                          );
@@ -287,15 +261,6 @@ service cloud.firestore {
         return isAdmin();
       }
 
-      // A mention can happen inside a comment OR directly inside a post's
-      // own content — commentId takes priority when both are present
-      // (a mention within a comment always includes the comment's parent
-      // postId too, for the "view post" link, so postId alone isn't
-      // enough to tell the two cases apart). Either way, the mentioned
-      // userId must actually appear in that document's mentionedUserIds
-      // array — a simple parallel array of just UIDs kept alongside the
-      // richer {uid, name} mentions array used for rendering, since rules
-      // can't cleanly check "is my UID in this array of objects".
       function isValidMentionNotification() {
         return (
           (request.resource.data.commentId is string
@@ -333,6 +298,20 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['status', 'resolvedAt', 'resolvedBy']);
       allow delete: if false;
+    }
+
+    // Deleted-account audit trail, shown on the admin dashboard's
+    // Deleted tab. Read-only from the client, admin-only — same pattern
+    // as reports above, since both are admin-facing data no ordinary
+    // user should be able to browse. Writes are always denied here
+    // (allow write: if false) because the only writer is the
+    // cleanupUserDataOnDelete Cloud Function, which uses the Admin SDK
+    // and bypasses these rules entirely regardless of what they say —
+    // denying client writes outright prevents anyone from forging a
+    // fake deletion record through this collection directly.
+    match /deletedUsers/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /{document=**} {
