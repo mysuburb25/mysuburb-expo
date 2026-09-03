@@ -305,6 +305,10 @@ exports.healthcheck = onRequest(async (req, res) => {
 // user's half of it.
 exports.cleanupUserDataOnDelete = onDocumentDeleted('users/{userId}', async (event) => {
   const deletedUserId = event.params.userId;
+  // The snapshot of the document as it existed the instant before
+  // deletion — still readable here even though the document itself is
+  // already gone from Firestore by the time this trigger fires.
+  const deletedData = event.data?.data() || {};
 
   try {
     const conversationsSnap = await db.collection('conversations')
@@ -357,6 +361,28 @@ exports.cleanupUserDataOnDelete = onDocumentDeleted('users/{userId}', async (eve
   } catch (e) {
     logger.error(`cleanupUserDataOnDelete error for user ${deletedUserId}:`, e);
   }
+
+  // Records this deletion for the admin dashboard's Deleted tab —
+  // reads the pendingDeletionBy/pendingDeletionByName/pendingDeletionEmail
+  // marker fields that whichever deletion path (self-service in
+  // delete-account.js, or admin via adminDeleteUser below) wrote onto
+  // this same document just before deleting it. Falls back to
+  // 'unknown' rather than failing outright if an older client version
+  // deletes an account without setting the marker — this audit trail
+  // being incomplete for one entry is better than the whole cleanup
+  // function throwing over it.
+  try {
+    await db.collection('deletedUsers').add({
+      uid: deletedUserId,
+      displayName: deletedData.displayName || 'Unknown',
+      email: deletedData.pendingDeletionEmail || null,
+      deletedAt: FieldValue.serverTimestamp(),
+      deletedBy: deletedData.pendingDeletionBy || 'unknown',
+      deletedByName: deletedData.pendingDeletionByName || null,
+    });
+  } catch (e) {
+    logger.error(`Failed to write deletedUsers record for ${deletedUserId}:`, e);
+  }
 });
 
 // ---------------------------------------------------------------------
@@ -406,6 +432,35 @@ exports.adminDeleteUser = onCall(async (request) => {
   const callerDoc = await db.collection('users').doc(callerUid).get();
   if (!callerDoc.exists || callerDoc.data().isAdmin !== true) {
     throw new HttpsError('permission-denied', 'Only admins can do this.');
+  }
+
+  // Email isn't stored on the Firestore profile itself (kept private
+  // in its own subcollection elsewhere in this app) — the Auth record
+  // is the reliable source for it. Captured here, before anything is
+  // deleted, and written onto the profile doc as a marker field below
+  // so cleanupUserDataOnDelete can still read it from the document's
+  // final snapshot after everything else is gone.
+  let targetEmail = null;
+  try {
+    const targetAuthRecord = await getAuth().getUser(targetUid);
+    targetEmail = targetAuthRecord.email || null;
+  } catch (e) {
+    // Auth record may already be missing in an edge case — not fatal,
+    // the deletedUsers record just won't have an email in that case.
+  }
+
+  try {
+    await db.collection('users').doc(targetUid).update({
+      pendingDeletionBy: 'admin',
+      pendingDeletionByName: callerDoc.data().displayName || 'Admin',
+      pendingDeletionEmail: targetEmail,
+    });
+  } catch (e) {
+    logger.error(`adminDeleteUser: failed to set deletion marker for ${targetUid}:`, e);
+    // Not fatal — proceeds with the deletion regardless. Worst case,
+    // the deletedUsers record this produces is missing the "by admin"
+    // detail, which cleanupUserDataOnDelete already falls back to
+    // 'unknown' for rather than failing outright.
   }
 
   try {

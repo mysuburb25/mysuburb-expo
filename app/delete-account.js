@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { EmailAuthProvider, reauthenticateWithCredential, deleteUser } from 'firebase/auth';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import AppName from '../components/AppName';
@@ -48,6 +48,29 @@ export default function DeleteAccountScreen() {
       // Firebase requires re-authentication before allowing account deletion.
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
+
+      // Marks who's deleting this account before anything is actually
+      // removed — read back later by the cleanupUserDataOnDelete Cloud
+      // Function (which fires automatically once the profile doc below
+      // is deleted) to build the admin dashboard's Deleted tab record.
+      // displayName/email come straight from the Auth object already in
+      // scope here — both were set at signup, so this needs no extra
+      // Firestore read. This write uses the same permission every other
+      // profile update in this app already relies on (updating your own
+      // user doc), so no new security rule is needed for it.
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          pendingDeletionBy: 'self',
+          pendingDeletionByName: null,
+          pendingDeletionEmail: user.email,
+        });
+      } catch (e) {
+        console.error('Failed to set deletion marker:', e);
+        // Not fatal — continues with the actual deletion regardless.
+        // Worst case, the resulting deletedUsers record is missing
+        // some detail, which the Cloud Function already falls back to
+        // 'unknown' for rather than failing outright.
+      }
 
       // Remove the private/push subcollection doc BEFORE the main profile
       // doc. deleteDoc only ever removes the exact document it's pointed

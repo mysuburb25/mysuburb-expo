@@ -9,12 +9,16 @@ import { useAuth } from '../context/AuthContext';
 import { Colors } from '../constants/theme';
 import AppName from '../components/AppName';
 
+// Reordered so the fixed row/flexBasis:30% layout below naturally wraps
+// into two rows of three: Overview, Posts, Reports on row one; Users,
+// Suspended, Deleted on row two.
 const TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'users', label: 'Users' },
   { key: 'posts', label: 'Posts' },
   { key: 'reports', label: 'Reports' },
+  { key: 'users', label: 'Users' },
   { key: 'suspended', label: 'Suspended' },
+  { key: 'deleted', label: 'Deleted' },
 ];
 
 const POSTS_COUNTER_RESET_DATE = Timestamp.fromDate(new Date('2026-08-21T00:00:00Z'));
@@ -53,6 +57,13 @@ export default function AdminDashboardScreen() {
 
   const [suspendedUsers, setSuspendedUsers] = useState([]);
   const [loadingSuspended, setLoadingSuspended] = useState(true);
+
+  // Deleted tab — sourced from the deletedUsers collection, written by
+  // the cleanupUserDataOnDelete Cloud Function whenever an account is
+  // removed (self-service or admin-initiated). Live listener, same
+  // pattern as Suspended, since new entries can appear at any time.
+  const [deletedUsers, setDeletedUsers] = useState([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(true);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -141,6 +152,19 @@ export default function AdminDashboardScreen() {
     }, (e) => {
       console.error(e);
       setLoadingSuspended(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    setLoadingDeleted(true);
+    const q = query(collection(db, 'deletedUsers'), orderBy('deletedAt', 'desc'), limit(200));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setDeletedUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoadingDeleted(false);
+    }, (e) => {
+      console.error(e);
+      setLoadingDeleted(false);
     });
     return () => unsubscribe();
   }, []);
@@ -729,6 +753,54 @@ export default function AdminDashboardScreen() {
             )}
           </View>
         )}
+
+        {activeTab === 'deleted' && (
+          <View style={styles.section}>
+            {loadingDeleted ? (
+              <ActivityIndicator color="#1B4F72" style={{ marginTop: 30 }} />
+            ) : deletedUsers.length === 0 ? (
+              <View style={styles.empty}>
+                <Ionicons name="trash-outline" size={48} color={Colors.lightGrey} />
+                <Text style={styles.emptyText}>No deleted accounts</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.userListCount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {deletedUsers.length}{deletedUsers.length >= 200 ? '+' : ''} deleted account{deletedUsers.length === 1 ? '' : 's'}
+                </Text>
+                {deletedUsers.map(u => (
+                  <View key={u.id} style={styles.deletedRow}>
+                    <View style={styles.deletedAvatar}>
+                      <Ionicons name="person-remove-outline" size={18} color={Colors.midGrey} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.userName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{u.displayName || 'Unknown'}</Text>
+                      <Text style={styles.userEmail} numberOfLines={1}>{u.email || 'No email'}</Text>
+                      <Text style={styles.userSuburb} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                        Deleted {formatDate(u.deletedAt)}
+                      </Text>
+                    </View>
+                    {u.deletedBy === 'admin' ? (
+                      <View style={styles.deletedByAdminBadge}>
+                        <Text style={styles.deletedByAdminBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                          By admin{u.deletedByName ? ` (${u.deletedByName})` : ''}
+                        </Text>
+                      </View>
+                    ) : u.deletedBy === 'self' ? (
+                      <View style={styles.deletedBySelfBadge}>
+                        <Text style={styles.deletedBySelfBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Self-deleted</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.deletedBySelfBadge}>
+                        <Text style={styles.deletedBySelfBadgeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Unknown</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={showWarnModal} transparent animationType="slide">
@@ -850,6 +922,16 @@ const styles = StyleSheet.create({
   suspendedSuburb: { fontSize: 12, color: Colors.midGrey, marginTop: 1 },
   unsuspendBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: Colors.brandGreen },
   unsuspendBtnText: { fontSize: 13, fontWeight: '700', color: Colors.brandGreen },
+
+  // Deleted tab — grey/muted styling throughout (no colored avatar
+  // background like Users/Suspended) since these are historical
+  // records, not active accounts you can act on.
+  deletedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#D5D5D5' },
+  deletedAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
+  deletedBySelfBadge: { backgroundColor: '#F0F0F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, maxWidth: 110 },
+  deletedBySelfBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.midGrey },
+  deletedByAdminBadge: { backgroundColor: '#FFF0F0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, maxWidth: 130 },
+  deletedByAdminBadgeText: { fontSize: 10, fontWeight: '800', color: '#E53935' },
 
   empty: { alignItems: 'center', paddingTop: 50, gap: 8 },
   emptyText: { fontSize: 15, color: Colors.midGrey },

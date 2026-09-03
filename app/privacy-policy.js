@@ -50,6 +50,7 @@ export default function PrivacyPolicyScreen() {
         <Text style={styles.body}>We retain your personal information for as long as your account is active, or as needed to provide the app to you.</Text>
         <Text style={styles.body}>If you delete your account, we remove your profile information and Firebase authentication record. We also permanently delete your private conversations, including all messages and any photos or videos sent within them.</Text>
         <Text style={styles.body}>Posts and comments you've made may remain visible to preserve the integrity of conversations they're part of, but they will no longer be linked to an active account or your personal details beyond the display name already shown at the time of posting.</Text>
+        <Text style={styles.body}>We also retain a minimal record of the deletion itself — your name, email address, and the date your account was deleted — for administrative purposes such as verifying that a deletion request was actioned and maintaining accountability for account removals. This record does not include your password, posts, messages, or any other account content.</Text>
         {renderTextWithEmail('If you would like your posts and comments removed as well as your account, contact us at support@mysuburb.app and we will action this within a reasonable time.', 'support@mysuburb.app', styles.body, styles.emailLink)}
 
         <Text style={styles.heading}>6. Your Rights and How to Complain</Text>
