@@ -12,7 +12,7 @@ import PostCard from '../../components/PostCard';
 
 const FILTERS = [
   { key: 'all', label: 'All', createCategory: 'community', preselect: 'updates' },
-  { key: 'updates', label: 'General', createCategory: 'community', preselect: 'updates' },
+  { key: 'updates', label: 'Generalsss', createCategory: 'community', preselect: 'updates' },
   { key: 'notices', label: 'Notices', createCategory: 'community', preselect: 'notices' },
   { key: 'safety', label: 'Alerts', createCategory: 'community', preselect: 'safety' },
 ];

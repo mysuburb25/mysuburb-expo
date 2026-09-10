@@ -41,6 +41,23 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
     const { token } = tokenSnap.data();
     if (!token) return;
 
+    // The recipient's current total unread count, sent as the push
+    // payload's own badge field — this is what makes the badge appear
+    // the moment the push is delivered, even when the app is fully
+    // closed. AuthContext.js's own badge-setting effect only runs
+    // while the app's JS is actually executing, so on its own it can
+    // only update the badge once the app is next opened — it can't do
+    // anything while the app isn't running at all. Counted fresh here
+    // rather than reused from elsewhere, since this function fires
+    // after the triggering notification doc is already committed to
+    // Firestore, so it's naturally already included in this count.
+    const unreadSnap = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .where('isRead', '==', false)
+      .count()
+      .get();
+    const badgeCount = unreadSnap.data().count;
+
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
@@ -52,6 +69,7 @@ exports.sendPushOnNotification = onDocumentCreated('notifications/{notificationI
         title: 'My Suburb',
         body: message,
         sound: 'default',
+        badge: badgeCount,
         data: { type: type || null, postId: postId || null, conversationId: conversationId || null },
       }),
     });
