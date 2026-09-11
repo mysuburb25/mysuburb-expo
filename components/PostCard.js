@@ -8,8 +8,15 @@ import { Colors } from '../constants/theme';
 import { getOrderedMedia } from '../utils/mediaOrder';
 import LinkifiedText from '../components/LinkifiedText';
 
+// Card width is the full screen width minus the feed's own horizontal
+// padding — computed once, synchronously, at module load. This replaces
+// an earlier onLayout-based measurement that wasn't reliably firing on
+// some Android devices, which left the image carousel stuck at 0 width
+// forever — since the wrapping View has no explicit height of its own,
+// it would then collapse to nothing, revealing the plain white card
+// background right where the photo should have been.
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_IMAGE_WIDTH = SCREEN_WIDTH - 32;
+const CARD_IMAGE_WIDTH = SCREEN_WIDTH - 32; // matches the feed's horizontal padding (16 each side)
 
 const CATEGORY_CONFIG = {
   updates:     { label: 'General', bg: Colors.brandGreen },
@@ -31,6 +38,11 @@ function formatDate(date) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// Plays directly inline in the small card carousel — "small screen
+// mode" — rather than just showing a static thumbnail that requires
+// navigating to the post to actually watch. Native controls handle
+// their own tap/scrub interaction, so this deliberately isn't wrapped
+// in a navigate-on-press TouchableOpacity the way photo items are.
 function CardVideoPlayer({ url, width, isActive }) {
   const videoViewRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -38,6 +50,12 @@ function CardVideoPlayer({ url, width, isActive }) {
     p.loop = false;
   });
 
+  // Tracks the player's own playing state so the play-button overlay
+  // below only shows while paused/not-yet-started — once someone taps
+  // play, it disappears, and comes back if they pause again. Without
+  // this, a video looked identical to a photo at a glance until you
+  // actually touched it, since expo-video's native controls only
+  // appear on interaction rather than being permanently visible.
   useEffect(() => {
     const sub = player.addListener('playingChange', (event) => {
       setIsPlaying(event.isPlaying);
@@ -45,6 +63,9 @@ function CardVideoPlayer({ url, width, isActive }) {
     return () => sub.remove();
   }, [player]);
 
+  // Pause and rewind to the start the moment this item scrolls out of
+  // view in the carousel — without this, a video kept playing invisibly
+  // in the background (audio and all) after swiping to the next photo.
   useEffect(() => {
     if (isActive) return;
     player.pause();
@@ -138,17 +159,7 @@ export default function PostCard({ item, currentUserUid, newCutoff, onLikeToggle
 
       <TouchableOpacity onPress={() => router.push('/post/' + item.id)} activeOpacity={0.85}>
         <View style={styles.cardBody}>
-          {/* Bold reserved for marketplace/lostfound only, matching the
-              same distinction already used on the post detail screen
-              (post-detail.js) — General/Notices/Alerts/Events/Services
-              all render at regular weight here, rather than every
-              category being bolded the same way regardless of type. */}
-          <LinkifiedText
-            text={item.content}
-            style={(item.category === 'marketplace' || item.category === 'lostfound') ? styles.content : styles.contentRegular}
-            linkStyle={styles.contentLink}
-            numberOfLines={4}
-          />
+          <LinkifiedText text={item.content} style={styles.content} linkStyle={styles.contentLink} numberOfLines={4} />
         </View>
       </TouchableOpacity>
       <View style={styles.footer}>
@@ -191,7 +202,6 @@ const styles = StyleSheet.create({
   authorName: { fontSize: 17, fontWeight: '700', color: Colors.charcoal },
   postedText: { fontSize: 12, color: Colors.midGrey, fontStyle: 'italic', marginTop: 2 },
   content: { fontSize: 15, color: Colors.charcoal, lineHeight: 22, fontWeight: '700' },
-  contentRegular: { fontSize: 15, color: Colors.charcoal, lineHeight: 22 },
   contentLink: { color: '#1565C0', textDecorationLine: 'underline' },
   footer: { flexDirection: 'row', gap: 16, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EFEFEF', borderTopWidth: 1.5, borderTopColor: '#E0E0E0' },
   footerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
