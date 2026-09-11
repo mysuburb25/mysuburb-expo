@@ -36,10 +36,6 @@ function formatTime(date) {
   return d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Shortens a full Google Places address down to venue/street/suburb only —
-// drops the trailing state and "Australia" that Places always appends,
-// since that's noise for a quick glance at an event card. The FULL address
-// is still what's stored and used for the actual "Get Directions" link.
 function shortenLocation(loc) {
   if (!loc) return '';
   let parts = loc.split(',').map(p => p.trim()).filter(Boolean);
@@ -58,12 +54,6 @@ function isToday(date) {
   return date.toDateString() === today.toDateString();
 }
 
-// Defined at module level, not inside EventsScreen, so React treats it as the
-// same component across renders — keeping it inside the screen would recreate
-// it on every keystroke and cause the selected photos to flicker.
-// Media: 8 total (photos + videos combined) — same model as
-// app/create-post.js. Kept in sync since events use a fully separate
-// creation flow, not the shared one.
 const MAX_MEDIA = 8;
 const MAX_VIDEO_DURATION_SEC = 120;
 const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
@@ -119,7 +109,7 @@ const DATE_FILTERS = [
   { key: 'later', label: 'Later' },
 ];
 
-const PAGE_SIZE = 15; // used for both the initial load and every Load More tap
+const PAGE_SIZE = 15;
 
 export default function EventsScreen() {
   const { profile, user, unreadMessageCount, updateUserProfile } = useAuth();
@@ -127,11 +117,6 @@ export default function EventsScreen() {
   const [newCutoff, setNewCutoff] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Only actually shows the spinner if loading takes longer than 200ms —
-  // fast loads (the common case) never flash a spinner at all, which
-  // reads as noticeably smoother than a spinner that flickers on for a
-  // fraction of a second before content replaces it. Genuinely slow
-  // loads still show the spinner normally once they cross the threshold.
   const [showSpinner, setShowSpinner] = useState(false);
   useEffect(() => {
     if (!loading) { setShowSpinner(false); return; }
@@ -140,7 +125,7 @@ export default function EventsScreen() {
   }, [loading]);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('upcoming');
-  const [dateFilter, setDateFilter] = useState('all'); // 'all' | 'today' | 'weekend' — only applies to the Upcoming tab
+  const [dateFilter, setDateFilter] = useState('all');
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -159,10 +144,8 @@ export default function EventsScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [posting, setPosting] = useState(false);
-  // One combined, ordered array — see app/create-post.js for the full
-  // reasoning (kept in sync since events use a separate creation flow).
   const [media, setMedia] = useState([]);
-  const [priceType, setPriceType] = useState('free'); // 'free' or 'paid'
+  const [priceType, setPriceType] = useState('free');
   const [eventPrice, setEventPrice] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -173,16 +156,9 @@ export default function EventsScreen() {
   const cursorsRef = useRef({});
   const exhaustedRef = useRef({});
   const scrollRef = useRef(null);
-  // Lets the focus effect check "do we already have events?" without
-  // needing events itself as a dependency.
   const eventsRef = useRef([]);
   useEffect(() => { eventsRef.current = events; }, [events]);
 
-  // Reached from post/[id].js's "Edit Post" menu option on an event —
-  // fetches the event and pre-fills the same New Event form, then opens
-  // it automatically, same idea as create-post.js's edit mode but for
-  // events specifically, since New Event lives here as its own modal
-  // rather than being routable on its own.
   useEffect(() => {
     if (!editEventId) return;
     setLoadingEditEvent(true);
@@ -219,10 +195,6 @@ export default function EventsScreen() {
     })();
   }, [editEventId]);
 
-  // "Added to calendar" is inherently a per-device fact (it lives in the
-  // phone's own calendar app, not our account data), so it's tracked in
-  // AsyncStorage rather than Firestore — checked once whenever the visible
-  // event list changes, so re-renders don't keep re-adding duplicates.
   useEffect(() => {
     if (events.length === 0) return;
     (async () => {
@@ -239,7 +211,7 @@ export default function EventsScreen() {
 
   const fetchLocationSuggestions = async (text) => {
     const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-    if (!apiKey) return; // Autocomplete silently does nothing if no key is configured yet
+    if (!apiKey) return;
     setLoadingSuggestions(true);
     try {
       const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
@@ -277,7 +249,6 @@ export default function EventsScreen() {
       setShowLocationSuggestions(false);
       return;
     }
-    // Debounce so we don't fire a request on every keystroke.
     locationDebounceRef.current = setTimeout(() => fetchLocationSuggestions(text.trim()), 350);
   };
 
@@ -295,7 +266,6 @@ export default function EventsScreen() {
     const currentProfile = profileRef.current;
     if (!currentProfile?.suburb) { setLoading(false); setRefreshing(false); setLoadingMore(false); return; }
     try {
-      // Active suburbs (suburb + state pair) — falls back to primary if suburbs array isn't set yet
       const activeSuburbs = currentProfile?.suburbs
         ? currentProfile.suburbs.filter(s => s.active).map(s => ({ suburb: s.suburb, state: s.state }))
         : [{ suburb: currentProfile.suburb, state: currentProfile.state }];
@@ -312,13 +282,6 @@ export default function EventsScreen() {
         return;
       }
 
-      // Run one query per active (non-exhausted) suburb, in parallel, always
-      // scoped by BOTH suburb and state (suburb names repeat across
-      // Australian states, so suburb alone isn't a safe filter). Each
-      // continues from its own cursor if one exists. Note: this paginates
-      // by createdAt (post creation order), same as before pagination
-      // existed — the Upcoming/Past/date-filter/search splitting still
-      // happens client-side on whatever's been loaded so far.
       const queryPromises = suburbsToQuery.map(({ suburb, state }) => {
         const key = `${suburb}|${state}`;
         const constraints = [
@@ -370,24 +333,16 @@ export default function EventsScreen() {
   };
 
   useFocusEffect(useCallback(() => {
-    // Only show the full-screen spinner when we have nothing yet — see
-    // app/(tabs)/index.js for the full explanation.
     if (eventsRef.current.length === 0) {
       setLoading(true);
     }
     fetchEvents();
 
-    // Capture the cutoff BEFORE updating it, so "NEW" badges stay visible
-    // for this entire visit — only the NEXT visit sees a fresh cutoff.
     const stored = profileRef.current?.lastVisited?.events;
     setNewCutoff(stored ? (stored.toDate ? stored.toDate() : new Date(stored)) : null);
 
     return () => {
       updateUserProfile({ lastVisited: { ...(profileRef.current?.lastVisited || {}), events: new Date() } });
-      // Close search when leaving the screen — otherwise it silently
-      // stays open in the background (this tab doesn't unmount when
-      // switching bottom tabs), so coming back later still shows the
-      // search bar even though the person never intended to search again.
       setShowSearch(false);
       setSearchQuery('');
     };
@@ -477,13 +432,6 @@ export default function EventsScreen() {
     router.push({ pathname: '/share-picker', params: { shareText: buildShareText(shareTarget), sharePostId: shareTarget.id } });
   };
 
-  // Native share sheet must wait for the custom Share modal to be FULLY
-  // gone before presenting — not just "probably gone after a guessed
-  // delay". iOS's Modal fires onDismiss at exactly that moment, so the
-  // share sheet call is deferred there instead of a fixed setTimeout,
-  // which was causing it to appear on top of the modal's still-fading
-  // overlay (a washed-out look) or fail to appear at all. Android's Modal
-  // doesn't support onDismiss, so it keeps a short fallback delay.
   const pendingExternalShareRef = useRef(false);
 
   const handleShareExternal = () => {
@@ -506,9 +454,6 @@ export default function EventsScreen() {
     }
   };
 
-  // Shared calendar helper defaults to a 1-hour duration since events only
-  // store a start time. Tracks which specific card is mid-add (by id) so
-  // only that card's button shows a spinner, not every card at once.
   const handleAddToCalendar = async (item) => {
     if (addedCalendarIds.has(item.id)) {
       Alert.alert('Already Added', 'This event is already in your calendar.');
@@ -528,9 +473,6 @@ export default function EventsScreen() {
     }
   };
 
-  // Single "Add Media" entry point — mirrors create-post.js. Camera and
-  // Library both accept either media type in one go; each result is
-  // appended to the single ordered `media` array.
   const handleAddMedia = () => {
     if (media.length >= MAX_MEDIA) {
       Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} photos and videos in total.`);
@@ -603,9 +545,6 @@ export default function EventsScreen() {
     setMedia(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Existing (already-uploaded) images keep their URL as-is — only
-  // freshly-picked local images need uploading. Mirrors create-post.js's
-  // same edit-mode handling.
   const uploadImages = async (postId, imageItems) => {
     const urls = [];
     for (let i = 0; i < imageItems.length; i++) {
@@ -623,9 +562,6 @@ export default function EventsScreen() {
     return urls;
   };
 
-  // Mirrors create-post.js's uploadVideos — uploads each video alongside
-  // its own thumbnail, and returns objects (not bare URLs) since
-  // duration travels with each one.
   const uploadVideos = async (postId, videoItems) => {
     const results = [];
     for (let i = 0; i < videoItems.length; i++) {
@@ -657,8 +593,6 @@ export default function EventsScreen() {
     return results;
   };
 
-  // Mirrors create-post.js's uploadMedia — splits by kind for upload,
-  // then reassembles pick order as mediaOrder.
   const uploadMedia = async (postId) => {
     const imageItems = media.filter(m => m.kind === 'image');
     const videoItems = media.filter(m => m.kind === 'video');
@@ -684,7 +618,6 @@ export default function EventsScreen() {
     if (priceType === 'paid' && !eventPrice.trim()) { Alert.alert('Error', 'Please enter a price, or switch to Free.'); return; }
     setPosting(true);
     try {
-      // --- Editing an existing event ---
       if (editingEventId) {
         const { images, videos, mediaOrder } = await uploadMedia(editingEventId);
         await updateDoc(doc(db, 'posts', editingEventId), {
@@ -699,7 +632,6 @@ export default function EventsScreen() {
         return;
       }
 
-      // --- Creating a new event ---
       const postRef = await addDoc(collection(db, 'posts'), {
         content: title.trim(), description: description.trim(),
         eventLocation: location.trim(), eventDate: eventDate,
@@ -727,8 +659,6 @@ export default function EventsScreen() {
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  // Upcoming weekend = the next Saturday/Sunday from today (inclusive of
-  // today if today itself is a Saturday or Sunday).
   const daysUntilSaturday = (6 - todayStart.getDay() + 7) % 7;
   const upcomingSaturday = new Date(todayStart);
   upcomingSaturday.setDate(todayStart.getDate() + daysUntilSaturday);
@@ -740,13 +670,7 @@ export default function EventsScreen() {
     if (searchQ && !(item.content?.toLowerCase().includes(searchQ) || item.description?.toLowerCase().includes(searchQ))) return false;
     if (!item.eventDate) return tab === 'upcoming';
     const ed = item.eventDate.toDate ? item.eventDate.toDate() : new Date(item.eventDate);
-    // Compare by calendar date, not exact time — an event happening later
-    // today shouldn't flip to "past" the moment its clock time passes if
-    // the day itself hasn't ended yet.
     const edDateOnly = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
-    // While actively searching, ignore both the Upcoming/Past tab and the
-    // Today/Weekend/Later sub-filter — search cuts across the whole Events
-    // category, matching every other screen's search behavior.
     if (!searchQ) {
       if (tab === 'past') return edDateOnly < todayStart;
       if (edDateOnly < todayStart) return false;
@@ -754,7 +678,6 @@ export default function EventsScreen() {
       if (dateFilter === 'weekend') {
         return edDateOnly.getTime() === upcomingSaturday.getTime() || edDateOnly.getTime() === upcomingSunday.getTime();
       }
-      // Everything from the Monday after this coming weekend onward.
       if (dateFilter === 'later') return edDateOnly.getTime() > upcomingSunday.getTime();
     }
     return true;
@@ -1042,12 +965,10 @@ export default function EventsScreen() {
         />
       )}
 
-      {tab === 'upcoming' && (
-        <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
-          <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
-          <Text style={styles.fabText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>New Event</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity style={styles.fab} onPress={() => setShowModal(true)}>
+        <Ionicons name="pencil-outline" size={16} color={Colors.brandGreen} />
+        <Text style={styles.fabText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>New Event</Text>
+      </TouchableOpacity>
 
       <Modal visible={showDateFilterModal} transparent animationType="slide">
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowDateFilterModal(false)}>
